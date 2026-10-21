@@ -27,8 +27,8 @@ jobs:
           cat > AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-              package="com.carlos.prisma3d" android:versionCode="5" android:versionName="0.5">
-              <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="34"/>
+              package="com.carlos.prisma3d" android:versionCode="6" android:versionName="0.6">
+              <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="34"/>
               <application android:label="Prisma 3D"
                   android:icon="@drawable/ic_launcher"
                   android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen">
@@ -61,6 +61,7 @@ jobs:
           package com.carlos.prisma3d;
 
           import android.app.Activity;
+          import android.content.ContentValues;
           import android.content.Intent;
           import android.database.Cursor;
           import android.graphics.Bitmap;
@@ -73,6 +74,7 @@ jobs:
           import android.opengl.GLUtils;
           import android.opengl.Matrix;
           import android.os.Bundle;
+          import android.provider.MediaStore;
           import android.provider.OpenableColumns;
           import android.text.Html;
           import android.view.Gravity;
@@ -90,10 +92,9 @@ jobs:
           import java.io.BufferedReader;
           import java.io.ByteArrayInputStream;
           import java.io.ByteArrayOutputStream;
-          import java.io.File;
-          import java.io.FileOutputStream;
           import java.io.InputStream;
           import java.io.InputStreamReader;
+          import java.io.OutputStream;
           import java.nio.ByteBuffer;
           import java.nio.ByteOrder;
           import java.nio.FloatBuffer;
@@ -113,8 +114,8 @@ jobs:
               static final int C_VIEW = 0xFF1F1F26;
               static final int C_FIELD = 0xFF22222A;
               static final int C_LINE = 0xFF2C2C36;
-              static final int C_TEXT = 0xFFE6E6EA;
-              static final int C_MUTED = 0xFF8A8A96;
+              static final int C_TEXT = 0xFFF0F0F4;
+              static final int C_MUTED = 0xFFA0A0AE;
               static final int C_ACCENT = 0xFF4F8CFF;
               static final int C_ACCENT_DIM = 0xFF263E6B;
               static final int MATCH = ViewGroup.LayoutParams.MATCH_PARENT;
@@ -128,21 +129,29 @@ jobs:
               static final float[] MAT_ROUGH = {0.9f, 0.4f, 0.2f, 0.06f};
               static final float[] MAT_METAL = {0f, 0f, 1f, 0f};
               static final float[][] PALETTE = {
-                  {0.91f, 0.49f, 0.05f}, {0.31f, 0.60f, 1f},
-                  {0.40f, 0.85f, 0.50f}, {0.85f, 0.40f, 0.85f}
+                  {0.95f, 0.45f, 0.10f}, {0.20f, 0.55f, 1f},
+                  {0.30f, 0.85f, 0.40f}, {0.90f, 0.30f, 0.70f}
               };
               static final float[][] AX_COL = {
-                  {0.95f, 0.35f, 0.35f}, {0.35f, 0.9f, 0.35f}, {0.35f, 0.6f, 1f}
+                  {1f, 0.25f, 0.25f}, {0.25f, 1f, 0.25f}, {0.25f, 0.55f, 1f}
               };
-              static final float[] SEL_COL = {0.31f, 0.55f, 1f};
-              static final float[] OFF_COL = {0.45f, 0.45f, 0.50f};
+              static final float[] SEL_COL = {1f, 0.6f, 0.1f};
+              static final float[] OFF_COL = {0.5f, 0.5f, 0.56f};
+              static final float[] SHADOW_M = {
+                  1f, 0f, 0f, 0f,
+                  -0.625f, 0f, -0.438f, 0f,
+                  0f, 0f, 1f, 0f,
+                  -0.625f, -1f, -0.438f, 1f
+              };
 
               static class GLPart { FloatBuffer buf; int count; int tex; }
               static class Part { float[] verts; Bitmap tex; }
               static class Model { String name; final List<Part> parts = new ArrayList<>(); }
               static class Obj {
                   String name;
-                  float x, y, z, rx, ry, rz, s = 1f;
+                  final float[] pos = new float[3];
+                  final float[] rot = new float[3];
+                  final float[] scl = {1f, 1f, 1f};
                   float[] col;
                   boolean selected, isCam;
                   int mat = 1;
@@ -178,7 +187,7 @@ jobs:
                   super.onCreate(b);
                   density = getResources().getDisplayMetrics().density;
 
-                  Obj cube = new Obj("Cube", PALETTE[0]);
+                  Obj cube = new Obj("Cubo", PALETTE[0]);
                   cube.selected = true;
                   cube.parts.add(cubeGL());
                   cube.box = boxEdges(cube.bmin, cube.bmax);
@@ -245,7 +254,7 @@ jobs:
                   Uri uri = data.getData();
                   if (req == REQ_MODEL) loadModelAsync(uri);
                   else if (req == REQ_TEX) loadImageAsync(uri, pendingTex, "Textura lista");
-                  else if (req == REQ_SKY) loadImageAsync(uri, pendingSky, "Sky cargado");
+                  else if (req == REQ_SKY) loadImageAsync(uri, pendingSky, "Cielo cargado");
               }
 
               static float clamp(float v, float lo, float hi) {
@@ -317,7 +326,8 @@ jobs:
               }
 
               private TextView railBtn(String label, final Runnable action) {
-                  TextView t = text(label, 12, C_MUTED);
+                  TextView t = text(label, 11, C_MUTED);
+                  t.setSingleLine(true);
                   t.setGravity(Gravity.CENTER);
                   t.setTypeface(null, Typeface.BOLD);
                   t.setOnClickListener(v -> action.run());
@@ -326,6 +336,7 @@ jobs:
 
               private TextView pill(String s, final Runnable r) {
                   TextView t = text(s, 13, 0xFFFFFFFF);
+                  t.setSingleLine(true);
                   t.setGravity(Gravity.CENTER);
                   t.setBackground(rounded(C_ACCENT, 18));
                   t.setPadding(dp(16), dp(8), dp(16), dp(8));
@@ -348,25 +359,25 @@ jobs:
                   for (int i = 0; i < 4; i++) {
                       final int idx = i;
                       toolBtns[i] = railBtn(TOOL_LABEL[i], () -> setTool(idx));
-                      tools.addView(toolBtns[i], lp(dp(54), dp(42)));
+                      tools.addView(toolBtns[i], lp(dp(76), dp(42)));
                   }
                   tools.addView(divider());
-                  tools.addView(railBtn("Add", () -> addCube()), lp(dp(54), dp(42)));
+                  tools.addView(railBtn("Add", () -> addCube()), lp(dp(76), dp(42)));
                   camBtn = railBtn("Cam", () -> toggleCamView());
-                  tools.addView(camBtn, lp(dp(54), dp(42)));
-                  tools.addView(railBtn("Mat", () -> cycleMaterial()), lp(dp(54), dp(42)));
-                  tools.addView(railBtn("Del", () -> deleteSelected()), lp(dp(54), dp(42)));
+                  tools.addView(camBtn, lp(dp(76), dp(42)));
+                  tools.addView(railBtn("Mat", () -> cycleMaterial()), lp(dp(76), dp(42)));
+                  tools.addView(railBtn("Del", () -> deleteSelected()), lp(dp(76), dp(42)));
                   tools.addView(divider());
-                  tools.addView(railBtn("Imp", () -> pickFile(REQ_MODEL, "*/*")), lp(dp(54), dp(42)));
+                  tools.addView(railBtn("Imp", () -> pickFile(REQ_MODEL, "*/*")), lp(dp(76), dp(42)));
                   tools.addView(railBtn("Tex", () -> {
                       if (selected() == null) toast("Selecciona un objeto");
                       else pickFile(REQ_TEX, "image/*");
-                  }), lp(dp(54), dp(42)));
-                  tools.addView(railBtn("Sky", () -> pickFile(REQ_SKY, "image/*")), lp(dp(54), dp(42)));
+                  }), lp(dp(76), dp(42)));
+                  tools.addView(railBtn("Sky", () -> pickFile(REQ_SKY, "image/*")), lp(dp(76), dp(42)));
                   tools.addView(divider());
-                  tools.addView(railBtn("Reset", () -> resetView()), lp(dp(54), dp(42)));
+                  tools.addView(railBtn("Reset", () -> resetView()), lp(dp(76), dp(42)));
                   rail.addView(tools);
-                  row.addView(rail, new LinearLayout.LayoutParams(dp(68), MATCH));
+                  row.addView(rail, new LinearLayout.LayoutParams(dp(88), MATCH));
 
                   LinearLayout center = vbox();
                   LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, MATCH, 1f);
@@ -379,8 +390,9 @@ jobs:
                   header.setPadding(dp(14), dp(6), dp(6), dp(6));
                   TextView title = text("Prisma 3D", 15, C_TEXT);
                   title.setTypeface(null, Typeface.BOLD);
+                  title.setSingleLine(true);
                   header.addView(title, new LinearLayout.LayoutParams(0, WRAP, 1f));
-                  modeBtn = pill("Solido", () -> toggleReal());
+                  modeBtn = pill("Real", () -> toggleReal());
                   header.addView(modeBtn, gapped());
                   header.addView(pill("Render", () -> renderer.requestCapture()), gapped());
                   LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(MATCH, WRAP);
@@ -398,17 +410,20 @@ jobs:
                   ol.setMargins(dp(14), dp(12), dp(14), dp(12));
                   vp.addView(overlay, ol);
 
-                  TextView gizmo = text("", 12, C_TEXT);
+                  TextView gizmo = text("", 13, C_TEXT);
                   gizmo.setText(Html.fromHtml(
-                      "<font color='#E84C4C'><b>X</b></font>&nbsp;&nbsp;"
-                      + "<font color='#6BCB4B'><b>Y</b></font>&nbsp;&nbsp;"
-                      + "<font color='#4C8CE8'><b>Z</b></font>"));
+                      "<font color='#FF4040'><b>X</b></font>&nbsp;&nbsp;"
+                      + "<font color='#40FF40'><b>Y</b></font>&nbsp;&nbsp;"
+                      + "<font color='#4090FF'><b>Z</b></font>"));
                   FrameLayout.LayoutParams gl = new FrameLayout.LayoutParams(WRAP, WRAP,
                       Gravity.TOP | Gravity.END);
                   gl.setMargins(dp(14), dp(12), dp(14), dp(12));
                   vp.addView(gizmo, gl);
 
-                  TextView hint = text("Arrastra: girar  \u00B7  Pellizco: zoom  \u00B7  Arrastra un eje: transformar", 10, C_MUTED);
+                  TextView hint = text("Arrastra: girar  \u00B7  Pellizco: zoom  \u00B7  Toca un eje: transformar eje", 11, C_TEXT);
+                  hint.setSingleLine(true);
+                  hint.setBackground(rounded(0xB01A1A1F, 8));
+                  hint.setPadding(dp(8), dp(4), dp(8), dp(4));
                   FrameLayout.LayoutParams hl = new FrameLayout.LayoutParams(WRAP, WRAP,
                       Gravity.BOTTOM | Gravity.START);
                   hl.setMargins(dp(14), dp(12), dp(14), dp(12));
@@ -418,26 +433,26 @@ jobs:
 
                   LinearLayout side = vbox();
                   side.setBackground(rounded(C_PANEL, 14));
-                  side.setPadding(dp(12), dp(12), dp(12), dp(12));
-                  side.addView(text("OUTLINER", 10, C_MUTED));
+                  side.setPadding(dp(10), dp(10), dp(10), dp(10));
+                  side.addView(text("ESCENA", 10, C_MUTED));
                   outliner = vbox();
                   ScrollView sc = new ScrollView(this);
                   sc.addView(outliner);
                   side.addView(sc, new LinearLayout.LayoutParams(MATCH, 0, 1f));
 
-                  TextView ph = text("PROPERTIES", 10, C_MUTED);
+                  TextView ph = text("PROPIEDADES", 10, C_MUTED);
                   LinearLayout.LayoutParams php = new LinearLayout.LayoutParams(MATCH, WRAP);
-                  php.setMargins(0, dp(10), 0, dp(6));
+                  php.setMargins(0, dp(8), 0, dp(6));
                   side.addView(ph, php);
 
                   LinearLayout props = vbox();
                   props.setBackground(rounded(C_FIELD, 10));
-                  props.setPadding(dp(10), dp(8), dp(10), dp(8));
-                  propName = text("", 13, C_TEXT);
-                  propLoc = text("", 11, C_MUTED);
-                  propRot = text("", 11, C_MUTED);
-                  propScale = text("", 11, C_MUTED);
-                  propMat = text("", 11, C_MUTED);
+                  props.setPadding(dp(8), dp(6), dp(8), dp(6));
+                  propName = text("", 12, C_TEXT);
+                  propLoc = text("", 10, C_MUTED);
+                  propRot = text("", 10, C_MUTED);
+                  propScale = text("", 10, C_MUTED);
+                  propMat = text("", 10, C_MUTED);
                   props.addView(propName);
                   props.addView(propLoc);
                   props.addView(propRot);
@@ -445,7 +460,7 @@ jobs:
                   props.addView(propMat);
                   side.addView(props, new LinearLayout.LayoutParams(MATCH, WRAP));
 
-                  row.addView(side, new LinearLayout.LayoutParams(dp(220), MATCH));
+                  row.addView(side, new LinearLayout.LayoutParams(dp(170), MATCH));
 
                   highlightTools();
                   return root;
@@ -601,30 +616,20 @@ jobs:
                   return new float[]{c, s, 0};
               }
 
-              static float[] shadowMatrix() {
-                  float dx = -0.4f, dy = -0.8f, dz = -0.6f, g = -0.999f;
-                  return new float[]{
-                      dy, 0, 0, 0,
-                      -dx, 0, -dz, 0,
-                      0, 0, dy, 0,
-                      dx * g, g * dy, dz * g, dy
-                  };
-              }
-
               static void buildModel(Obj o, float[] m) {
                   Matrix.setIdentityM(m, 0);
-                  Matrix.translateM(m, 0, o.x, o.y, o.z);
-                  Matrix.rotateM(m, 0, o.rx, 1, 0, 0);
-                  Matrix.rotateM(m, 0, o.ry, 0, 1, 0);
-                  Matrix.rotateM(m, 0, o.rz, 0, 0, 1);
-                  Matrix.scaleM(m, 0, o.s, o.s, o.s);
+                  Matrix.translateM(m, 0, o.pos[0], o.pos[1], o.pos[2]);
+                  Matrix.rotateM(m, 0, o.rot[0], 1, 0, 0);
+                  Matrix.rotateM(m, 0, o.rot[1], 0, 1, 0);
+                  Matrix.rotateM(m, 0, o.rot[2], 0, 0, 1);
+                  Matrix.scaleM(m, 0, o.scl[0], o.scl[1], o.scl[2]);
               }
 
               static void camModel(Obj o, float[] m) {
                   Matrix.setIdentityM(m, 0);
-                  Matrix.translateM(m, 0, o.x, o.y, o.z);
-                  Matrix.rotateM(m, 0, o.ry, 0, 1, 0);
-                  Matrix.rotateM(m, 0, o.rx, 1, 0, 0);
+                  Matrix.translateM(m, 0, o.pos[0], o.pos[1], o.pos[2]);
+                  Matrix.rotateM(m, 0, o.rot[1], 0, 1, 0);
+                  Matrix.rotateM(m, 0, o.rot[0], 1, 0, 0);
               }
 
               static float pf(String s) {
@@ -888,21 +893,20 @@ jobs:
               }
 
               private Obj newCamera() {
-                  Obj c = new Obj("Camera", new float[]{1f, 1f, 1f});
+                  Obj c = new Obj("Camara", new float[]{1f, 1f, 1f});
                   c.isCam = true;
-                  c.x = 0f;
-                  c.y = 1.5f;
-                  c.z = 5f;
-                  c.rx = -16.7f;
+                  c.pos[1] = 1.5f;
+                  c.pos[2] = 5f;
+                  c.rot[0] = -16.7f;
                   return c;
               }
 
               private void addCube() {
                   counter++;
-                  Obj o = new Obj("Cube." + String.format(Locale.US, "%03d", counter),
+                  Obj o = new Obj("Cubo " + String.format(Locale.US, "%03d", counter),
                       PALETTE[counter % PALETTE.length]);
-                  o.x = (counter % 3 - 1) * 2.5f;
-                  o.z = (counter / 3 % 3 - 1) * 2.5f;
+                  o.pos[0] = (counter % 3 - 1) * 2.5f;
+                  o.pos[2] = (counter / 3 % 3 - 1) * 2.5f;
                   o.parts.add(cubeGL());
                   o.box = boxEdges(o.bmin, o.bmax);
                   addObj(o);
@@ -959,13 +963,15 @@ jobs:
                   Obj o = selected();
                   if (o == null) return -1;
                   float L = renderer.dist * 0.12f;
-                  float[] o2 = renderer.project(o.x, o.y, o.z);
+                  float[] o2 = renderer.project(o.pos[0], o.pos[1], o.pos[2]);
                   if (o2 == null) return -1;
-                  float best = dp(28);
+                  float best = dp(32);
                   int hit = -1;
                   for (int a = 0; a < 3; a++) {
-                      float[] t2 = renderer.project(o.x + (a == 0 ? L : 0), o.y + (a == 1 ? L : 0),
-                          o.z + (a == 2 ? L : 0));
+                      float[] t2 = renderer.project(
+                          o.pos[0] + (a == 0 ? L : 0),
+                          o.pos[1] + (a == 1 ? L : 0),
+                          o.pos[2] + (a == 2 ? L : 0));
                       if (t2 == null) continue;
                       float d = segDist(px, py, o2[0], o2[1], t2[0], t2[1]);
                       if (d < best) { best = d; hit = a; }
@@ -973,53 +979,34 @@ jobs:
                   return hit;
               }
 
-              private static void addAxis(Obj o, int a, float v) {
-                  if (a == 0) o.x += v;
-                  else if (a == 1) o.y += v;
-                  else o.z += v;
-              }
-
-              private static void addRot(Obj o, int a, float v) {
-                  if (a == 0) o.rx += v;
-                  else if (a == 1) o.ry += v;
-                  else o.rz += v;
+              private void applyAxis(Obj o, int a, float dx, float dy) {
+                  float L = renderer.dist * 0.12f;
+                  float[] o2 = renderer.project(o.pos[0], o.pos[1], o.pos[2]);
+                  float[] t2 = renderer.project(
+                      o.pos[0] + (a == 0 ? L : 0),
+                      o.pos[1] + (a == 1 ? L : 0),
+                      o.pos[2] + (a == 2 ? L : 0));
+                  if (o2 == null || t2 == null) return;
+                  float ux = t2[0] - o2[0], uy = t2[1] - o2[1];
+                  float len = (float) Math.sqrt(ux * ux + uy * uy);
+                  if (len < 1f) return;
+                  float along = (dx * ux + dy * uy) / len;
+                  if (tool == TOOL_MOV) {
+                      o.pos[a] += along * (L / len);
+                  } else if (tool == TOOL_ROT) {
+                      o.rot[a] += along * 0.6f;
+                  } else if (tool == TOOL_SCA && !o.isCam) {
+                      o.scl[a] = clamp(o.scl[a] + along * 0.01f, 0.05f, 10f);
+                  }
               }
 
               private void onDrag(float dx, float dy) {
                   Obj sel = selected();
                   if (activeAxis >= 0 && sel != null && tool != TOOL_SEL) {
-                      float L = renderer.dist * 0.12f;
-                      float[] o2 = renderer.project(sel.x, sel.y, sel.z);
-                      float[] t2 = renderer.project(sel.x + (activeAxis == 0 ? L : 0),
-                          sel.y + (activeAxis == 1 ? L : 0), sel.z + (activeAxis == 2 ? L : 0));
-                      if (o2 != null && t2 != null) {
-                          float ux = t2[0] - o2[0], uy = t2[1] - o2[1];
-                          float len = (float) Math.sqrt(ux * ux + uy * uy);
-                          if (len > 1f) {
-                              float along = (dx * ux + dy * uy) / len;
-                              float perp = (-dx * uy + dy * ux) / len;
-                              if (tool == TOOL_MOV) addAxis(sel, activeAxis, along * L / len);
-                              else if (tool == TOOL_ROT) addRot(sel, activeAxis, perp * 0.8f);
-                              else sel.s = clamp(sel.s + along * 0.004f, 0.1f, 5f);
-                          }
-                      }
-                      updateProps();
-                      return;
-                  }
-                  synchronized (scene) {
-                      if (tool == TOOL_SEL || sel == null) {
-                          renderer.rotY += dx * 0.4f;
-                          renderer.rotX += dy * 0.4f;
-                      } else if (tool == TOOL_MOV) {
-                          float k = renderer.dist * 0.002f;
-                          sel.x += dx * k;
-                          sel.z += dy * k;
-                      } else if (tool == TOOL_ROT) {
-                          sel.ry += dx * 0.5f;
-                          sel.rx += dy * 0.5f;
-                      } else {
-                          sel.s = clamp(sel.s - dy * 0.004f, 0.1f, 5f);
-                      }
+                      applyAxis(sel, activeAxis, dx, dy);
+                  } else if (!renderer.camView) {
+                      renderer.rotY += dx * 0.4f;
+                      renderer.rotX += dy * 0.4f;
                   }
                   updateProps();
               }
@@ -1029,8 +1016,8 @@ jobs:
                   synchronized (scene) {
                       for (final Obj o : scene) {
                           String icon = o.isCam ? "\u25C9  " : "\u25A2  ";
-                          TextView r = text(icon + o.name, 13, o.selected ? C_TEXT : C_MUTED);
-                          r.setPadding(dp(8), dp(7), dp(8), dp(7));
+                          TextView r = text(icon + o.name, 12, o.selected ? C_TEXT : C_MUTED);
+                          r.setPadding(dp(8), dp(6), dp(8), dp(6));
                           if (o.selected) r.setBackground(rounded(C_ACCENT_DIM, 8));
                           r.setOnClickListener(v -> select(o));
                           LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(MATCH, WRAP);
@@ -1056,23 +1043,25 @@ jobs:
                       return;
                   }
                   propName.setText(o.name);
-                  propLoc.setText(String.format(Locale.US, "Posicion  %.2f  %.2f  %.2f", o.x, o.y, o.z));
-                  propRot.setText(String.format(Locale.US, "Rotacion  %.0f\u00B0  %.0f\u00B0  %.0f\u00B0",
-                      o.rx, o.ry, o.rz));
+                  propLoc.setText(String.format(Locale.US, "Pos  %.2f  %.2f  %.2f",
+                      o.pos[0], o.pos[1], o.pos[2]));
+                  propRot.setText(String.format(Locale.US, "Rot  %.0f\u00B0  %.0f\u00B0  %.0f\u00B0",
+                      o.rot[0], o.rot[1], o.rot[2]));
                   propScale.setText(o.isCam ? "Campo de vision  45\u00B0"
-                      : String.format(Locale.US, "Escala  %.2f", o.s));
+                      : String.format(Locale.US, "Escala  %.2f  %.2f  %.2f",
+                          o.scl[0], o.scl[1], o.scl[2]));
                   propMat.setText(o.isCam ? ""
-                      : "Material  " + MAT_NAME[o.mat] + "   R " + String.format(Locale.US, "%.2f", MAT_ROUGH[o.mat])
-                      + "   M " + String.format(Locale.US, "%.0f", MAT_METAL[o.mat]));
+                      : MAT_NAME[o.mat] + "  R " + String.format(Locale.US, "%.2f", MAT_ROUGH[o.mat])
+                      + "  M " + String.format(Locale.US, "%.0f", MAT_METAL[o.mat]));
               }
 
-              private void makeObjFromModel(Model m) {
-                  // used by renderer thread through processPending
+              private Obj makeObjFromModel(Model m) {
+                  return null;
               }
 
               class Renderer implements GLSurfaceView.Renderer {
                   volatile float rotX = 25f, rotY = 35f, dist = 10f;
-                  volatile boolean real, camView, capture, hasSky, ready;
+                  volatile boolean real = true, camView, capture, hasSky, ready;
                   volatile int vw = 1, vh = 1;
                   private int skyId, prog, progSky;
                   private int aPos, aNrm, aUv, uMvp, uModel, uTint, uUseTex, uTex, uReal, uShadow, uCam,
@@ -1083,9 +1072,9 @@ jobs:
                   private final FloatBuffer[] ringBufs = new FloatBuffer[3];
                   private final float[] proj = new float[16], view = new float[16], inv = new float[16];
                   private final float[] model = new float[16], tmp = new float[16], mvp = new float[16];
-                  private final float[] vp = new float[16], vr = new float[16], invVP = new float[16], sm = new float[16];
+                  private final float[] vp = new float[16], vr = new float[16], invVP = new float[16];
+                  private final float[] sm = new float[16], gm = new float[16];
                   private final float[] lastVP = new float[16];
-                  private final float[] shadowM = shadowMatrix();
 
                   private static final String MAIN_VS =
                       "attribute vec3 aPos; attribute vec3 aNrm; attribute vec2 aUv;"
@@ -1101,28 +1090,38 @@ jobs:
                       + "uniform vec3 uTint; uniform sampler2D uTex; uniform float uUseTex;"
                       + "uniform float uReal; uniform float uShadow; uniform vec3 uCam;"
                       + "uniform float uRough; uniform float uMetal; uniform vec3 uHor; uniform vec3 uZen;"
+                      + "const vec3 SUN = vec3(0.497, 0.795, 0.348);"
                       + "vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.0,1.0); }"
+                      + "vec3 sky(vec3 d){"
+                      + " vec3 c = mix(uHor, uZen, pow(clamp(d.y,0.0,1.0),0.6));"
+                      + " c = mix(c, vec3(0.30,0.24,0.20), step(d.y,0.0));"
+                      + " c += vec3(1.0,0.9,0.7)*pow(max(dot(d,SUN),0.0),300.0)*3.0;"
+                      + " return c; }"
                       + "void main(){"
-                      + " if (uShadow > 0.5) { gl_FragColor = vec4(0.0,0.0,0.0,0.35); return; }"
+                      + " if (uShadow > 0.5) { gl_FragColor = vec4(0.0,0.0,0.0,0.4); return; }"
                       + " vec3 base = uTint;"
                       + " if (uUseTex > 0.5) base = texture2D(uTex, vUv).rgb * uTint;"
                       + " vec3 N = normalize(vN);"
-                      + " vec3 L = normalize(vec3(0.4,0.8,0.6));"
-                      + " float ndl = max(dot(N,L),0.0);"
-                      + " if (uReal < 0.5) { gl_FragColor = vec4(base*(0.35+0.65*ndl),1.0); return; }"
+                      + " if (uReal < 0.5) {"
+                      + "   float d = max(dot(N,SUN),0.0);"
+                      + "   gl_FragColor = vec4(base*(0.35+0.65*d),1.0); return; }"
                       + " vec3 V = normalize(uCam - vW);"
-                      + " vec3 H = normalize(L+V);"
-                      + " float shin = mix(160.0, 8.0, uRough);"
+                      + " vec3 R = reflect(-V, N);"
+                      + " float ndl = max(dot(N,SUN),0.0);"
+                      + " vec3 H = normalize(SUN + V);"
+                      + " float shin = mix(200.0, 6.0, uRough);"
                       + " float spec = pow(max(dot(N,H),0.0), shin) * (shin+8.0)/25.13;"
+                      + " vec3 amb = mix(vec3(0.22,0.18,0.16), vec3(0.35,0.5,0.85), N.y*0.5+0.5);"
                       + " vec3 F0 = mix(vec3(0.04), base, uMetal);"
-                      + " float fres = pow(1.0 - max(dot(N,V),0.0), 5.0);"
-                      + " vec3 env = mix(uHor, uZen, clamp(N.y*0.5+0.5,0.0,1.0));"
+                      + " float fres = pow(1.0-max(dot(N,V),0.0),5.0);"
                       + " vec3 kd = base*(1.0-uMetal);"
-                      + " vec3 col = kd*ndl*vec3(1.0,0.97,0.9)*1.3;"
-                      + " col += kd*env*0.45;"
-                      + " col += F0*spec*ndl*2.5;"
-                      + " col += (F0+(1.0-F0)*fres)*env*(1.0-uRough*0.8)*0.6;"
-                      + " col = aces(col);"
+                      + " vec3 sunCol = vec3(1.0,0.93,0.82);"
+                      + " vec3 col = kd*(sunCol*ndl*1.7 + amb*0.9);"
+                      + " col += F0*sunCol*spec*ndl*1.5;"
+                      + " col += (F0+(1.0-F0)*fres)*sky(R)*(1.0-uRough*0.6)*0.8;"
+                      + " col = aces(col*1.15);"
+                      + " float lum = dot(col, vec3(0.299,0.587,0.114));"
+                      + " col = clamp(mix(vec3(lum), col, 1.3), 0.0, 1.0);"
                       + " gl_FragColor = vec4(pow(col, vec3(0.4545)), 1.0); }";
 
                   private static final String SKY_VS =
@@ -1133,21 +1132,21 @@ jobs:
                   private static final String SKY_FS =
                       "precision mediump float; varying vec3 vDir;"
                       + "uniform sampler2D uSkyTex; uniform float uHasSky; uniform vec3 uHor; uniform vec3 uZen;"
+                      + "const vec3 SUN = vec3(0.497, 0.795, 0.348);"
                       + "vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.0,1.0); }"
+                      + "vec3 sky(vec3 d){"
+                      + " vec3 c = mix(uHor, uZen, pow(clamp(d.y,0.0,1.0),0.6));"
+                      + " c = mix(c, vec3(0.30,0.24,0.20), step(d.y,0.0));"
+                      + " c += vec3(1.0,0.9,0.7)*pow(max(dot(d,SUN),0.0),300.0)*3.0;"
+                      + " return c; }"
                       + "void main(){"
-                      + " vec3 d = normalize(vDir);"
-                      + " vec3 col;"
+                      + " vec3 d = normalize(vDir); vec3 col;"
                       + " if (uHasSky > 0.5) {"
                       + "   float u = atan(d.z, d.x)/6.28318 + 0.5;"
                       + "   float v = 0.5 + asin(clamp(d.y,-1.0,1.0))/3.14159;"
-                      + "   col = pow(texture2D(uSkyTex, vec2(u, 1.0 - v)).rgb, vec3(2.2));"
-                      + " } else {"
-                      + "   col = mix(uHor, uZen, pow(max(d.y,0.0),0.5));"
-                      + "   float sd = max(dot(d, normalize(vec3(0.4,0.8,0.6))),0.0);"
-                      + "   col += vec3(1.0,0.95,0.8)*(pow(sd,600.0)*4.0 + pow(sd,8.0)*0.25);"
-                      + "   if (d.y < 0.0) col = mix(col, uHor*0.35, 0.85);"
-                      + " }"
-                      + " col = aces(col);"
+                      + "   col = pow(texture2D(uSkyTex, vec2(u, 1.0-v)).rgb, vec3(2.2));"
+                      + " } else { col = sky(d); }"
+                      + " col = aces(col*1.1);"
                       + " gl_FragColor = vec4(pow(col, vec3(0.4545)), 1.0); }";
 
                   void requestCapture() {
@@ -1271,6 +1270,7 @@ jobs:
                       GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
                       GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
                       GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bmp, 0);
+                      GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
                       return t[0];
                   }
 
@@ -1384,22 +1384,22 @@ jobs:
                       GLES20.glUseProgram(progSky);
                       GLES20.glEnableVertexAttribArray(aSky);
                       GLES20.glUniformMatrix4fv(uInvVP, 1, false, invVP, 0);
-                      GLES20.glUniform3f(sHor, 0.70f, 0.76f, 0.86f);
-                      GLES20.glUniform3f(sZen, 0.25f, 0.42f, 0.75f);
+                      GLES20.glUniform3f(sHor, 0.62f, 0.78f, 0.98f);
+                      GLES20.glUniform3f(sZen, 0.10f, 0.35f, 0.92f);
                       GLES20.glUniform1f(sHas, hasSky ? 1f : 0f);
-                      GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+                      GLES20.glActiveTexture(GLES20.GL_TEXTURE1);
                       GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, skyId);
-                      GLES20.glUniform1i(sSkyTex, 0);
+                      GLES20.glUniform1i(sSkyTex, 1);
                       skyBuf.position(0);
                       GLES20.glVertexAttribPointer(aSky, 2, GLES20.GL_FLOAT, false, 0, skyBuf);
                       GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 3);
                       GLES20.glDisableVertexAttribArray(aSky);
+                      GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
                       GLES20.glDepthMask(true);
                   }
 
                   private void drawGizmo(Obj o) {
                       float L = dist * 0.12f;
-                      float[] m = new float[16];
                       GLES20.glDisable(GLES20.GL_DEPTH_TEST);
                       GLES20.glUniform1f(uReal, 0f);
                       GLES20.glUniform1f(uUseTex, 0f);
@@ -1407,21 +1407,20 @@ jobs:
                       for (int a = 0; a < 3; a++) {
                           float ex = a == 0 ? 1 : 0, ey = a == 1 ? 1 : 0, ez = a == 2 ? 1 : 0;
                           setTint(AX_COL[a]);
-                          Matrix.setIdentityM(m, 0);
-                          Matrix.translateM(m, 0, o.x, o.y, o.z);
-                          Matrix.scaleM(m, 0, L, L, L);
-                          setMats(m);
+                          Matrix.setIdentityM(gm, 0);
+                          Matrix.translateM(gm, 0, o.pos[0], o.pos[1], o.pos[2]);
+                          Matrix.scaleM(gm, 0, L, L, L);
+                          setMats(gm);
+                          draw(gAxis[a], GLES20.GL_LINES, 2);
                           if (tool == TOOL_ROT) {
                               draw(ringBufs[a], GLES20.GL_LINES, 96);
-                          } else {
-                              draw(gAxis[a], GLES20.GL_LINES, 2);
-                              float ms = L * (tool == TOOL_SCA ? 0.07f : 0.10f);
-                              Matrix.setIdentityM(m, 0);
-                              Matrix.translateM(m, 0, o.x + ex * L, o.y + ey * L, o.z + ez * L);
-                              Matrix.scaleM(m, 0, ms, ms, ms);
-                              setMats(m);
-                              draw(markerCube, GLES20.GL_TRIANGLES, 36);
                           }
+                          float ms = L * (tool == TOOL_SCA ? 0.09f : 0.12f);
+                          Matrix.setIdentityM(gm, 0);
+                          Matrix.translateM(gm, 0, o.pos[0] + ex * L, o.pos[1] + ey * L, o.pos[2] + ez * L);
+                          Matrix.scaleM(gm, 0, ms, ms, ms);
+                          setMats(gm);
+                          draw(markerCube, GLES20.GL_TRIANGLES, 36);
                       }
                       GLES20.glLineWidth(2f);
                       GLES20.glEnable(GLES20.GL_DEPTH_TEST);
@@ -1461,6 +1460,7 @@ jobs:
                       Matrix.multiplyMV(eye, 0, inv, 0, new float[]{0, 0, 0, 1}, 0);
 
                       boolean isReal = real;
+                      boolean doCapture = capture;
                       if (isReal) drawSky();
 
                       GLES20.glUseProgram(prog);
@@ -1469,13 +1469,13 @@ jobs:
                       GLES20.glUniform1f(uUseTex, 0f);
                       GLES20.glUniform1f(uShadow, 0f);
                       GLES20.glUniform3f(uCam, eye[0], eye[1], eye[2]);
-                      GLES20.glUniform3f(uHor, 0.70f, 0.76f, 0.86f);
-                      GLES20.glUniform3f(uZen, 0.25f, 0.42f, 0.75f);
+                      GLES20.glUniform3f(uHor, 0.62f, 0.78f, 0.98f);
+                      GLES20.glUniform3f(uZen, 0.10f, 0.35f, 0.92f);
 
                       GLES20.glUniform1f(uReal, 0f);
                       Matrix.setIdentityM(model, 0);
                       setMats(model);
-                      GLES20.glUniform3f(uTint, 0.30f, 0.30f, 0.34f);
+                      GLES20.glUniform3f(uTint, 0.32f, 0.32f, 0.38f);
                       draw(gridBuf, GLES20.GL_LINES, 80);
 
                       GLES20.glLineWidth(2f);
@@ -1486,14 +1486,14 @@ jobs:
                       setTint(AX_COL[2]);
                       draw(axisZ, GLES20.GL_LINES, 2);
 
+                      Obj sel = null;
                       synchronized (scene) {
-                          Obj sel = null;
                           if (isReal) {
                               GLES20.glUniform1f(uShadow, 1f);
                               for (Obj o : scene) {
                                   if (o.isCam) continue;
                                   buildModel(o, model);
-                                  Matrix.multiplyMM(sm, 0, shadowM, 0, model, 0);
+                                  Matrix.multiplyMM(sm, 0, SHADOW_M_MAT, 0, model, 0);
                                   setMats(sm);
                                   for (GLPart g : o.parts) draw(g.buf, GLES20.GL_TRIANGLES, g.count);
                               }
@@ -1535,11 +1535,11 @@ jobs:
                               draw(o.box, GLES20.GL_LINES, 24);
                           }
 
-                          if (sel != null && tool != TOOL_SEL) drawGizmo(sel);
+                          if (sel != null && tool != TOOL_SEL && !doCapture) drawGizmo(sel);
                       }
 
                       enableAttribs(false);
-                      if (capture) {
+                      if (doCapture) {
                           capture = false;
                           saveFrame();
                       }
@@ -1560,24 +1560,30 @@ jobs:
                           }
                       }
                       try {
-                          File dir = MainActivity.this.getExternalFilesDir(null);
                           String stamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
-                          File f = new File(dir, "render_" + stamp + ".png");
+                          ContentValues cv = new ContentValues();
+                          cv.put(MediaStore.Images.Media.DISPLAY_NAME, "render_" + stamp + ".png");
+                          cv.put(MediaStore.Images.Media.MIME_TYPE, "image/png");
+                          cv.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Prisma3D");
+                          Uri u = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv);
+                          if (u == null) throw new Exception("No se pudo crear el archivo");
                           Bitmap bmp = Bitmap.createBitmap(px, w, h, Bitmap.Config.ARGB_8888);
-                          FileOutputStream out = new FileOutputStream(f);
-                          bmp.compress(Bitmap.CompressFormat.PNG, 100, out);
-                          out.close();
-                          uiToast("Render guardado: " + f.getAbsolutePath());
+                          OutputStream os = getContentResolver().openOutputStream(u);
+                          bmp.compress(Bitmap.CompressFormat.PNG, 100, os);
+                          os.close();
+                          uiToast("Render guardado en Imagenes/Prisma3D");
                       } catch (Exception ex) {
                           uiToast("Error al guardar: " + ex.getMessage());
                       }
                   }
+
+                  private final float[] SHADOW_M_MAT = SHADOW_M;
               }
           }
           EOF
 
           javac -source 8 -target 8 -Xlint:-options -cp "$AJAR" -d out $(find src -name '*.java')
-          "$BT/d8" --release --min-api 21 --lib "$AJAR" --output build $(find out -name '*.class')
+          "$BT/d8" --release --min-api 29 --lib "$AJAR" --output build $(find out -name '*.class')
           "$BT/aapt" package -f -M AndroidManifest.xml -S res -I "$AJAR" -F build/base.apk
           (cd build && zip -j base.apk classes.dex)
           keytool -genkeypair -keystore debug.keystore -storepass android -keypass android \

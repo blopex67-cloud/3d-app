@@ -60,6 +60,18 @@ jobs:
                   versionCode = 1
                   versionName = "0.1.0"
               }
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
+              packaging {
+                  resources {
+                      excludes += setOf("META-INF/LICENSE*", "META-INF/NOTICE*", "META-INF/DEPENDENCIES", "META-INF/INDEX.LIST")
+                  }
+              }
           }
           dependencies {
               implementation("org.luaj:luaj-jse:3.0.1")
@@ -299,11 +311,21 @@ jobs:
           }
           EOF
 
-      - name: Compilar APK debug
-        uses: gradle/gradle-build-action@v3
+      - name: Preparar Gradle
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-          arguments: assembleDebug --stacktrace
+
+      - name: Compilar APK debug
+        shell: bash
+        run: gradle assembleDebug --console=plain --no-daemon 2>&1 | tee build.log; test ${PIPESTATUS[0]} -eq 0
+
+      - name: Resumen del error (si falla)
+        if: failure()
+        shell: bash
+        run: |
+          echo "=== Líneas clave del error ==="
+          grep -nE "^e: |error:|What went wrong|Execution failed|Caused by|Could not resolve|AAPT|Duplicate|Manifest merger|Missing class" build.log | head -40
 
       - name: Dejar APK descargable
         uses: actions/upload-artifact@v4

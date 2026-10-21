@@ -67,7 +67,6 @@ jobs:
                   glView.setEGLContextClientVersion(2);
                   renderer = new Renderer();
                   glView.setRenderer(renderer);
-                  glView.setRenderMode(GLSurfaceView.RENDERMODE_CONTINUOUS);
                   setContentView(glView);
               }
 

@@ -22,15 +22,18 @@ jobs:
           BT="$SDK/build-tools/34.0.0"
           AJAR="$SDK/platforms/android-34/android.jar"
 
-          mkdir -p src/com/carlos/prisma3d out build
+          mkdir -p src/com/carlos/prisma3d out build res/drawable
 
           cat > AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-              package="com.carlos.prisma3d" android:versionCode="1" android:versionName="0.1">
-              <uses-sdk android:minSdkVersion="16" android:targetSdkVersion="34"/>
-              <application android:label="Prisma 3D">
-                  <activity android:name=".MainActivity" android:exported="true">
+              package="com.carlos.prisma3d" android:versionCode="2" android:versionName="0.2">
+              <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="34"/>
+              <application android:label="Prisma 3D"
+                  android:icon="@drawable/ic_launcher"
+                  android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen">
+                  <activity android:name=".MainActivity" android:exported="true"
+                      android:screenOrientation="landscape">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN"/>
                           <category android:name="android.intent.category.LAUNCHER"/>
@@ -38,6 +41,20 @@ jobs:
                   </activity>
               </application>
           </manifest>
+          EOF
+
+          cat > res/drawable/ic_launcher.xml << 'EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp" android:height="108dp"
+              android:viewportWidth="108" android:viewportHeight="108">
+              <path android:fillColor="#2B2B2B" android:pathData="M0,0H108V108H0Z"/>
+              <path android:fillColor="#F0F0F0" android:pathData="M54,24L80,39L54,54L28,39Z"/>
+              <path android:fillColor="#B0B0B0" android:pathData="M28,39L54,54L54,84L28,69Z"/>
+              <path android:fillColor="#8A8A8A" android:pathData="M54,54L80,39L80,69L54,84Z"/>
+              <path android:strokeColor="#E87D0D" android:strokeWidth="3"
+                  android:strokeLineJoin="round"
+                  android:pathData="M54,24L80,39L80,69L54,84L28,69L28,39Z"/>
+          </vector>
           EOF
 
           cat > src/com/carlos/prisma3d/MainActivity.java << 'EOF'
@@ -48,7 +65,15 @@ jobs:
           import android.opengl.GLSurfaceView;
           import android.opengl.Matrix;
           import android.os.Bundle;
+          import android.text.Html;
+          import android.view.Gravity;
           import android.view.MotionEvent;
+          import android.view.ScaleGestureDetector;
+          import android.view.View;
+          import android.view.ViewGroup;
+          import android.widget.FrameLayout;
+          import android.widget.LinearLayout;
+          import android.widget.TextView;
           import java.nio.ByteBuffer;
           import java.nio.ByteOrder;
           import java.nio.FloatBuffer;
@@ -56,18 +81,61 @@ jobs:
           import javax.microedition.khronos.opengles.GL10;
 
           public class MainActivity extends Activity {
+              static final int BG = 0xFF3D3D3D;
+              static final int PANEL = 0xFF303030;
+              static final int DARK = 0xFF2B2B2B;
+              static final int TXT = 0xFFDDDDDD;
+              static final int ORANGE = 0xFFE87D0D;
+              static final int MATCH = ViewGroup.LayoutParams.MATCH_PARENT;
+              static final int WRAP = ViewGroup.LayoutParams.WRAP_CONTENT;
+
               private GLSurfaceView glView;
               private Renderer renderer;
+              private float density;
               private float lastX, lastY;
 
               @Override
               protected void onCreate(Bundle b) {
                   super.onCreate(b);
+                  density = getResources().getDisplayMetrics().density;
+
+                  renderer = new Renderer();
                   glView = new GLSurfaceView(this);
                   glView.setEGLContextClientVersion(2);
-                  renderer = new Renderer();
                   glView.setRenderer(renderer);
-                  setContentView(glView);
+
+                  final ScaleGestureDetector sgd = new ScaleGestureDetector(this,
+                      new ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                          @Override
+                          public boolean onScale(ScaleGestureDetector d) {
+                              renderer.dist = clamp(renderer.dist / d.getScaleFactor(), 3f, 25f);
+                              return true;
+                          }
+                      });
+
+                  glView.setOnTouchListener(new View.OnTouchListener() {
+                      @Override
+                      public boolean onTouch(View v, MotionEvent e) {
+                          sgd.onTouchEvent(e);
+                          switch (e.getActionMasked()) {
+                              case MotionEvent.ACTION_DOWN:
+                                  lastX = e.getX();
+                                  lastY = e.getY();
+                                  break;
+                              case MotionEvent.ACTION_MOVE:
+                                  if (!sgd.isInProgress() && e.getPointerCount() == 1) {
+                                      renderer.rotY += (e.getX() - lastX) * 0.4f;
+                                      renderer.rotX += (e.getY() - lastY) * 0.4f;
+                                  }
+                                  lastX = e.getX();
+                                  lastY = e.getY();
+                                  break;
+                          }
+                          return true;
+                      }
+                  });
+
+                  setContentView(buildUi());
               }
 
               @Override
@@ -82,27 +150,112 @@ jobs:
                   glView.onResume();
               }
 
-              @Override
-              public boolean onTouchEvent(MotionEvent e) {
-                  switch (e.getActionMasked()) {
-                      case MotionEvent.ACTION_DOWN:
-                          lastX = e.getX();
-                          lastY = e.getY();
-                          return true;
-                      case MotionEvent.ACTION_MOVE:
-                          renderer.rotY += (e.getX() - lastX) * 0.5f;
-                          renderer.rotX += (e.getY() - lastY) * 0.5f;
-                          lastX = e.getX();
-                          lastY = e.getY();
-                          return true;
+              static float clamp(float v, float lo, float hi) {
+                  return Math.max(lo, Math.min(hi, v));
+              }
+
+              private int dp(int v) {
+                  return Math.round(v * density);
+              }
+
+              private TextView tv(String s, int sp, int color, int pad) {
+                  TextView t = new TextView(this);
+                  t.setText(s);
+                  t.setTextSize(sp);
+                  t.setTextColor(color);
+                  t.setPadding(dp(pad), dp(pad), dp(pad), dp(pad));
+                  return t;
+              }
+
+              private LinearLayout row() {
+                  LinearLayout l = new LinearLayout(this);
+                  l.setOrientation(LinearLayout.HORIZONTAL);
+                  return l;
+              }
+
+              private LinearLayout col() {
+                  LinearLayout l = new LinearLayout(this);
+                  l.setOrientation(LinearLayout.VERTICAL);
+                  return l;
+              }
+
+              private View buildUi() {
+                  LinearLayout root = row();
+                  root.setBackgroundColor(BG);
+
+                  LinearLayout tools = col();
+                  tools.setBackgroundColor(PANEL);
+                  String[] toolNames = {"Sel", "Mov", "Rot", "Sca", "Add", "Ann"};
+                  for (String s : toolNames) {
+                      TextView t = tv(s, 11, s.equals("Sel") ? ORANGE : TXT, 0);
+                      t.setGravity(Gravity.CENTER);
+                      tools.addView(t, new LinearLayout.LayoutParams(dp(46), dp(46)));
                   }
-                  return super.onTouchEvent(e);
+                  root.addView(tools, new LinearLayout.LayoutParams(dp(46), MATCH));
+
+                  LinearLayout center = col();
+
+                  LinearLayout header = row();
+                  header.setBackgroundColor(PANEL);
+                  String[] menus = {"File", "Edit", "Render", "Window", "Help"};
+                  for (String m : menus) header.addView(tv(m, 12, TXT, 6));
+                  header.addView(tv("Object Mode", 12, TXT, 6));
+                  center.addView(header, new LinearLayout.LayoutParams(MATCH, WRAP));
+
+                  FrameLayout vp = new FrameLayout(this);
+                  vp.addView(glView, new FrameLayout.LayoutParams(MATCH, MATCH));
+                  TextView info = tv("User Perspective\n(1) Collection | Cube", 11, TXT, 6);
+                  vp.addView(info, new FrameLayout.LayoutParams(WRAP, WRAP, Gravity.TOP | Gravity.START));
+                  TextView gizmo = tv("", 12, TXT, 6);
+                  gizmo.setText(Html.fromHtml(
+                      "<font color='#E84C4C'><b>X</b></font>  "
+                      + "<font color='#6BCB4B'><b>Y</b></font>  "
+                      + "<font color='#4C8CE8'><b>Z</b></font>"));
+                  vp.addView(gizmo, new FrameLayout.LayoutParams(WRAP, WRAP, Gravity.TOP | Gravity.END));
+                  center.addView(vp, new LinearLayout.LayoutParams(MATCH, 0, 1f));
+
+                  LinearLayout tl = row();
+                  tl.setBackgroundColor(PANEL);
+                  tl.addView(tv("Playback", 11, TXT, 6));
+                  tl.addView(tv("Keying", 11, TXT, 6));
+                  tl.addView(tv("View", 11, TXT, 6));
+                  tl.addView(tv("Marker", 11, TXT, 6));
+                  View spacer = new View(this);
+                  tl.addView(spacer, new LinearLayout.LayoutParams(0, 1, 1f));
+                  tl.addView(tv("Frame 1", 11, TXT, 6));
+                  center.addView(tl, new LinearLayout.LayoutParams(MATCH, WRAP));
+
+                  root.addView(center, new LinearLayout.LayoutParams(0, MATCH, 1f));
+
+                  LinearLayout side = col();
+                  side.setBackgroundColor(PANEL);
+
+                  LinearLayout outliner = col();
+                  outliner.setPadding(dp(8), dp(6), dp(8), dp(6));
+                  outliner.addView(tv("Scene Collection", 11, TXT, 2));
+                  outliner.addView(tv("  Collection", 11, TXT, 2));
+                  outliner.addView(tv("    Camera", 11, TXT, 2));
+                  outliner.addView(tv("    Cube", 11, ORANGE, 2));
+                  outliner.addView(tv("    Light", 11, TXT, 2));
+                  side.addView(outliner, new LinearLayout.LayoutParams(MATCH, 0, 1f));
+
+                  LinearLayout props = col();
+                  props.setBackgroundColor(DARK);
+                  props.setPadding(dp(8), dp(6), dp(8), dp(6));
+                  props.addView(tv("Cube", 12, ORANGE, 2));
+                  props.addView(tv("Location  0 m  0 m  0 m", 11, TXT, 2));
+                  props.addView(tv("Rotation  0\u00B0  0\u00B0  0\u00B0", 11, TXT, 2));
+                  props.addView(tv("Scale  1.00  1.00  1.00", 11, TXT, 2));
+                  side.addView(props, new LinearLayout.LayoutParams(MATCH, 0, 1f));
+
+                  root.addView(side, new LinearLayout.LayoutParams(dp(180), MATCH));
+                  return root;
               }
 
               static class Renderer implements GLSurfaceView.Renderer {
-                  volatile float rotX = 20f, rotY = 30f;
+                  volatile float rotX = 25f, rotY = 35f, dist = 10f;
                   private int prog, aPos, aCol, uMvp;
-                  private FloatBuffer vb, cb;
+                  private FloatBuffer gridBuf, cubeBuf, edgeBuf;
                   private final float[] proj = new float[16], view = new float[16];
                   private final float[] model = new float[16], tmp = new float[16], mvp = new float[16];
 
@@ -115,7 +268,7 @@ jobs:
 
                   @Override
                   public void onSurfaceCreated(GL10 gl, EGLConfig c) {
-                      GLES20.glClearColor(0.08f, 0.08f, 0.1f, 1f);
+                      GLES20.glClearColor(0.24f, 0.24f, 0.24f, 1f);
                       GLES20.glEnable(GLES20.GL_DEPTH_TEST);
                       int vs = compile(GLES20.GL_VERTEX_SHADER, VS);
                       int fs = compile(GLES20.GL_FRAGMENT_SHADER, FS);
@@ -126,7 +279,7 @@ jobs:
                       aPos = GLES20.glGetAttribLocation(prog, "aPos");
                       aCol = GLES20.glGetAttribLocation(prog, "aCol");
                       uMvp = GLES20.glGetUniformLocation(prog, "uMvp");
-                      buildCube();
+                      buildMeshes();
                   }
 
                   private static int compile(int type, String src) {
@@ -136,7 +289,30 @@ jobs:
                       return s;
                   }
 
-                  private void buildCube() {
+                  private static int put(float[] a, int k, float x, float y, float z,
+                                         float r, float g, float b) {
+                      a[k] = x; a[k + 1] = y; a[k + 2] = z;
+                      a[k + 3] = r; a[k + 4] = g; a[k + 5] = b;
+                      return k + 6;
+                  }
+
+                  private void buildMeshes() {
+                      float[] grid = new float[86 * 6];
+                      int k = 0;
+                      for (int i = -10; i <= 10; i++) {
+                          boolean axis = i == 0;
+                          float gray = 0.36f;
+                          float rx = axis ? 0.85f : gray, gx = axis ? 0.25f : gray, bx = axis ? 0.25f : gray;
+                          float rz = axis ? 0.25f : gray, gz = axis ? 0.5f : gray, bz = axis ? 0.95f : gray;
+                          k = put(grid, k, -10, -1, i, rx, gx, bx);
+                          k = put(grid, k, 10, -1, i, rx, gx, bx);
+                          k = put(grid, k, i, -1, -10, rz, gz, bz);
+                          k = put(grid, k, i, -1, 10, rz, gz, bz);
+                      }
+                      k = put(grid, k, 0, -1, 0, 0.3f, 0.85f, 0.3f);
+                      k = put(grid, k, 0, 4, 0, 0.3f, 0.85f, 0.3f);
+                      gridBuf = toBuffer(grid);
+
                       float[][] p = {
                           {-1, -1, -1}, {1, -1, -1}, {1, 1, -1}, {-1, 1, -1},
                           {-1, -1, 1}, {1, -1, 1}, {1, 1, 1}, {-1, 1, 1}
@@ -145,29 +321,32 @@ jobs:
                           {0, 3, 2, 1}, {4, 5, 6, 7}, {0, 4, 7, 3},
                           {1, 2, 6, 5}, {3, 7, 6, 2}, {0, 1, 5, 4}
                       };
-                      float[][] col = {
-                          {0.9f, 0.3f, 0.3f}, {0.3f, 0.9f, 0.3f}, {0.3f, 0.5f, 1f},
-                          {0.9f, 0.9f, 0.3f}, {0.9f, 0.4f, 0.9f}, {0.3f, 0.9f, 0.9f}
-                      };
-                      float[] v = new float[36 * 3];
-                      float[] c = new float[36 * 3];
-                      int k = 0;
+                      float[] shade = {1f, 0.7f, 0.85f, 0.6f, 0.9f, 0.75f};
+                      float[] cube = new float[36 * 6];
+                      k = 0;
                       for (int f = 0; f < 6; f++) {
                           int[] q = faces[f];
                           int[] order = {q[0], q[1], q[2], q[0], q[2], q[3]};
+                          float s = 0.8f * shade[f];
                           for (int idx : order) {
-                              float[] pt = p[idx];
-                              v[k] = pt[0];
-                              v[k + 1] = pt[1];
-                              v[k + 2] = pt[2];
-                              c[k] = col[f][0];
-                              c[k + 1] = col[f][1];
-                              c[k + 2] = col[f][2];
-                              k += 3;
+                              k = put(cube, k, p[idx][0], p[idx][1], p[idx][2], s, s, s);
                           }
                       }
-                      vb = toBuffer(v);
-                      cb = toBuffer(c);
+                      cubeBuf = toBuffer(cube);
+
+                      int[][] edges = {
+                          {0, 1}, {1, 2}, {2, 3}, {3, 0}, {4, 5}, {5, 6},
+                          {6, 7}, {7, 4}, {0, 4}, {1, 5}, {2, 6}, {3, 7}
+                      };
+                      float[] ed = new float[24 * 6];
+                      k = 0;
+                      for (int[] e : edges) {
+                          for (int idx : e) {
+                              k = put(ed, k, p[idx][0] * 1.003f, p[idx][1] * 1.003f, p[idx][2] * 1.003f,
+                                      0.91f, 0.49f, 0.05f);
+                          }
+                      }
+                      edgeBuf = toBuffer(ed);
                   }
 
                   private static FloatBuffer toBuffer(float[] a) {
@@ -175,6 +354,15 @@ jobs:
                           .order(ByteOrder.nativeOrder()).asFloatBuffer();
                       fb.put(a).position(0);
                       return fb;
+                  }
+
+                  private void draw(FloatBuffer b, int mode, int count) {
+                      b.position(0);
+                      GLES20.glVertexAttribPointer(aPos, 3, GLES20.GL_FLOAT, false, 24, b);
+                      b.position(3);
+                      GLES20.glVertexAttribPointer(aCol, 3, GLES20.GL_FLOAT, false, 24, b);
+                      b.position(0);
+                      GLES20.glDrawArrays(mode, 0, count);
                   }
 
                   @Override
@@ -185,8 +373,10 @@ jobs:
 
                   @Override
                   public void onDrawFrame(GL10 gl) {
+                      rotY += 0.15f;
                       GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
-                      Matrix.setLookAtM(view, 0, 0, 0, 5, 0, 0, 0, 0, 1, 0);
+
+                      Matrix.setLookAtM(view, 0, 0, 0, dist, 0, 0, 0, 0, 1, 0);
                       Matrix.setIdentityM(model, 0);
                       Matrix.rotateM(model, 0, rotX, 1, 0, 0);
                       Matrix.rotateM(model, 0, rotY, 0, 1, 0);
@@ -195,11 +385,14 @@ jobs:
 
                       GLES20.glUseProgram(prog);
                       GLES20.glEnableVertexAttribArray(aPos);
-                      GLES20.glVertexAttribPointer(aPos, 3, GLES20.GL_FLOAT, false, 0, vb);
                       GLES20.glEnableVertexAttribArray(aCol);
-                      GLES20.glVertexAttribPointer(aCol, 3, GLES20.GL_FLOAT, false, 0, cb);
                       GLES20.glUniformMatrix4fv(uMvp, 1, false, mvp, 0);
-                      GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 36);
+
+                      draw(gridBuf, GLES20.GL_LINES, 86);
+                      draw(cubeBuf, GLES20.GL_TRIANGLES, 36);
+                      GLES20.glLineWidth(2f);
+                      draw(edgeBuf, GLES20.GL_LINES, 24);
+
                       GLES20.glDisableVertexAttribArray(aPos);
                       GLES20.glDisableVertexAttribArray(aCol);
                   }
@@ -208,8 +401,8 @@ jobs:
           EOF
 
           javac -source 8 -target 8 -Xlint:-options -cp "$AJAR" -d out $(find src -name '*.java')
-          "$BT/d8" --release --min-api 16 --lib "$AJAR" --output build $(find out -name '*.class')
-          "$BT/aapt" package -f -M AndroidManifest.xml -I "$AJAR" -F build/base.apk
+          "$BT/d8" --release --min-api 21 --lib "$AJAR" --output build $(find out -name '*.class')
+          "$BT/aapt" package -f -M AndroidManifest.xml -S res -I "$AJAR" -F build/base.apk
           (cd build && zip -j base.apk classes.dex)
           keytool -genkeypair -keystore debug.keystore -storepass android -keypass android \
             -alias debug -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"

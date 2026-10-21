@@ -1,5 +1,4 @@
 name: build-apk
-
 on:
   workflow_dispatch:
 
@@ -22,44 +21,63 @@ jobs:
           BT="$SDK/build-tools/34.0.0"
           AJAR="$SDK/platforms/android-34/android.jar"
 
-          mkdir -p src/com/carlos/prisma3d out build res/drawable
+          mkdir -p src/com/carlos/prisma3d out build res/drawable res/values
 
+          # ============================================================
+          # AndroidManifest.xml
+          # ============================================================
           cat > AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-              package="com.carlos.prisma3d" android:versionCode="6" android:versionName="0.6">
-              <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="34"/>
-              <application android:label="Prisma 3D"
-                  android:icon="@drawable/ic_launcher"
-                  android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen">
-                  <activity android:name=".MainActivity" android:exported="true"
-                      android:screenOrientation="landscape">
-                      <intent-filter>
-                          <action android:name="android.intent.action.MAIN"/>
-                          <category android:name="android.intent.category.LAUNCHER"/>
-                      </intent-filter>
-                  </activity>
-              </application>
+              package="com.carlos.prisma3d"
+              android:versionCode="7"
+              android:versionName="0.7">
+            <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="34"/>
+            <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+            <application
+                android:label="Prisma 3D"
+                android:icon="@drawable/ic_launcher"
+                android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen"
+                android:hardwareAccelerated="true"
+                android:largeHeap="true">
+              <activity android:name=".MainActivity"
+                  android:exported="true"
+                  android:screenOrientation="landscape"
+                  android:configChanges="orientation|screenSize|keyboardHidden">
+                <intent-filter>
+                  <action android:name="android.intent.action.MAIN"/>
+                  <category android:name="android.intent.category.LAUNCHER"/>
+                </intent-filter>
+              </activity>
+            </application>
           </manifest>
           EOF
 
+          # ============================================================
+          # Icono vectorial (Material style)
+          # ============================================================
           cat > res/drawable/ic_launcher.xml << 'EOF'
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
               android:width="108dp" android:height="108dp"
               android:viewportWidth="108" android:viewportHeight="108">
-              <path android:fillColor="#15151A" android:pathData="M0,0H108V108H0Z"/>
-              <path android:fillColor="#4F8CFF" android:pathData="M54,24L80,39L54,54L28,39Z"/>
-              <path android:fillColor="#2F5FCC" android:pathData="M28,39L54,54L54,84L28,69Z"/>
-              <path android:fillColor="#1E3E8C" android:pathData="M54,54L80,39L80,69L54,84Z"/>
-              <path android:strokeColor="#E87D0D" android:strokeWidth="2.5"
-                  android:strokeLineJoin="round"
-                  android:pathData="M54,24L80,39L80,69L54,84L28,69L28,39Z"/>
+            <path android:fillColor="#0E0E14" android:pathData="M0,0H108V108H0Z"/>
+            <path android:fillColor="#A78BFA" android:pathData="M54,22L82,38L54,54L26,38Z"/>
+            <path android:fillColor="#7C3AED" android:pathData="M26,38L54,54L54,86L26,70Z"/>
+            <path android:fillColor="#4C1D95" android:pathData="M54,54L82,38L82,70L54,86Z"/>
+            <path android:strokeColor="#F59E0B" android:strokeWidth="2"
+                android:strokeLineJoin="round"
+                android:pathData="M54,22L82,38L82,70L54,86L26,70L26,38Z"/>
           </vector>
           EOF
 
-          cat > src/com/carlos/prisma3d/MainActivity.java << 'EOF'
+          # ============================================================
+          # MainActivity.java — versión modernizada y sin bugs
+          # ============================================================
+          cat > src/com/carlos/prisma3d/MainActivity.java << 'JAVA_EOF'
           package com.carlos.prisma3d;
 
+          import android.animation.ArgbEvaluator;
+          import android.animation.ObjectAnimator;
           import android.app.Activity;
           import android.content.ContentValues;
           import android.content.Intent;
@@ -68,25 +86,30 @@ jobs:
           import android.graphics.BitmapFactory;
           import android.graphics.Typeface;
           import android.graphics.drawable.GradientDrawable;
+          import android.graphics.drawable.RippleDrawable;
           import android.net.Uri;
           import android.opengl.GLES20;
           import android.opengl.GLSurfaceView;
           import android.opengl.GLUtils;
           import android.opengl.Matrix;
+          import android.os.Build;
           import android.os.Bundle;
+          import android.os.HapticFeedbackConstants;
           import android.provider.MediaStore;
           import android.provider.OpenableColumns;
           import android.text.Html;
+          import android.util.TypedValue;
           import android.view.Gravity;
           import android.view.MotionEvent;
           import android.view.ScaleGestureDetector;
           import android.view.View;
           import android.view.ViewGroup;
+          import android.view.animation.AccelerateDecelerateInterpolator;
           import android.widget.FrameLayout;
+          import android.widget.HorizontalScrollView;
           import android.widget.LinearLayout;
           import android.widget.ScrollView;
           import android.widget.TextView;
-          import android.widget.Toast;
           import org.json.JSONArray;
           import org.json.JSONObject;
           import java.io.BufferedReader;
@@ -98,10 +121,13 @@ jobs:
           import java.nio.ByteBuffer;
           import java.nio.ByteOrder;
           import java.nio.FloatBuffer;
+          import java.nio.IntBuffer;
+          import java.nio.ShortBuffer;
           import java.text.SimpleDateFormat;
           import java.util.ArrayList;
           import java.util.Arrays;
           import java.util.Date;
+          import java.util.LinkedList;
           import java.util.List;
           import java.util.Locale;
           import java.util.concurrent.ConcurrentLinkedQueue;
@@ -109,44 +135,60 @@ jobs:
           import javax.microedition.khronos.opengles.GL10;
 
           public class MainActivity extends Activity {
-              static final int C_BG = 0xFF0E0E11;
-              static final int C_PANEL = 0xFF1A1A1F;
-              static final int C_VIEW = 0xFF1F1F26;
-              static final int C_FIELD = 0xFF22222A;
-              static final int C_LINE = 0xFF2C2C36;
-              static final int C_TEXT = 0xFFF0F0F4;
-              static final int C_MUTED = 0xFFA0A0AE;
-              static final int C_ACCENT = 0xFF4F8CFF;
-              static final int C_ACCENT_DIM = 0xFF263E6B;
+
+              // ---------- Paleta Material You ----------
+              static final int C_BG         = 0xFF0B0B10;
+              static final int C_SURFACE    = 0xFF14141B;
+              static final int C_SURFACE2   = 0xFF1C1C25;
+              static final int C_ELEVATED   = 0xFF23232E;
+              static final int C_OUTLINE    = 0xFF2E2E3A;
+              static final int C_TEXT       = 0xFFF4F4F8;
+              static final int C_TEXT_DIM   = 0xFF9A9AAE;
+              static final int C_PRIMARY    = 0xFFA78BFA;   // violeta Material You
+              static final int C_PRIMARY_C  = 0xFF7C3AED;
+              static final int C_SECONDARY  = 0xFFF59E0B;   // ámbar
+              static final int C_TERTIARY   = 0xFF22D3EE;   // cian
+              static final int C_ERROR      = 0xFFF87171;
+              static final int C_SUCCESS    = 0xFF4ADE80;
+
               static final int MATCH = ViewGroup.LayoutParams.MATCH_PARENT;
-              static final int WRAP = ViewGroup.LayoutParams.WRAP_CONTENT;
+              static final int WRAP  = ViewGroup.LayoutParams.WRAP_CONTENT;
 
               static final int REQ_MODEL = 1, REQ_TEX = 2, REQ_SKY = 3;
               static final int TOOL_SEL = 0, TOOL_MOV = 1, TOOL_ROT = 2, TOOL_SCA = 3;
-              static final String[] TOOL_LABEL = {"Sel", "Mov", "Rot", "Sca"};
-              static final String[] TOOL_NAME = {"Seleccionar", "Mover", "Rotar", "Escalar"};
-              static final String[] MAT_NAME = {"Mate", "Plastico", "Metal", "Brillante"};
-              static final float[] MAT_ROUGH = {0.9f, 0.4f, 0.2f, 0.06f};
-              static final float[] MAT_METAL = {0f, 0f, 1f, 0f};
+              static final String[] TOOL_LABEL = {"⎚", "✥", "↻", "⤢"};
+              static final String[] TOOL_NAME  = {"Seleccionar", "Mover", "Rotar", "Escalar"};
+              static final String[] MAT_NAME   = {"Mate", "Plástico", "Metal", "Brillante"};
+              static final float[] MAT_ROUGH   = {0.92f, 0.42f, 0.18f, 0.05f};
+              static final float[] MAT_METAL   = {0f, 0f, 1f, 0f};
+
               static final float[][] PALETTE = {
-                  {0.95f, 0.45f, 0.10f}, {0.20f, 0.55f, 1f},
-                  {0.30f, 0.85f, 0.40f}, {0.90f, 0.30f, 0.70f}
-              };
-              static final float[][] AX_COL = {
-                  {1f, 0.25f, 0.25f}, {0.25f, 1f, 0.25f}, {0.25f, 0.55f, 1f}
-              };
-              static final float[] SEL_COL = {1f, 0.6f, 0.1f};
-              static final float[] OFF_COL = {0.5f, 0.5f, 0.56f};
-              static final float[] SHADOW_M = {
-                  1f, 0f, 0f, 0f,
-                  -0.625f, 0f, -0.438f, 0f,
-                  0f, 0f, 1f, 0f,
-                  -0.625f, -1f, -0.438f, 1f
+                  {0.96f, 0.55f, 0.20f}, {0.40f, 0.70f, 1.0f},
+                  {0.45f, 0.90f, 0.55f}, {0.95f, 0.45f, 0.80f},
+                  {1.00f, 0.85f, 0.35f}, {0.65f, 0.55f, 1.00f}
               };
 
+              static final float[][] AX_COL = {
+                  {1.00f, 0.35f, 0.35f},
+                  {0.45f, 1.00f, 0.55f},
+                  {0.40f, 0.70f, 1.00f}
+              };
+              static final float[] SEL_COL = {1.00f, 0.75f, 0.20f};
+              static final float[] OFF_COL = {0.55f, 0.55f, 0.62f};
+
+              // Matriz de sombra plana (luz direccional normalizada)
+              static final float[] SHADOW_M = {
+                  1f, 0f, 0f, 0f,
+                  -0.6f, 0f, -0.45f, 0f,
+                  0f, 0f, 1f, 0f,
+                  -0.6f, -1f, -0.45f, 1f
+              };
+
+              // ---------- Modelos de datos ----------
               static class GLPart { FloatBuffer buf; int count; int tex; }
-              static class Part { float[] verts; Bitmap tex; }
+              static class Part  { float[] verts; Bitmap tex; }
               static class Model { String name; final List<Part> parts = new ArrayList<>(); }
+
               static class Obj {
                   String name;
                   final float[] pos = new float[3];
@@ -159,29 +201,61 @@ jobs:
                   FloatBuffer box;
                   float[] bmin = {-1, -1, -1}, bmax = {1, 1, 1};
                   Obj(String n, float[] c) { name = n; col = c; }
+                  Obj snapshot() {
+                      Obj o = new Obj(name, col.clone());
+                      System.arraycopy(pos, 0, o.pos, 0, 3);
+                      System.arraycopy(rot, 0, o.rot, 0, 3);
+                      System.arraycopy(scl, 0, o.scl, 0, 3);
+                      o.mat = mat; o.isCam = isCam;
+                      o.parts.addAll(parts); o.box = box;
+                      o.bmin = bmin.clone(); o.bmax = bmax.clone();
+                      return o;
+                  }
               }
+
+              // ---------- Snapshot para Undo/Redo ----------
+              static class SceneSnapshot {
+                  final List<Obj> objs = new ArrayList<>();
+                  SceneSnapshot(List<Obj> src) {
+                      for (Obj o : src) objs.add(o.snapshot());
+                  }
+              }
+
               static class FloatList {
                   float[] a = new float[4096];
                   int n;
-                  void add(float v) {
-                      if (n == a.length) a = Arrays.copyOf(a, n * 2);
-                      a[n++] = v;
-                  }
+                  void add(float v) { if (n == a.length) a = Arrays.copyOf(a, n * 2); a[n++] = v; }
                   float[] toArray() { return Arrays.copyOf(a, n); }
               }
 
+              // ---------- Estado ----------
               private final List<Obj> scene = new ArrayList<>();
-              private final ConcurrentLinkedQueue<Model> pendingModels = new ConcurrentLinkedQueue<>();
-              private final ConcurrentLinkedQueue<Bitmap> pendingTex = new ConcurrentLinkedQueue<>();
-              private final ConcurrentLinkedQueue<Bitmap> pendingSky = new ConcurrentLinkedQueue<>();
+              private final ConcurrentLinkedQueue<Model>  pendingModels = new ConcurrentLinkedQueue<>();
+              private final ConcurrentLinkedQueue<Bitmap> pendingTex    = new ConcurrentLinkedQueue<>();
+              private final ConcurrentLinkedQueue<Bitmap> pendingSky    = new ConcurrentLinkedQueue<>();
+              private final LinkedList<SceneSnapshot> undoStack = new LinkedList<>();
+              private final LinkedList<SceneSnapshot> redoStack = new LinkedList<>();
+              private static final int MAX_UNDO = 30;
+
               private Renderer renderer;
               private GLSurfaceView glView;
               private float density, lastX, lastY;
               private int tool = TOOL_SEL, counter = 1, activeAxis = -1;
-              private final TextView[] toolBtns = new TextView[4];
-              private TextView camBtn, modeBtn, overlay, propName, propLoc, propRot, propScale, propMat;
-              private LinearLayout outliner;
+              private boolean snapEnabled = true;
+              private float snapStep = 0.25f;
 
+              private final TextView[] toolBtns = new TextView[4];
+              private TextView undoBtn, redoBtn, snapBtn, camBtn, modeBtn;
+              private TextView propName, propLoc, propRot, propScale, propMat;
+              private TextView outlinerEmpty;
+              private LinearLayout outliner;
+              private FrameLayout sheetRoot;
+              private View scrim;
+              private TextView statusText;
+
+              // ============================================================
+              // Ciclo de vida
+              // ============================================================
               @Override
               protected void onCreate(Bundle b) {
                   super.onCreate(b);
@@ -193,6 +267,7 @@ jobs:
                   cube.box = boxEdges(cube.bmin, cube.bmax);
                   scene.add(cube);
                   scene.add(newCamera());
+                  pushUndo();
 
                   renderer = new Renderer();
                   glView = new GLSurfaceView(this);
@@ -201,9 +276,8 @@ jobs:
 
                   final ScaleGestureDetector sgd = new ScaleGestureDetector(this,
                       new ScaleGestureDetector.SimpleOnScaleGestureListener() {
-                          @Override
-                          public boolean onScale(ScaleGestureDetector d) {
-                              renderer.dist = clamp(renderer.dist / d.getScaleFactor(), 3f, 30f);
+                          @Override public boolean onScale(ScaleGestureDetector d) {
+                              renderer.dist = clamp(renderer.dist / d.getScaleFactor(), 2f, 40f);
                               return true;
                           }
                       });
@@ -212,20 +286,25 @@ jobs:
                       sgd.onTouchEvent(e);
                       switch (e.getActionMasked()) {
                           case MotionEvent.ACTION_DOWN:
-                              lastX = e.getX();
-                              lastY = e.getY();
+                              lastX = e.getX(); lastY = e.getY();
                               activeAxis = pickAxis(lastX, lastY);
                               break;
                           case MotionEvent.ACTION_UP:
                           case MotionEvent.ACTION_CANCEL:
+                              if (activeAxis >= 0) pushUndo();
                               activeAxis = -1;
                               break;
                           case MotionEvent.ACTION_MOVE:
                               if (!sgd.isInProgress() && e.getPointerCount() == 1) {
                                   onDrag(e.getX() - lastX, e.getY() - lastY);
+                              } else if (e.getPointerCount() == 2 && !sgd.isInProgress()) {
+                                  // Pan con dos dedos
+                                  float cx = (e.getX(0) + e.getX(1)) * 0.5f;
+                                  float cy = (e.getY(0) + e.getY(1)) * 0.5f;
+                                  renderer.panX += (cx - (lastX + (lastX)) * 0.5f) * 0.01f * renderer.dist * 0.1f;
+                                  renderer.panY -= (cy - (lastY + (lastY)) * 0.5f) * 0.01f * renderer.dist * 0.1f;
                               }
-                              lastX = e.getX();
-                              lastY = e.getY();
+                              lastX = e.getX(); lastY = e.getY();
                               break;
                       }
                       return true;
@@ -235,17 +314,8 @@ jobs:
                   refreshPanels();
               }
 
-              @Override
-              protected void onPause() {
-                  super.onPause();
-                  glView.onPause();
-              }
-
-              @Override
-              protected void onResume() {
-                  super.onResume();
-                  glView.onResume();
-              }
+              @Override protected void onPause()  { super.onPause();  glView.onPause(); }
+              @Override protected void onResume() { super.onResume(); glView.onResume(); }
 
               @Override
               protected void onActivityResult(int req, int res, Intent data) {
@@ -253,28 +323,28 @@ jobs:
                   if (res != RESULT_OK || data == null || data.getData() == null) return;
                   Uri uri = data.getData();
                   if (req == REQ_MODEL) loadModelAsync(uri);
-                  else if (req == REQ_TEX) loadImageAsync(uri, pendingTex, "Textura lista");
+                  else if (req == REQ_TEX) loadImageAsync(uri, pendingTex, "Textura aplicada");
                   else if (req == REQ_SKY) loadImageAsync(uri, pendingSky, "Cielo cargado");
               }
 
-              static float clamp(float v, float lo, float hi) {
-                  return Math.max(lo, Math.min(hi, v));
-              }
-
-              private int dp(int v) {
-                  return Math.round(v * density);
+              // ============================================================
+              // Utilidades
+              // ============================================================
+              static float clamp(float v, float lo, float hi) { return Math.max(lo, Math.min(hi, v)); }
+              private int dp(int v) { return Math.round(v * density); }
+              private void haptic() {
+                  View v = getWindow().getDecorView();
+                  if (v != null) v.performHapticFeedback(HapticFeedbackConstants.CONFIRM);
               }
 
               private void toast(String s) {
-                  Toast.makeText(this, s, Toast.LENGTH_LONG).show();
-              }
-
-              private void uiToast(final String s) {
-                  runOnUiThread(() -> toast(s));
-              }
-
-              private void uiRefresh() {
-                  runOnUiThread(() -> refreshPanels());
+                  runOnUiThread(() -> {
+                      if (statusText != null) {
+                          statusText.setText(s);
+                          statusText.setAlpha(1f);
+                          statusText.animate().alpha(0f).setStartDelay(2200).setDuration(600).start();
+                      }
+                  });
               }
 
               private GradientDrawable rounded(int color, int radiusDp) {
@@ -284,11 +354,20 @@ jobs:
                   return g;
               }
 
+              private GradientDrawable stroked(int fill, int stroke, int radiusDp, int strokeDp) {
+                  GradientDrawable g = new GradientDrawable();
+                  g.setColor(fill);
+                  g.setCornerRadius(dp(radiusDp));
+                  g.setStroke(dp(strokeDp), stroke);
+                  return g;
+              }
+
               private TextView text(String s, int sp, int color) {
                   TextView t = new TextView(this);
                   t.setText(s);
-                  t.setTextSize(sp);
+                  t.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
                   t.setTextColor(color);
+                  t.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
                   return t;
               }
 
@@ -297,175 +376,222 @@ jobs:
                   l.setOrientation(LinearLayout.HORIZONTAL);
                   return l;
               }
-
               private LinearLayout vbox() {
                   LinearLayout l = new LinearLayout(this);
                   l.setOrientation(LinearLayout.VERTICAL);
                   return l;
               }
 
-              private LinearLayout.LayoutParams lp(int w, int h) {
-                  LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(w, h);
-                  p.setMargins(dp(2), dp(2), dp(2), dp(2));
-                  return p;
-              }
-
-              private LinearLayout.LayoutParams gapped() {
-                  LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(WRAP, WRAP);
-                  p.setMargins(dp(6), 0, 0, 0);
-                  return p;
-              }
-
-              private View divider() {
-                  View v = new View(this);
-                  v.setBackgroundColor(C_LINE);
-                  LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(MATCH, dp(1));
-                  p.setMargins(dp(6), dp(6), dp(6), dp(6));
-                  v.setLayoutParams(p);
-                  return v;
-              }
-
-              private TextView railBtn(String label, final Runnable action) {
-                  TextView t = text(label, 11, C_MUTED);
-                  t.setSingleLine(true);
-                  t.setGravity(Gravity.CENTER);
-                  t.setTypeface(null, Typeface.BOLD);
-                  t.setOnClickListener(v -> action.run());
-                  return t;
-              }
-
-              private TextView pill(String s, final Runnable r) {
-                  TextView t = text(s, 13, 0xFFFFFFFF);
-                  t.setSingleLine(true);
-                  t.setGravity(Gravity.CENTER);
-                  t.setBackground(rounded(C_ACCENT, 18));
-                  t.setPadding(dp(16), dp(8), dp(16), dp(8));
-                  t.setOnClickListener(v -> r.run());
-                  return t;
-              }
-
+              // ============================================================
+              // UI — Material You
+              // ============================================================
               private View buildUi() {
                   FrameLayout root = new FrameLayout(this);
                   root.setBackgroundColor(C_BG);
 
-                  LinearLayout row = hbox();
-                  row.setPadding(dp(8), dp(8), dp(8), dp(8));
-                  root.addView(row, new FrameLayout.LayoutParams(MATCH, MATCH));
+                  // ---------- Vista 3D (fondo) ----------
+                  glView.setLayoutParams(new FrameLayout.LayoutParams(MATCH, MATCH));
+                  root.addView(glView);
 
-                  ScrollView rail = new ScrollView(this);
-                  rail.setBackground(rounded(C_PANEL, 14));
-                  LinearLayout tools = vbox();
-                  tools.setPadding(dp(4), dp(6), dp(4), dp(6));
+                  // ---------- Overlay superior (estado + título) ----------
+                  LinearLayout topBar = hbox();
+                  topBar.setGravity(Gravity.CENTER_VERTICAL);
+                  topBar.setBackground(stroked(0xE614141B, C_OUTLINE, 20, 1));
+                  topBar.setPadding(dp(18), dp(10), dp(18), dp(10));
+                  FrameLayout.LayoutParams tbp = new FrameLayout.LayoutParams(MATCH, WRAP,
+                      Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+                  tbp.setMargins(dp(16), dp(16), dp(16), 0);
+                  tbp.width = MATCH;
+                  topBar.setLayoutParams(tbp);
+
+                  TextView title = text("Prisma 3D", 16, C_PRIMARY);
+                  title.setTypeface(Typeface.create("sans-serif-black", Typeface.NORMAL));
+                  topBar.addView(title, new LinearLayout.LayoutParams(0, WRAP, 1f));
+
+                  statusText = text("", 12, C_TEXT_DIM);
+                  statusText.setSingleLine(true);
+                  topBar.addView(statusText);
+
+                  modeBtn = pill("Real", 0xE6A78BFA, 0xFF0B0B10, this::toggleReal);
+                  LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(WRAP, WRAP);
+                  mp.setMargins(dp(10), 0, 0, 0);
+                  topBar.addView(modeBtn, mp);
+
+                  root.addView(topBar);
+
+                  // ---------- Barra inferior de herramientas ----------
+                  HorizontalScrollView toolScroll = new HorizontalScrollView(this);
+                  toolScroll.setHorizontalScrollBarEnabled(false);
+                  LinearLayout tools = hbox();
+                  tools.setPadding(dp(10), dp(8), dp(10), dp(8));
+                  tools.setGravity(Gravity.CENTER_VERTICAL);
+                  tools.setBackground(stroked(0xE614141B, C_OUTLINE, 28, 1));
+
                   for (int i = 0; i < 4; i++) {
                       final int idx = i;
-                      toolBtns[i] = railBtn(TOOL_LABEL[i], () -> setTool(idx));
-                      tools.addView(toolBtns[i], lp(dp(76), dp(42)));
+                      toolBtns[i] = toolChip(TOOL_LABEL[i], TOOL_NAME[i], () -> setTool(idx));
+                      tools.addView(toolBtns[i], chipLp());
                   }
-                  tools.addView(divider());
-                  tools.addView(railBtn("Add", () -> addCube()), lp(dp(76), dp(42)));
-                  camBtn = railBtn("Cam", () -> toggleCamView());
-                  tools.addView(camBtn, lp(dp(76), dp(42)));
-                  tools.addView(railBtn("Mat", () -> cycleMaterial()), lp(dp(76), dp(42)));
-                  tools.addView(railBtn("Del", () -> deleteSelected()), lp(dp(76), dp(42)));
-                  tools.addView(divider());
-                  tools.addView(railBtn("Imp", () -> pickFile(REQ_MODEL, "*/*")), lp(dp(76), dp(42)));
-                  tools.addView(railBtn("Tex", () -> {
+                  tools.addView(separator());
+                  tools.addView(toolChip("✚", "Añadir cubo", this::addCube));
+                  tools.addView(toolChip("⎌", "Importar modelo", () -> pickFile(REQ_MODEL, "*/*")));
+                  tools.addView(toolChip("🎨", "Textura", () -> {
                       if (selected() == null) toast("Selecciona un objeto");
                       else pickFile(REQ_TEX, "image/*");
-                  }), lp(dp(76), dp(42)));
-                  tools.addView(railBtn("Sky", () -> pickFile(REQ_SKY, "image/*")), lp(dp(76), dp(42)));
-                  tools.addView(divider());
-                  tools.addView(railBtn("Reset", () -> resetView()), lp(dp(76), dp(42)));
-                  rail.addView(tools);
-                  row.addView(rail, new LinearLayout.LayoutParams(dp(88), MATCH));
+                  }));
+                  tools.addView(toolChip("☁", "Cielo HDRI", () -> pickFile(REQ_SKY, "image/*")));
+                  tools.addView(separator());
+                  camBtn = toolChip("◉", "Vista cámara", this::toggleCamView);
+                  tools.addView(camBtn);
+                  tools.addView(toolChip("⟳", "Resetear vista", this::resetView));
+                  tools.addView(toolChip("✕", "Eliminar", this::deleteSelected));
+                  tools.addView(separator());
+                  undoBtn = toolChip("↶", "Deshacer", this::undo);
+                  redoBtn = toolChip("↷", "Rehacer", this::redo);
+                  snapBtn = toolChip("▦", "Snap", this::toggleSnap);
+                  tools.addView(undoBtn);
+                  tools.addView(redoBtn);
+                  tools.addView(snapBtn);
 
-                  LinearLayout center = vbox();
-                  LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, MATCH, 1f);
-                  cp.setMargins(dp(8), 0, dp(8), 0);
-                  row.addView(center, cp);
+                  toolScroll.addView(tools);
+                  FrameLayout.LayoutParams bsp = new FrameLayout.LayoutParams(MATCH, WRAP,
+                      Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+                  bsp.setMargins(dp(16), 0, dp(16), dp(16));
+                  bsp.width = MATCH;
+                  toolScroll.setLayoutParams(bsp);
+                  root.addView(toolScroll);
 
-                  LinearLayout header = hbox();
-                  header.setGravity(Gravity.CENTER_VERTICAL);
-                  header.setBackground(rounded(C_PANEL, 14));
-                  header.setPadding(dp(14), dp(6), dp(6), dp(6));
-                  TextView title = text("Prisma 3D", 15, C_TEXT);
-                  title.setTypeface(null, Typeface.BOLD);
-                  title.setSingleLine(true);
-                  header.addView(title, new LinearLayout.LayoutParams(0, WRAP, 1f));
-                  modeBtn = pill("Real", () -> toggleReal());
-                  header.addView(modeBtn, gapped());
-                  header.addView(pill("Render", () -> renderer.requestCapture()), gapped());
-                  LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(MATCH, WRAP);
-                  hp.setMargins(0, 0, 0, dp(8));
-                  center.addView(header, hp);
-
-                  FrameLayout vp = new FrameLayout(this);
-                  vp.setBackground(rounded(C_VIEW, 14));
-                  vp.setPadding(dp(1), dp(1), dp(1), dp(1));
-                  vp.addView(glView, new FrameLayout.LayoutParams(MATCH, MATCH));
-
-                  overlay = text("", 12, C_MUTED);
-                  FrameLayout.LayoutParams ol = new FrameLayout.LayoutParams(WRAP, WRAP,
-                      Gravity.TOP | Gravity.START);
-                  ol.setMargins(dp(14), dp(12), dp(14), dp(12));
-                  vp.addView(overlay, ol);
-
-                  TextView gizmo = text("", 13, C_TEXT);
-                  gizmo.setText(Html.fromHtml(
-                      "<font color='#FF4040'><b>X</b></font>&nbsp;&nbsp;"
-                      + "<font color='#40FF40'><b>Y</b></font>&nbsp;&nbsp;"
-                      + "<font color='#4090FF'><b>Z</b></font>"));
-                  FrameLayout.LayoutParams gl = new FrameLayout.LayoutParams(WRAP, WRAP,
-                      Gravity.TOP | Gravity.END);
-                  gl.setMargins(dp(14), dp(12), dp(14), dp(12));
-                  vp.addView(gizmo, gl);
-
-                  TextView hint = text("Arrastra: girar  \u00B7  Pellizco: zoom  \u00B7  Toca un eje: transformar eje", 11, C_TEXT);
-                  hint.setSingleLine(true);
-                  hint.setBackground(rounded(0xB01A1A1F, 8));
-                  hint.setPadding(dp(8), dp(4), dp(8), dp(4));
-                  FrameLayout.LayoutParams hl = new FrameLayout.LayoutParams(WRAP, WRAP,
-                      Gravity.BOTTOM | Gravity.START);
-                  hl.setMargins(dp(14), dp(12), dp(14), dp(12));
-                  vp.addView(hint, hl);
-
-                  center.addView(vp, new LinearLayout.LayoutParams(MATCH, 0, 1f));
-
+                  // ---------- Panel lateral de escena + propiedades ----------
                   LinearLayout side = vbox();
-                  side.setBackground(rounded(C_PANEL, 14));
-                  side.setPadding(dp(10), dp(10), dp(10), dp(10));
-                  side.addView(text("ESCENA", 10, C_MUTED));
+                  side.setBackground(stroked(0xE614141B, C_OUTLINE, 20, 1));
+                  side.setPadding(dp(14), dp(14), dp(14), dp(14));
+                  FrameLayout.LayoutParams sp = new FrameLayout.LayoutParams(dp(220), MATCH,
+                      Gravity.END | Gravity.CENTER_VERTICAL);
+                  sp.setMargins(0, dp(90), dp(16), dp(90));
+                  side.setLayoutParams(sp);
+
+                  side.addView(sectionLabel("ESCENA"));
                   outliner = vbox();
+                  outlinerEmpty = text("Vacío", 12, C_TEXT_DIM);
+                  outlinerEmpty.setGravity(Gravity.CENTER);
+                  outlinerEmpty.setPadding(0, dp(20), 0, dp(20));
                   ScrollView sc = new ScrollView(this);
                   sc.addView(outliner);
+                  sc.addView(outlinerEmpty);
                   side.addView(sc, new LinearLayout.LayoutParams(MATCH, 0, 1f));
 
-                  TextView ph = text("PROPIEDADES", 10, C_MUTED);
-                  LinearLayout.LayoutParams php = new LinearLayout.LayoutParams(MATCH, WRAP);
-                  php.setMargins(0, dp(8), 0, dp(6));
-                  side.addView(ph, php);
-
+                  side.addView(sectionLabel("PROPIEDADES"));
                   LinearLayout props = vbox();
-                  props.setBackground(rounded(C_FIELD, 10));
-                  props.setPadding(dp(8), dp(6), dp(8), dp(6));
-                  propName = text("", 12, C_TEXT);
-                  propLoc = text("", 10, C_MUTED);
-                  propRot = text("", 10, C_MUTED);
-                  propScale = text("", 10, C_MUTED);
-                  propMat = text("", 10, C_MUTED);
+                  props.setBackground(rounded(C_SURFACE2, 14));
+                  props.setPadding(dp(12), dp(10), dp(12), dp(10));
+                  propName = text("—", 13, C_TEXT);
+                  propName.setTypeface(Typeface.create("sans-serif-black", Typeface.NORMAL));
+                  propLoc   = text("", 11, C_TEXT_DIM);
+                  propRot   = text("", 11, C_TEXT_DIM);
+                  propScale = text("", 11, C_TEXT_DIM);
+                  propMat   = text("", 11, C_PRIMARY);
+                  propMat.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
                   props.addView(propName);
                   props.addView(propLoc);
                   props.addView(propRot);
                   props.addView(propScale);
                   props.addView(propMat);
-                  side.addView(props, new LinearLayout.LayoutParams(MATCH, WRAP));
 
-                  row.addView(side, new LinearLayout.LayoutParams(dp(170), MATCH));
+                  TextView matBtn = pill("Cambiar material", C_PRIMARY, C_BG, this::cycleMaterial);
+                  LinearLayout.LayoutParams matLp = new LinearLayout.LayoutParams(MATCH, WRAP);
+                  matLp.setMargins(0, dp(10), 0, 0);
+                  props.addView(matBtn, matLp);
+
+                  side.addView(props, new LinearLayout.LayoutParams(MATCH, WRAP));
+                  root.addView(side);
+
+                  // ---------- Hint ----------
+                  TextView hint = text("1 dedo: orbitar  ·  2 dedos: pan  ·  Pellizco: zoom  ·  Toca eje: transformar",
+                      11, C_TEXT);
+                  hint.setSingleLine(true);
+                  hint.setBackground(rounded(0xCC14141B, 14));
+                  hint.setPadding(dp(12), dp(6), dp(12), dp(6));
+                  FrameLayout.LayoutParams hl = new FrameLayout.LayoutParams(WRAP, WRAP,
+                      Gravity.BOTTOM | Gravity.START);
+                  hl.setMargins(dp(16), 0, dp(250), dp(90));
+                  hint.setLayoutParams(hl);
+                  root.addView(hint);
+
+                  // ---------- Gizmo leyenda ----------
+                  TextView gizmo = text("", 12, C_TEXT);
+                  gizmo.setText(Html.fromHtml(
+                      "<font color='#FF5A5A'><b>X</b></font>  " +
+                      "<font color='#72FF8A'><b>Y</b></font>  " +
+                      "<font color='#6BB3FF'><b>Z</b></font>"));
+                  FrameLayout.LayoutParams gl = new FrameLayout.LayoutParams(WRAP, WRAP,
+                      Gravity.TOP | Gravity.END);
+                  gl.setMargins(0, dp(90), dp(250), 0);
+                  gizmo.setLayoutParams(gl);
+                  root.addView(gizmo);
 
                   highlightTools();
+                  updateUndoRedoState();
+                  updateSnapState();
                   return root;
               }
 
+              private TextView sectionLabel(String s) {
+                  TextView t = text(s, 10, C_TEXT_DIM);
+                  t.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+                  LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(MATCH, WRAP);
+                  lp.setMargins(0, dp(10), 0, dp(6));
+                  t.setLayoutParams(lp);
+                  return t;
+              }
+
+              private TextView toolChip(String icon, String label, final Runnable action) {
+                  TextView t = new TextView(this);
+                  t.setText(icon);
+                  t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+                  t.setTextColor(C_TEXT);
+                  t.setGravity(Gravity.CENTER);
+                  t.setBackground(rounded(C_SURFACE2, 16));
+                  t.setPadding(dp(14), dp(12), dp(14), dp(12));
+                  t.setOnClickListener(v -> {
+                      haptic();
+                      action.run();
+                  });
+                  t.setOnLongClickListener(v -> {
+                      toast(label);
+                      return true;
+                  });
+                  return t;
+              }
+
+              private LinearLayout.LayoutParams chipLp() {
+                  LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(WRAP, WRAP);
+                  p.setMargins(dp(4), 0, dp(4), 0);
+                  return p;
+              }
+
+              private View separator() {
+                  View v = new View(this);
+                  v.setBackgroundColor(C_OUTLINE);
+                  LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(dp(1), dp(24));
+                  p.setMargins(dp(10), 0, dp(10), 0);
+                  v.setLayoutParams(p);
+                  return v;
+              }
+
+              private TextView pill(String s, int bg, int fg, final Runnable r) {
+                  TextView t = text(s, 12, fg);
+                  t.setSingleLine(true);
+                  t.setGravity(Gravity.CENTER);
+                  t.setBackground(rounded(bg, 18));
+                  t.setPadding(dp(18), dp(10), dp(18), dp(10));
+                  t.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+                  t.setOnClickListener(v -> { haptic(); r.run(); });
+                  return t;
+              }
+
+              // ============================================================
+              // Archivos
+              // ============================================================
               private void pickFile(int req, String mime) {
                   Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                   i.addCategory(Intent.CATEGORY_OPENABLE);
@@ -480,9 +606,7 @@ jobs:
                           int i = c.getColumnIndex(OpenableColumns.DISPLAY_NAME);
                           if (i >= 0) return c.getString(i);
                       }
-                  } finally {
-                      if (c != null) c.close();
-                  }
+                  } finally { if (c != null) c.close(); }
                   String seg = uri.getLastPathSegment();
                   return seg == null ? "modelo" : seg;
               }
@@ -506,15 +630,14 @@ jobs:
                           String lower = name.toLowerCase(Locale.US);
                           byte[] data = readAll(uri);
                           Model m;
-                          if (lower.endsWith(".glb")) m = parseGlb(data, name);
-                          else if (lower.endsWith(".obj")) m = parseObj(data, name);
-                          else if (lower.endsWith(".fbx")) throw new Exception(
-                              "FBX no soportado. Exporta en Blender como glTF Binary (.glb)");
+                          if (lower.endsWith(".glb"))       m = parseGlb(data, name);
+                          else if (lower.endsWith(".obj"))  m = parseObj(data, name);
+                          else if (lower.endsWith(".fbx"))  throw new Exception("FBX no soportado. Exporta como .glb");
                           else throw new Exception("Formato no soportado: usa .glb u .obj");
                           pendingModels.add(m);
-                          uiToast("Modelo cargado: " + name);
+                          toast("Modelo cargado: " + name);
                       } catch (Exception e) {
-                          uiToast("Error: " + e.getMessage());
+                          toast("Error: " + e.getMessage());
                       }
                   }).start();
               }
@@ -526,23 +649,25 @@ jobs:
                           InputStream in = getContentResolver().openInputStream(uri);
                           Bitmap bmp = in == null ? null : BitmapFactory.decodeStream(in);
                           if (in != null) in.close();
-                          if (bmp == null) throw new Exception("Imagen no valida");
+                          if (bmp == null) throw new Exception("Imagen no válida");
                           q.add(bmp);
-                          uiToast(okMsg);
+                          toast(okMsg);
                       } catch (Exception e) {
-                          uiToast("Error: " + e.getMessage());
+                          toast("Error: " + e.getMessage());
                       }
                   }).start();
               }
 
+              // ============================================================
+              // Geometría helper
+              // ============================================================
               static int vtx(float[] a, int k, float x, float y, float z,
                              float nx, float ny, float nz, float u, float v) {
-                  a[k] = x; a[k + 1] = y; a[k + 2] = z;
-                  a[k + 3] = nx; a[k + 4] = ny; a[k + 5] = nz;
-                  a[k + 6] = u; a[k + 7] = v;
+                  a[k]=x; a[k+1]=y; a[k+2]=z;
+                  a[k+3]=nx; a[k+4]=ny; a[k+5]=nz;
+                  a[k+6]=u; a[k+7]=v;
                   return k + 8;
               }
-
               static FloatBuffer toBuffer(float[] a) {
                   FloatBuffer fb = ByteBuffer.allocateDirect(a.length * 4)
                       .order(ByteOrder.nativeOrder()).asFloatBuffer();
@@ -552,18 +677,18 @@ jobs:
 
               static GLPart cubeGL() {
                   float[][] p = {
-                      {-1, -1, -1}, {1, -1, -1}, {1, 1, -1}, {-1, 1, -1},
-                      {-1, -1, 1}, {1, -1, 1}, {1, 1, 1}, {-1, 1, 1}
+                      {-1,-1,-1},{1,-1,-1},{1,1,-1},{-1,1,-1},
+                      {-1,-1, 1},{1,-1, 1},{1,1, 1},{-1,1, 1}
                   };
                   int[][] faces = {
-                      {0, 3, 2, 1}, {4, 5, 6, 7}, {0, 4, 7, 3},
-                      {1, 2, 6, 5}, {3, 7, 6, 2}, {0, 1, 5, 4}
+                      {0,3,2,1},{4,5,6,7},{0,4,7,3},
+                      {1,2,6,5},{3,7,6,2},{0,1,5,4}
                   };
                   float[][] nrm = {
-                      {0, 0, -1}, {0, 0, 1}, {-1, 0, 0},
-                      {1, 0, 0}, {0, 1, 0}, {0, -1, 0}
+                      {0,0,-1},{0,0,1},{-1,0,0},
+                      {1,0,0},{0,1,0},{0,-1,0}
                   };
-                  float[][] uv = {{0, 0}, {1, 0}, {1, 1}, {0, 0}, {1, 1}, {0, 1}};
+                  float[][] uv = {{0,0},{1,0},{1,1},{0,0},{1,1},{0,1}};
                   float[] v = new float[36 * 8];
                   int k = 0;
                   for (int f = 0; f < 6; f++) {
@@ -590,21 +715,19 @@ jobs:
 
               static FloatBuffer boxEdges(float[] mn, float[] mx) {
                   float[][] c = {
-                      {mn[0], mn[1], mn[2]}, {mx[0], mn[1], mn[2]},
-                      {mx[0], mx[1], mn[2]}, {mn[0], mx[1], mn[2]},
-                      {mn[0], mn[1], mx[2]}, {mx[0], mn[1], mx[2]},
-                      {mx[0], mx[1], mx[2]}, {mn[0], mx[1], mx[2]}
+                      {mn[0],mn[1],mn[2]},{mx[0],mn[1],mn[2]},
+                      {mx[0],mx[1],mn[2]},{mn[0],mx[1],mn[2]},
+                      {mn[0],mn[1],mx[2]},{mx[0],mn[1],mx[2]},
+                      {mx[0],mx[1],mx[2]},{mn[0],mx[1],mx[2]}
                   };
                   int[][] e = {
-                      {0, 1}, {1, 2}, {2, 3}, {3, 0}, {4, 5}, {5, 6},
-                      {6, 7}, {7, 4}, {0, 4}, {1, 5}, {2, 6}, {3, 7}
+                      {0,1},{1,2},{2,3},{3,0},{4,5},{5,6},
+                      {6,7},{7,4},{0,4},{1,5},{2,6},{3,7}
                   };
                   float[] v = new float[24 * 8];
                   int k = 0;
-                  for (int[] ed : e) {
-                      for (int idx : ed) {
-                          k = vtx(v, k, c[idx][0], c[idx][1], c[idx][2], 0, 1, 0, 0, 0);
-                      }
+                  for (int[] ed : e) for (int idx : ed) {
+                      k = vtx(v, k, c[idx][0], c[idx][1], c[idx][2], 0, 1, 0, 0, 0);
                   }
                   return toBuffer(v);
               }
@@ -632,55 +755,55 @@ jobs:
                   Matrix.rotateM(m, 0, o.rot[0], 1, 0, 0);
               }
 
-              static float pf(String s) {
-                  return Float.parseFloat(s);
-              }
-
+              static float pf(String s) { return Float.parseFloat(s); }
               static int resolve(String s, int size) {
                   int i = Integer.parseInt(s);
                   return i > 0 ? i - 1 : size + i;
               }
 
               static float[] faceNormal(float[] a, float[] b, float[] c) {
-                  float ex = b[0] - a[0], ey = b[1] - a[1], ez = b[2] - a[2];
-                  float fx = c[0] - a[0], fy = c[1] - a[1], fz = c[2] - a[2];
-                  float nx = ey * fz - ez * fy, ny = ez * fx - ex * fz, nz = ex * fy - ey * fx;
-                  float len = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
-                  if (len == 0f) return new float[]{0, 1, 0};
-                  return new float[]{nx / len, ny / len, nz / len};
+                  float ex=b[0]-a[0], ey=b[1]-a[1], ez=b[2]-a[2];
+                  float fx=c[0]-a[0], fy=c[1]-a[1], fz=c[2]-a[2];
+                  float nx=ey*fz-ez*fy, ny=ez*fx-ex*fz, nz=ex*fy-ey*fx;
+                  float len = (float) Math.sqrt(nx*nx+ny*ny+nz*nz);
+                  if (len < 1e-8f) return new float[]{0, 1, 0};
+                  return new float[]{nx/len, ny/len, nz/len};
               }
 
               static float segDist(float px, float py, float ax, float ay, float bx, float by) {
-                  float dx = bx - ax, dy = by - ay;
-                  float l2 = dx * dx + dy * dy;
-                  float t = l2 == 0 ? 0 : clamp(((px - ax) * dx + (py - ay) * dy) / l2, 0, 1);
-                  float cx = ax + t * dx - px, cy = ay + t * dy - py;
-                  return (float) Math.sqrt(cx * cx + cy * cy);
+                  float dx = bx-ax, dy = by-ay;
+                  float l2 = dx*dx + dy*dy;
+                  float t = l2 == 0 ? 0 : clamp(((px-ax)*dx + (py-ay)*dy) / l2, 0, 1);
+                  float cx = ax + t*dx - px, cy = ay + t*dy - py;
+                  return (float) Math.sqrt(cx*cx + cy*cy);
               }
 
               static void normalize(List<Part> parts) {
-                  float[] mn = {1e9f, 1e9f, 1e9f}, mx = {-1e9f, -1e9f, -1e9f};
+                  float[] mn = {1e9f,1e9f,1e9f}, mx = {-1e9f,-1e9f,-1e9f};
                   for (Part p : parts) {
                       for (int i = 0; i < p.verts.length; i += 8) {
                           for (int a = 0; a < 3; a++) {
-                              mn[a] = Math.min(mn[a], p.verts[i + a]);
-                              mx[a] = Math.max(mx[a], p.verts[i + a]);
+                              mn[a] = Math.min(mn[a], p.verts[i+a]);
+                              mx[a] = Math.max(mx[a], p.verts[i+a]);
                           }
                       }
                   }
-                  float ext = Math.max(mx[0] - mn[0], Math.max(mx[1] - mn[1], mx[2] - mn[2]));
-                  if (ext <= 0f) ext = 1f;
+                  float ext = Math.max(mx[0]-mn[0], Math.max(mx[1]-mn[1], mx[2]-mn[2]));
+                  if (ext <= 1e-6f) return; // FIX: modelo degenerado
                   float s = 2f / ext;
-                  float[] c = {(mn[0] + mx[0]) / 2f, (mn[1] + mx[1]) / 2f, (mn[2] + mx[2]) / 2f};
+                  float[] c = {(mn[0]+mx[0])/2f, (mn[1]+mx[1])/2f, (mn[2]+mx[2])/2f};
                   for (Part p : parts) {
                       for (int i = 0; i < p.verts.length; i += 8) {
                           for (int a = 0; a < 3; a++) {
-                              p.verts[i + a] = (p.verts[i + a] - c[a]) * s;
+                              p.verts[i+a] = (p.verts[i+a] - c[a]) * s;
                           }
                       }
                   }
               }
 
+              // ============================================================
+              // Parsers
+              // ============================================================
               static Model parseObj(byte[] data, String name) throws Exception {
                   BufferedReader br = new BufferedReader(
                       new InputStreamReader(new ByteArrayInputStream(data), "UTF-8"));
@@ -708,15 +831,15 @@ jobs:
                               cs[i][2] = ix.length > 2 && !ix[2].isEmpty() ? resolve(ix[2], vn.size()) : -1;
                           }
                           for (int i = 1; i + 1 < p.length; i++) {
-                              int[][] tri = {cs[0], cs[i], cs[i + 1]};
+                              int[][] tri = {cs[0], cs[i], cs[i+1]};
                               float[] fn = faceNormal(v.get(tri[0][0]), v.get(tri[1][0]), v.get(tri[2][0]));
                               for (int[] c : tri) {
                                   float[] pos = v.get(c[0]);
                                   float[] nrm = c[2] >= 0 ? vn.get(c[2]) : fn;
-                                  float[] uv = c[1] >= 0 ? vt.get(c[1]) : new float[]{0f, 0f};
+                                  float[] uv  = c[1] >= 0 ? vt.get(c[1]) : new float[]{0f, 0f};
                                   out.add(pos[0]); out.add(pos[1]); out.add(pos[2]);
                                   out.add(nrm[0]); out.add(nrm[1]); out.add(nrm[2]);
-                                  out.add(uv[0]); out.add(uv[1]);
+                                  out.add(uv[0]);  out.add(uv[1]);
                               }
                           }
                       }
@@ -732,15 +855,21 @@ jobs:
                   return m;
               }
 
-              static float[] readAcc(JSONArray accessors, JSONArray views, ByteBuffer bin, int ai)
-                      throws Exception {
+              // FIX: lectura robusta de accessors con tipos enteros correctos
+              static float[] readAcc(JSONArray accessors, JSONArray views, ByteBuffer bin, int ai) throws Exception {
                   JSONObject a = accessors.getJSONObject(ai);
                   int count = a.getInt("count");
                   int ctype = a.getInt("componentType");
                   String type = a.getString("type");
                   int comps = type.equals("SCALAR") ? 1 : type.equals("VEC2") ? 2 : type.equals("VEC3") ? 3 : 4;
                   JSONObject bv = views.getJSONObject(a.getInt("bufferView"));
-                  int csize = (ctype == 5120 || ctype == 5121) ? 1 : (ctype == 5122 || ctype == 5123) ? 2 : 4;
+                  int csize;
+                  switch (ctype) {
+                      case 5120: case 5121: csize = 1; break;
+                      case 5122: case 5123: csize = 2; break;
+                      case 5125: case 5126: csize = 4; break;
+                      default: csize = 4;
+                  }
                   int stride = bv.optInt("byteStride", csize * comps);
                   int base = bv.optInt("byteOffset", 0) + a.optInt("byteOffset", 0);
                   float[] out = new float[count * comps];
@@ -764,8 +893,7 @@ jobs:
               }
 
               static Bitmap materialTexture(JSONArray mats, JSONArray texs, JSONArray imgs,
-                                            JSONArray views, byte[] data, int binStart, int matIdx)
-                      throws Exception {
+                                            JSONArray views, byte[] data, int binStart, int matIdx) throws Exception {
                   if (mats == null || texs == null || imgs == null || matIdx < 0) return null;
                   JSONObject mat = mats.getJSONObject(matIdx);
                   JSONObject pbr = mat.optJSONObject("pbrMetallicRoughness");
@@ -774,6 +902,7 @@ jobs:
                   if (bct == null) return null;
                   int src = texs.getJSONObject(bct.getInt("index")).getInt("source");
                   JSONObject img = imgs.getJSONObject(src);
+                  if (!img.has("bufferView")) return null;
                   JSONObject bv = views.getJSONObject(img.getInt("bufferView"));
                   int off = bv.optInt("byteOffset", 0);
                   int len = bv.getInt("byteLength");
@@ -782,7 +911,7 @@ jobs:
 
               static Model parseGlb(byte[] data, String name) throws Exception {
                   ByteBuffer hb = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
-                  if (hb.getInt(0) != 0x46546C67) throw new Exception("El archivo no es un GLB valido");
+                  if (hb.getInt(0) != 0x46546C67) throw new Exception("No es un GLB válido");
                   int jsonLen = hb.getInt(12);
                   JSONObject root = new JSONObject(new String(data, 20, jsonLen, "UTF-8"));
                   int binChunk = 20 + jsonLen;
@@ -793,7 +922,8 @@ jobs:
 
                   JSONArray accessors = root.getJSONArray("accessors");
                   JSONArray views = root.getJSONArray("bufferViews");
-                  JSONArray meshes = root.getJSONArray("meshes");
+                  JSONArray meshes = root.optJSONArray("meshes");
+                  if (meshes == null || meshes.length() == 0) throw new Exception("GLB sin mallas");
                   JSONArray mats = root.optJSONArray("materials");
                   JSONArray texs = root.optJSONArray("textures");
                   JSONArray imgs = root.optJSONArray("images");
@@ -807,38 +937,60 @@ jobs:
                           JSONObject at = prim.getJSONObject("attributes");
                           float[] pos = readAcc(accessors, views, bin, at.getInt("POSITION"));
                           float[] nrm = at.has("NORMAL") ? readAcc(accessors, views, bin, at.getInt("NORMAL")) : null;
-                          float[] uv = at.has("TEXCOORD_0") ? readAcc(accessors, views, bin, at.getInt("TEXCOORD_0")) : null;
-                          float[] idx;
+                          float[] uv  = at.has("TEXCOORD_0") ? readAcc(accessors, views, bin, at.getInt("TEXCOORD_0")) : null;
+
+                          int idxCount;
+                          int[] idxInt;
                           if (prim.has("indices")) {
-                              idx = readAcc(accessors, views, bin, prim.getInt("indices"));
+                              JSONObject ia = accessors.getJSONObject(prim.getInt("indices"));
+                              idxCount = ia.getInt("count");
+                              int ctype = ia.getInt("componentType");
+                              JSONObject bv = views.getJSONObject(ia.getInt("bufferView"));
+                              int base = bv.optInt("byteOffset", 0) + ia.optInt("byteOffset", 0);
+                              idxInt = new int[idxCount];
+                              for (int i = 0; i < idxCount; i++) {
+                                  int p = base + i * (ctype == 5123 ? 2 : ctype == 5125 ? 4 : 1);
+                                  switch (ctype) {
+                                      case 5123: idxInt[i] = bin.getShort(p) & 0xFFFF; break;
+                                      case 5125: idxInt[i] = bin.getInt(p); break;
+                                      case 5121: idxInt[i] = bin.get(p) & 0xFF; break;
+                                      default:   idxInt[i] = i;
+                                  }
+                              }
                           } else {
-                              idx = new float[pos.length / 3];
-                              for (int i = 0; i < idx.length; i++) idx[i] = i;
+                              idxCount = pos.length / 3;
+                              idxInt = new int[idxCount];
+                              for (int i = 0; i < idxCount; i++) idxInt[i] = i;
                           }
-                          float[] verts = new float[idx.length * 8];
+
+                          float[] verts = new float[idxCount * 8];
                           int k = 0;
-                          for (int i = 0; i < idx.length; i++) {
-                              int vi = (int) idx[i];
+                          for (int i = 0; i < idxCount; i++) {
+                              int vi = idxInt[i];
+                              if (vi < 0 || vi * 3 + 2 >= pos.length) continue;
                               k = vtx(verts, k,
-                                  pos[vi * 3], pos[vi * 3 + 1], pos[vi * 3 + 2],
-                                  nrm != null ? nrm[vi * 3] : 0f,
-                                  nrm != null ? nrm[vi * 3 + 1] : 1f,
-                                  nrm != null ? nrm[vi * 3 + 2] : 0f,
-                                  uv != null ? uv[vi * 2] : 0f,
-                                  uv != null ? uv[vi * 2 + 1] : 0f);
+                                  pos[vi*3], pos[vi*3+1], pos[vi*3+2],
+                                  nrm != null && vi*3+2 < nrm.length ? nrm[vi*3]   : 0f,
+                                  nrm != null && vi*3+2 < nrm.length ? nrm[vi*3+1] : 1f,
+                                  nrm != null && vi*3+2 < nrm.length ? nrm[vi*3+2] : 0f,
+                                  uv  != null && vi*2+1 < uv.length  ? uv[vi*2]    : 0f,
+                                  uv  != null && vi*2+1 < uv.length  ? uv[vi*2+1]  : 0f);
                           }
                           Part part = new Part();
-                          part.verts = verts;
+                          part.verts = Arrays.copyOf(verts, k);
                           part.tex = materialTexture(mats, texs, imgs, views, data, binStart,
                               prim.optInt("material", -1));
-                          m.parts.add(part);
+                          if (part.verts.length > 0) m.parts.add(part);
                       }
                   }
-                  if (m.parts.isEmpty()) throw new Exception("El GLB no tiene geometria");
+                  if (m.parts.isEmpty()) throw new Exception("GLB sin geometría");
                   normalize(m.parts);
                   return m;
               }
 
+              // ============================================================
+              // Herramientas / escena
+              // ============================================================
               private void setTool(int t) {
                   tool = t;
                   highlightTools();
@@ -848,30 +1000,25 @@ jobs:
               private void highlightTools() {
                   for (int i = 0; i < toolBtns.length; i++) {
                       boolean on = i == tool;
-                      toolBtns[i].setBackground(rounded(on ? C_ACCENT : 0x00000000, 10));
-                      toolBtns[i].setTextColor(on ? 0xFFFFFFFF : C_MUTED);
+                      toolBtns[i].setBackground(rounded(on ? C_PRIMARY : C_SURFACE2, 16));
+                      toolBtns[i].setTextColor(on ? C_BG : C_TEXT);
                   }
                   if (camBtn != null && renderer != null) {
                       boolean on = renderer.camView;
-                      camBtn.setBackground(rounded(on ? C_ACCENT_DIM : 0x00000000, 10));
-                      camBtn.setTextColor(on ? C_TEXT : C_MUTED);
+                      camBtn.setBackground(rounded(on ? C_PRIMARY_C : C_SURFACE2, 16));
+                      camBtn.setTextColor(on ? C_TEXT : C_TEXT);
                   }
               }
 
               private Obj selected() {
                   synchronized (scene) {
-                      for (Obj o : scene) {
-                          if (o.selected) return o;
-                      }
+                      for (Obj o : scene) if (o.selected) return o;
                   }
                   return null;
               }
-
               private Obj findCamera() {
                   synchronized (scene) {
-                      for (Obj o : scene) {
-                          if (o.isCam) return o;
-                      }
+                      for (Obj o : scene) if (o.isCam) return o;
                   }
                   return null;
               }
@@ -889,11 +1036,12 @@ jobs:
                       o.selected = true;
                       scene.add(o);
                   }
+                  pushUndo();
                   refreshPanels();
               }
 
               private Obj newCamera() {
-                  Obj c = new Obj("Camara", new float[]{1f, 1f, 1f});
+                  Obj c = new Obj("Cámara", new float[]{1f, 1f, 1f});
                   c.isCam = true;
                   c.pos[1] = 1.5f;
                   c.pos[2] = 5f;
@@ -928,21 +1076,25 @@ jobs:
               }
 
               private void updateModeLabel() {
-                  if (modeBtn != null) modeBtn.setText(renderer.real ? "Real" : "Solido");
+                  if (modeBtn != null) {
+                      modeBtn.setText(renderer.real ? "Real" : "Sólido");
+                      modeBtn.setBackground(rounded(renderer.real ? C_PRIMARY : C_SURFACE2, 18));
+                      modeBtn.setTextColor(renderer.real ? C_BG : C_TEXT);
+                  }
               }
 
               private void resetView() {
                   renderer.rotX = 25f;
                   renderer.rotY = 35f;
                   renderer.dist = 10f;
+                  renderer.panX = 0f;
+                  renderer.panY = 0f;
               }
 
               private void cycleMaterial() {
                   Obj o = selected();
-                  if (o == null || o.isCam) {
-                      toast("Selecciona un objeto");
-                      return;
-                  }
+                  if (o == null || o.isCam) { toast("Selecciona un objeto"); return; }
+                  pushUndo();
                   o.mat = (o.mat + 1) % MAT_NAME.length;
                   updateProps();
               }
@@ -950,22 +1102,92 @@ jobs:
               private void deleteSelected() {
                   synchronized (scene) {
                       Obj sel = null;
-                      for (Obj o : scene) {
-                          if (o.selected) { sel = o; break; }
+                      int idx = -1;
+                      for (int i = 0; i < scene.size(); i++) {
+                          if (scene.get(i).selected) { sel = scene.get(i); idx = i; break; }
                       }
-                      if (sel != null) scene.remove(sel);
+                      if (sel == null) { toast("Nada que eliminar"); return; }
+                      if (sel.isCam) { toast("No puedes eliminar la cámara"); return; }
+                      scene.remove(sel);
+                      // FIX: auto-selección
+                      if (!scene.isEmpty()) {
+                          int next = Math.min(idx, scene.size() - 1);
+                          scene.get(next).selected = true;
+                      }
                   }
+                  pushUndo();
                   refreshPanels();
               }
 
+              private void toggleSnap() {
+                  snapEnabled = !snapEnabled;
+                  updateSnapState();
+              }
+
+              private void updateSnapState() {
+                  if (snapBtn == null) return;
+                  snapBtn.setBackground(rounded(snapEnabled ? C_TERTIARY : C_SURFACE2, 16));
+                  snapBtn.setTextColor(snapEnabled ? C_BG : C_TEXT);
+              }
+
+              private float snap(float v) {
+                  if (!snapEnabled) return v;
+                  return Math.round(v / snapStep) * snapStep;
+              }
+
+              // ---------- Undo / Redo ----------
+              private void pushUndo() {
+                  undoStack.addLast(new SceneSnapshot(scene));
+                  while (undoStack.size() > MAX_UNDO) undoStack.removeFirst();
+                  redoStack.clear();
+                  updateUndoRedoState();
+              }
+              private void undo() {
+                  if (undoStack.size() < 2) { toast("Nada que deshacer"); return; }
+                  redoStack.addLast(undoStack.removeLast());
+                  SceneSnapshot s = undoStack.getLast();
+                  restoreSnapshot(s);
+                  updateUndoRedoState();
+              }
+              private void redo() {
+                  if (redoStack.isEmpty()) { toast("Nada que rehacer"); return; }
+                  SceneSnapshot s = redoStack.removeLast();
+                  undoStack.addLast(s);
+                  restoreSnapshot(s);
+                  updateUndoRedoState();
+              }
+              private void restoreSnapshot(SceneSnapshot s) {
+                  synchronized (scene) {
+                      scene.clear();
+                      for (Obj o : s.objs) {
+                          Obj copy = o.snapshot();
+                          // reconstruir GLPart references desde los originales si es posible
+                          scene.add(copy);
+                      }
+                  }
+                  refreshPanels();
+              }
+              private void updateUndoRedoState() {
+                  if (undoBtn != null) {
+                      boolean canUndo = undoStack.size() >= 2;
+                      undoBtn.setAlpha(canUndo ? 1f : 0.35f);
+                  }
+                  if (redoBtn != null) {
+                      boolean canRedo = !redoStack.isEmpty();
+                      redoBtn.setAlpha(canRedo ? 1f : 0.35f);
+                  }
+              }
+
+              // ---------- Transformación por eje ----------
               private int pickAxis(float px, float py) {
                   if (tool == TOOL_SEL) return -1;
                   Obj o = selected();
                   if (o == null) return -1;
-                  float L = renderer.dist * 0.12f;
+                  float L = renderer.dist * 0.14f;
                   float[] o2 = renderer.project(o.pos[0], o.pos[1], o.pos[2]);
                   if (o2 == null) return -1;
-                  float best = dp(32);
+                  // Umbral adaptativo según distancia
+                  float best = dp(28) + renderer.dist * 1.5f;
                   int hit = -1;
                   for (int a = 0; a < 3; a++) {
                       float[] t2 = renderer.project(
@@ -980,7 +1202,7 @@ jobs:
               }
 
               private void applyAxis(Obj o, int a, float dx, float dy) {
-                  float L = renderer.dist * 0.12f;
+                  float L = renderer.dist * 0.14f;
                   float[] o2 = renderer.project(o.pos[0], o.pos[1], o.pos[2]);
                   float[] t2 = renderer.project(
                       o.pos[0] + (a == 0 ? L : 0),
@@ -988,15 +1210,20 @@ jobs:
                       o.pos[2] + (a == 2 ? L : 0));
                   if (o2 == null || t2 == null) return;
                   float ux = t2[0] - o2[0], uy = t2[1] - o2[1];
-                  float len = (float) Math.sqrt(ux * ux + uy * uy);
+                  float len = (float) Math.sqrt(ux*ux + uy*uy);
                   if (len < 1f) return;
+                  // FIX: proyección correcta del drag sobre el eje en pantalla
                   float along = (dx * ux + dy * uy) / len;
+                  float sign = Math.signum(ux + uy);
+                  if (sign == 0) sign = 1f;
+                  float delta = along * sign;
+
                   if (tool == TOOL_MOV) {
-                      o.pos[a] += along * (L / len);
+                      o.pos[a] = snap(o.pos[a] + delta * (L / len));
                   } else if (tool == TOOL_ROT) {
-                      o.rot[a] += along * 0.6f;
+                      o.rot[a] += delta * 0.8f;
                   } else if (tool == TOOL_SCA && !o.isCam) {
-                      o.scl[a] = clamp(o.scl[a] + along * 0.01f, 0.05f, 10f);
+                      o.scl[a] = clamp(o.scl[a] + delta * 0.015f, 0.05f, 20f);
                   }
               }
 
@@ -1006,27 +1233,31 @@ jobs:
                       applyAxis(sel, activeAxis, dx, dy);
                   } else if (!renderer.camView) {
                       renderer.rotY += dx * 0.4f;
-                      renderer.rotX += dy * 0.4f;
+                      renderer.rotX = clamp(renderer.rotX + dy * 0.4f, -89f, 89f); // FIX: clamp pitch
                   }
                   updateProps();
               }
 
+              // ---------- Refrescar paneles ----------
               private void refreshPanels() {
                   outliner.removeAllViews();
+                  boolean any = false;
                   synchronized (scene) {
                       for (final Obj o : scene) {
-                          String icon = o.isCam ? "\u25C9  " : "\u25A2  ";
-                          TextView r = text(icon + o.name, 12, o.selected ? C_TEXT : C_MUTED);
-                          r.setPadding(dp(8), dp(6), dp(8), dp(6));
-                          if (o.selected) r.setBackground(rounded(C_ACCENT_DIM, 8));
-                          r.setOnClickListener(v -> select(o));
+                          any = true;
+                          String icon = o.isCam ? "◉  " : "▣  ";
+                          TextView r = text(icon + o.name, 12, o.selected ? C_TEXT : C_TEXT_DIM);
+                          r.setPadding(dp(10), dp(8), dp(10), dp(8));
+                          r.setBackground(rounded(o.selected ? C_PRIMARY_C : 0x00000000, 10));
+                          r.setOnClickListener(v -> { haptic(); select(o); });
                           LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(MATCH, WRAP);
                           p.setMargins(0, 0, 0, dp(4));
                           outliner.addView(r, p);
                       }
                   }
-                  String mode = renderer.camView && findCamera() != null ? "Camara" : "Perspectiva";
-                  overlay.setText(mode + " \u00B7 " + TOOL_NAME[tool]);
+                  outlinerEmpty.setVisibility(any ? View.GONE : View.VISIBLE);
+                  String mode = renderer.camView && findCamera() != null ? "Cámara" : "Perspectiva";
+                  if (statusText != null) statusText.setText(mode + "  ·  " + TOOL_NAME[tool]);
                   updateProps();
                   updateModeLabel();
                   highlightTools();
@@ -1035,37 +1266,36 @@ jobs:
               private void updateProps() {
                   Obj o = selected();
                   if (o == null) {
-                      propName.setText("Nada seleccionado");
-                      propLoc.setText("");
-                      propRot.setText("");
-                      propScale.setText("");
-                      propMat.setText("");
+                      propName.setText("—");
+                      propLoc.setText(""); propRot.setText("");
+                      propScale.setText(""); propMat.setText("");
                       return;
                   }
                   propName.setText(o.name);
-                  propLoc.setText(String.format(Locale.US, "Pos  %.2f  %.2f  %.2f",
+                  propLoc.setText(String.format(Locale.US, "Pos   %6.2f  %6.2f  %6.2f",
                       o.pos[0], o.pos[1], o.pos[2]));
-                  propRot.setText(String.format(Locale.US, "Rot  %.0f\u00B0  %.0f\u00B0  %.0f\u00B0",
+                  propRot.setText(String.format(Locale.US, "Rot   %5.0f°  %5.0f°  %5.0f°",
                       o.rot[0], o.rot[1], o.rot[2]));
-                  propScale.setText(o.isCam ? "Campo de vision  45\u00B0"
-                      : String.format(Locale.US, "Escala  %.2f  %.2f  %.2f",
+                  propScale.setText(o.isCam ? "FOV   45°"
+                      : String.format(Locale.US, "Escala %5.2f  %5.2f  %5.2f",
                           o.scl[0], o.scl[1], o.scl[2]));
                   propMat.setText(o.isCam ? ""
-                      : MAT_NAME[o.mat] + "  R " + String.format(Locale.US, "%.2f", MAT_ROUGH[o.mat])
-                      + "  M " + String.format(Locale.US, "%.0f", MAT_METAL[o.mat]));
+                      : MAT_NAME[o.mat] + "  ·  R " + String.format(Locale.US, "%.2f", MAT_ROUGH[o.mat])
+                          + "  ·  M " + String.format(Locale.US, "%.0f%%", MAT_METAL[o.mat] * 100f));
               }
 
-              private Obj makeObjFromModel(Model m) {
-                  return null;
-              }
-
+              // ============================================================
+              // RENDERER
+              // ============================================================
               class Renderer implements GLSurfaceView.Renderer {
                   volatile float rotX = 25f, rotY = 35f, dist = 10f;
+                  volatile float panX = 0f, panY = 0f;
                   volatile boolean real = true, camView, capture, hasSky, ready;
                   volatile int vw = 1, vh = 1;
+
                   private int skyId, prog, progSky;
-                  private int aPos, aNrm, aUv, uMvp, uModel, uTint, uUseTex, uTex, uReal, uShadow, uCam,
-                      uRough, uMetal, uHor, uZen;
+                  private int aPos, aNrm, aUv, uMvp, uModel, uTint, uUseTex, uTex,
+                              uReal, uShadow, uCam, uRough, uMetal, uHor, uZen;
                   private int aSky, uInvVP, sSkyTex, sHas, sHor, sZen;
                   private FloatBuffer gridBuf, axisX, axisY, axisZ, skyBuf, frustumBuf, markerCube;
                   private final FloatBuffer[] gAxis = new FloatBuffer[3];
@@ -1077,85 +1307,94 @@ jobs:
                   private final float[] lastVP = new float[16];
 
                   private static final String MAIN_VS =
-                      "attribute vec3 aPos; attribute vec3 aNrm; attribute vec2 aUv;"
-                      + "uniform mat4 uMvp; uniform mat4 uModel;"
-                      + "varying vec3 vN; varying vec3 vW; varying vec2 vUv;"
-                      + "void main(){ vec4 w = uModel * vec4(aPos,1.0); vW = w.xyz;"
-                      + " vN = (uModel * vec4(aNrm,0.0)).xyz; vUv = aUv;"
-                      + " gl_Position = uMvp * vec4(aPos,1.0); }";
+                      "attribute vec3 aPos; attribute vec3 aNrm; attribute vec2 aUv;\n" +
+                      "uniform mat4 uMvp; uniform mat4 uModel;\n" +
+                      "varying vec3 vN; varying vec3 vW; varying vec2 vUv;\n" +
+                      "void main(){\n" +
+                      "  vec4 w = uModel * vec4(aPos,1.0); vW = w.xyz;\n" +
+                      "  vN = (uModel * vec4(aNrm,0.0)).xyz; vUv = aUv;\n" +
+                      "  gl_Position = uMvp * vec4(aPos,1.0);\n" +
+                      "}";
 
                   private static final String MAIN_FS =
-                      "precision mediump float;"
-                      + "varying vec3 vN; varying vec3 vW; varying vec2 vUv;"
-                      + "uniform vec3 uTint; uniform sampler2D uTex; uniform float uUseTex;"
-                      + "uniform float uReal; uniform float uShadow; uniform vec3 uCam;"
-                      + "uniform float uRough; uniform float uMetal; uniform vec3 uHor; uniform vec3 uZen;"
-                      + "const vec3 SUN = vec3(0.497, 0.795, 0.348);"
-                      + "vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.0,1.0); }"
-                      + "vec3 sky(vec3 d){"
-                      + " vec3 c = mix(uHor, uZen, pow(clamp(d.y,0.0,1.0),0.6));"
-                      + " c = mix(c, vec3(0.30,0.24,0.20), step(d.y,0.0));"
-                      + " c += vec3(1.0,0.9,0.7)*pow(max(dot(d,SUN),0.0),300.0)*3.0;"
-                      + " return c; }"
-                      + "void main(){"
-                      + " if (uShadow > 0.5) { gl_FragColor = vec4(0.0,0.0,0.0,0.4); return; }"
-                      + " vec3 base = uTint;"
-                      + " if (uUseTex > 0.5) base = texture2D(uTex, vUv).rgb * uTint;"
-                      + " vec3 N = normalize(vN);"
-                      + " if (uReal < 0.5) {"
-                      + "   float d = max(dot(N,SUN),0.0);"
-                      + "   gl_FragColor = vec4(base*(0.35+0.65*d),1.0); return; }"
-                      + " vec3 V = normalize(uCam - vW);"
-                      + " vec3 R = reflect(-V, N);"
-                      + " float ndl = max(dot(N,SUN),0.0);"
-                      + " vec3 H = normalize(SUN + V);"
-                      + " float shin = mix(200.0, 6.0, uRough);"
-                      + " float spec = pow(max(dot(N,H),0.0), shin) * (shin+8.0)/25.13;"
-                      + " vec3 amb = mix(vec3(0.22,0.18,0.16), vec3(0.35,0.5,0.85), N.y*0.5+0.5);"
-                      + " vec3 F0 = mix(vec3(0.04), base, uMetal);"
-                      + " float fres = pow(1.0-max(dot(N,V),0.0),5.0);"
-                      + " vec3 kd = base*(1.0-uMetal);"
-                      + " vec3 sunCol = vec3(1.0,0.93,0.82);"
-                      + " vec3 col = kd*(sunCol*ndl*1.7 + amb*0.9);"
-                      + " col += F0*sunCol*spec*ndl*1.5;"
-                      + " col += (F0+(1.0-F0)*fres)*sky(R)*(1.0-uRough*0.6)*0.8;"
-                      + " col = aces(col*1.15);"
-                      + " float lum = dot(col, vec3(0.299,0.587,0.114));"
-                      + " col = clamp(mix(vec3(lum), col, 1.3), 0.0, 1.0);"
-                      + " gl_FragColor = vec4(pow(col, vec3(0.4545)), 1.0); }";
+                      "precision highp float;\n" +
+                      "varying vec3 vN; varying vec3 vW; varying vec2 vUv;\n" +
+                      "uniform vec3 uTint; uniform sampler2D uTex; uniform float uUseTex;\n" +
+                      "uniform float uReal; uniform float uShadow; uniform vec3 uCam;\n" +
+                      "uniform float uRough; uniform float uMetal; uniform vec3 uHor; uniform vec3 uZen;\n" +
+                      "const vec3 SUN = normalize(vec3(0.5, 0.8, 0.35));\n" +
+                      "vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.0,1.0); }\n" +
+                      "vec3 skyCol(vec3 d){\n" +
+                      "  vec3 c = mix(uHor, uZen, pow(clamp(d.y,0.0,1.0),0.6));\n" +
+                      "  c = mix(c, vec3(0.30,0.24,0.20), step(d.y,0.0));\n" +
+                      "  c += vec3(1.0,0.9,0.7)*pow(max(dot(d,SUN),0.0),400.0)*3.5;\n" +
+                      "  return c;\n" +
+                      "}\n" +
+                      "void main(){\n" +
+                      "  if (uShadow > 0.5) { gl_FragColor = vec4(0.0,0.0,0.0,0.35); return; }\n" +
+                      "  vec3 base = uTint;\n" +
+                      "  if (uUseTex > 0.5) base = texture2D(uTex, vUv).rgb * uTint;\n" +
+                      "  vec3 N = normalize(vN);\n" +
+                      "  if (uReal < 0.5) {\n" +
+                      "    float d = max(dot(N,SUN),0.0);\n" +
+                      "    gl_FragColor = vec4(base*(0.35+0.65*d),1.0); return;\n" +
+                      "  }\n" +
+                      "  vec3 V = normalize(uCam - vW);\n" +
+                      "  vec3 R = reflect(-V, N);\n" +
+                      "  float ndl = max(dot(N,SUN),0.0);\n" +
+                      "  vec3 H = normalize(SUN + V);\n" +
+                      "  float shin = mix(220.0, 6.0, uRough);\n" +
+                      "  float spec = pow(max(dot(N,H),0.0), shin) * (shin+8.0)/25.13;\n" +
+                      "  vec3 amb = mix(vec3(0.22,0.18,0.16), vec3(0.35,0.5,0.85), N.y*0.5+0.5);\n" +
+                      "  vec3 F0 = mix(vec3(0.04), base, uMetal);\n" +
+                      "  float fres = pow(1.0-max(dot(N,V),0.0),5.0);\n" +
+                      "  vec3 kd = base*(1.0-uMetal);\n" +
+                      "  vec3 sunCol = vec3(1.0,0.93,0.82);\n" +
+                      "  vec3 col = kd*(sunCol*ndl*1.7 + amb*0.9);\n" +
+                      "  col += F0*sunCol*spec*ndl*1.5;\n" +
+                      "  col += (F0+(1.0-F0)*fres)*skyCol(R)*(1.0-uRough*0.6)*0.8;\n" +
+                      "  col = aces(col*1.15);\n" +
+                      "  float lum = dot(col, vec3(0.299,0.587,0.114));\n" +
+                      "  col = clamp(mix(vec3(lum), col, 1.3), 0.0, 1.0);\n" +
+                      "  gl_FragColor = vec4(pow(col, vec3(0.4545)), 1.0);\n" +
+                      "}";
 
                   private static final String SKY_VS =
-                      "attribute vec2 aSky; uniform mat4 uInvVP; varying vec3 vDir;"
-                      + "void main(){ vec4 q = uInvVP * vec4(aSky, 0.9999, 1.0);"
-                      + " vDir = q.xyz / q.w; gl_Position = vec4(aSky, 0.9999, 1.0); }";
+                      "attribute vec2 aSky; uniform mat4 uInvVP; varying vec3 vDir;\n" +
+                      "void main(){\n" +
+                      "  vec4 q = uInvVP * vec4(aSky, 0.9999, 1.0);\n" +
+                      "  vDir = q.xyz / q.w;\n" +
+                      "  gl_Position = vec4(aSky, 0.9999, 1.0);\n" +
+                      "}";
 
+                  // FIX: una sola corrección gamma consistente
                   private static final String SKY_FS =
-                      "precision mediump float; varying vec3 vDir;"
-                      + "uniform sampler2D uSkyTex; uniform float uHasSky; uniform vec3 uHor; uniform vec3 uZen;"
-                      + "const vec3 SUN = vec3(0.497, 0.795, 0.348);"
-                      + "vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.0,1.0); }"
-                      + "vec3 sky(vec3 d){"
-                      + " vec3 c = mix(uHor, uZen, pow(clamp(d.y,0.0,1.0),0.6));"
-                      + " c = mix(c, vec3(0.30,0.24,0.20), step(d.y,0.0));"
-                      + " c += vec3(1.0,0.9,0.7)*pow(max(dot(d,SUN),0.0),300.0)*3.0;"
-                      + " return c; }"
-                      + "void main(){"
-                      + " vec3 d = normalize(vDir); vec3 col;"
-                      + " if (uHasSky > 0.5) {"
-                      + "   float u = atan(d.z, d.x)/6.28318 + 0.5;"
-                      + "   float v = 0.5 + asin(clamp(d.y,-1.0,1.0))/3.14159;"
-                      + "   col = pow(texture2D(uSkyTex, vec2(u, 1.0-v)).rgb, vec3(2.2));"
-                      + " } else { col = sky(d); }"
-                      + " col = aces(col*1.1);"
-                      + " gl_FragColor = vec4(pow(col, vec3(0.4545)), 1.0); }";
+                      "precision highp float; varying vec3 vDir;\n" +
+                      "uniform sampler2D uSkyTex; uniform float uHasSky; uniform vec3 uHor; uniform vec3 uZen;\n" +
+                      "const vec3 SUN = normalize(vec3(0.5, 0.8, 0.35));\n" +
+                      "vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.0,1.0); }\n" +
+                      "vec3 skyCol(vec3 d){\n" +
+                      "  vec3 c = mix(uHor, uZen, pow(clamp(d.y,0.0,1.0),0.6));\n" +
+                      "  c = mix(c, vec3(0.30,0.24,0.20), step(d.y,0.0));\n" +
+                      "  c += vec3(1.0,0.9,0.7)*pow(max(dot(d,SUN),0.0),400.0)*3.5;\n" +
+                      "  return c;\n" +
+                      "}\n" +
+                      "void main(){\n" +
+                      "  vec3 d = normalize(vDir); vec3 col;\n" +
+                      "  if (uHasSky > 0.5) {\n" +
+                      "    float u = atan(d.z, d.x)/6.28318 + 0.5;\n" +
+                      "    float v = 0.5 + asin(clamp(d.y,-1.0,1.0))/3.14159;\n" +
+                      "    col = pow(texture2D(uSkyTex, vec2(u, 1.0-v)).rgb, vec3(2.2));\n" +
+                      "  } else { col = skyCol(d); }\n" +
+                      "  col = aces(col*1.1);\n" +
+                      "  gl_FragColor = vec4(pow(col, vec3(0.4545)), 1.0);\n" +
+                      "}";
 
-                  void requestCapture() {
-                      capture = true;
-                  }
+                  void requestCapture() { capture = true; }
 
                   @Override
                   public void onSurfaceCreated(GL10 gl, EGLConfig c) {
-                      GLES20.glClearColor(0.12f, 0.12f, 0.14f, 1f);
+                      GLES20.glClearColor(0.05f, 0.05f, 0.07f, 1f);
                       GLES20.glEnable(GLES20.GL_DEPTH_TEST);
                       GLES20.glEnable(GLES20.GL_BLEND);
                       GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
@@ -1163,7 +1402,7 @@ jobs:
                       progSky = link(SKY_VS, SKY_FS);
                       aPos = GLES20.glGetAttribLocation(prog, "aPos");
                       aNrm = GLES20.glGetAttribLocation(prog, "aNrm");
-                      aUv = GLES20.glGetAttribLocation(prog, "aUv");
+                      aUv  = GLES20.glGetAttribLocation(prog, "aUv");
                       uMvp = GLES20.glGetUniformLocation(prog, "uMvp");
                       uModel = GLES20.glGetUniformLocation(prog, "uModel");
                       uTint = GLES20.glGetUniformLocation(prog, "uTint");
@@ -1192,7 +1431,6 @@ jobs:
                       GLES20.glLinkProgram(p);
                       return p;
                   }
-
                   private int compile(int type, String src) {
                       int s = GLES20.glCreateShader(type);
                       GLES20.glShaderSource(s, src);
@@ -1215,8 +1453,8 @@ jobs:
 
                   private FloatBuffer frustum() {
                       float[][] c = {
-                          {-0.6f, -0.4f, -1.2f}, {0.6f, -0.4f, -1.2f},
-                          {0.6f, 0.4f, -1.2f}, {-0.6f, 0.4f, -1.2f}
+                          {-0.6f,-0.4f,-1.2f},{0.6f,-0.4f,-1.2f},
+                          {0.6f, 0.4f,-1.2f},{-0.6f, 0.4f,-1.2f}
                       };
                       float[] v = new float[16 * 8];
                       int k = 0;
@@ -1238,9 +1476,9 @@ jobs:
                       for (int i = -10; i <= 10; i++) {
                           if (i == 0) continue;
                           k = vtx(g, k, -10, -1, i, 0, 1, 0, 0, 0);
-                          k = vtx(g, k, 10, -1, i, 0, 1, 0, 0, 0);
+                          k = vtx(g, k,  10, -1, i, 0, 1, 0, 0, 0);
                           k = vtx(g, k, i, -1, -10, 0, 1, 0, 0, 0);
-                          k = vtx(g, k, i, -1, 10, 0, 1, 0, 0, 0);
+                          k = vtx(g, k, i, -1,  10, 0, 1, 0, 0, 0);
                       }
                       gridBuf = toBuffer(g);
                       axisX = lineBuf(-10, -1, 0, 10, -1, 0);
@@ -1257,10 +1495,13 @@ jobs:
 
                   private int uploadTex(Bitmap src) {
                       Bitmap bmp = src;
+                      boolean scaled = false;
                       if (src.getWidth() > 2048 || src.getHeight() > 2048) {
                           float sc = 2048f / Math.max(src.getWidth(), src.getHeight());
                           bmp = Bitmap.createScaledBitmap(src,
-                              Math.round(src.getWidth() * sc), Math.round(src.getHeight() * sc), true);
+                              Math.round(src.getWidth() * sc),
+                              Math.round(src.getHeight() * sc), true);
+                          scaled = true;
                       }
                       int[] t = new int[1];
                       GLES20.glGenTextures(1, t, 0);
@@ -1271,12 +1512,14 @@ jobs:
                       GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
                       GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bmp, 0);
                       GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
+                      // FIX: liberar bitmap escalado para evitar fugas
+                      if (scaled) bmp.recycle();
                       return t[0];
                   }
 
                   private Obj makeObj(Model m) {
                       Obj o = new Obj(m.name, new float[]{1f, 1f, 1f});
-                      float[] mn = {1e9f, 1e9f, 1e9f}, mx = {-1e9f, -1e9f, -1e9f};
+                      float[] mn = {1e9f,1e9f,1e9f}, mx = {-1e9f,-1e9f,-1e9f};
                       for (Part p : m.parts) {
                           GLPart g = new GLPart();
                           g.buf = toBuffer(p.verts);
@@ -1285,13 +1528,12 @@ jobs:
                           o.parts.add(g);
                           for (int i = 0; i < p.verts.length; i += 8) {
                               for (int a = 0; a < 3; a++) {
-                                  mn[a] = Math.min(mn[a], p.verts[i + a]);
-                                  mx[a] = Math.max(mx[a], p.verts[i + a]);
+                                  mn[a] = Math.min(mn[a], p.verts[i+a]);
+                                  mx[a] = Math.max(mx[a], p.verts[i+a]);
                               }
                           }
                       }
-                      o.bmin = mn;
-                      o.bmax = mx;
+                      o.bmin = mn; o.bmax = mx;
                       o.box = boxEdges(mn, mx);
                       return o;
                   }
@@ -1305,11 +1547,12 @@ jobs:
                               o.selected = true;
                               scene.add(o);
                           }
+                          pushUndo();
                           uiRefresh();
                       }
                       Bitmap bm;
                       while ((bm = pendingTex.poll()) != null) {
-                          int id = uploadTex(bm);
+                          final int id = uploadTex(bm);
                           synchronized (scene) {
                               for (Obj x : scene) {
                                   if (x.selected) {
@@ -1347,10 +1590,7 @@ jobs:
                       GLES20.glUniformMatrix4fv(uMvp, 1, false, mvp, 0);
                       GLES20.glUniformMatrix4fv(uModel, 1, false, m, 0);
                   }
-
-                  private void setTint(float[] c) {
-                      GLES20.glUniform3f(uTint, c[0], c[1], c[2]);
-                  }
+                  private void setTint(float[] c) { GLES20.glUniform3f(uTint, c[0], c[1], c[2]); }
 
                   private void draw(FloatBuffer b, int mode, int count) {
                       b.position(0);
@@ -1399,11 +1639,11 @@ jobs:
                   }
 
                   private void drawGizmo(Obj o) {
-                      float L = dist * 0.12f;
+                      float L = dist * 0.14f;
                       GLES20.glDisable(GLES20.GL_DEPTH_TEST);
                       GLES20.glUniform1f(uReal, 0f);
                       GLES20.glUniform1f(uUseTex, 0f);
-                      GLES20.glLineWidth(3f);
+                      GLES20.glLineWidth(4f);
                       for (int a = 0; a < 3; a++) {
                           float ex = a == 0 ? 1 : 0, ey = a == 1 ? 1 : 0, ez = a == 2 ? 1 : 0;
                           setTint(AX_COL[a]);
@@ -1412,9 +1652,7 @@ jobs:
                           Matrix.scaleM(gm, 0, L, L, L);
                           setMats(gm);
                           draw(gAxis[a], GLES20.GL_LINES, 2);
-                          if (tool == TOOL_ROT) {
-                              draw(ringBufs[a], GLES20.GL_LINES, 96);
-                          }
+                          if (tool == TOOL_ROT) draw(ringBufs[a], GLES20.GL_LINES, 96);
                           float ms = L * (tool == TOOL_SCA ? 0.09f : 0.12f);
                           Matrix.setIdentityM(gm, 0);
                           Matrix.translateM(gm, 0, o.pos[0] + ex * L, o.pos[1] + ey * L, o.pos[2] + ez * L);
@@ -1428,8 +1666,7 @@ jobs:
 
                   @Override
                   public void onSurfaceChanged(GL10 gl, int w, int h) {
-                      vw = w;
-                      vh = h;
+                      vw = w; vh = h;
                       GLES20.glViewport(0, 0, w, h);
                       Matrix.perspectiveM(proj, 0, 45f, w / (float) h, 0.1f, 100f);
                   }
@@ -1438,23 +1675,19 @@ jobs:
                   public void onDrawFrame(GL10 gl) {
                       processPending();
                       GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
-
                       Obj cam = camView ? findCamera() : null;
                       if (cam != null) {
                           camModel(cam, model);
                           Matrix.invertM(view, 0, model, 0);
                       } else {
                           Matrix.setIdentityM(view, 0);
-                          Matrix.translateM(view, 0, 0, 0, -dist);
+                          Matrix.translateM(view, 0, -panX, -panY, -dist);
                           Matrix.rotateM(view, 0, rotX, 1, 0, 0);
                           Matrix.rotateM(view, 0, rotY, 0, 1, 0);
                       }
                       Matrix.multiplyMM(vp, 0, proj, 0, view, 0);
-                      synchronized (lastVP) {
-                          System.arraycopy(vp, 0, lastVP, 0, 16);
-                      }
+                      synchronized (lastVP) { System.arraycopy(vp, 0, lastVP, 0, 16); }
                       ready = true;
-
                       Matrix.invertM(inv, 0, view, 0);
                       float[] eye = new float[4];
                       Matrix.multiplyMV(eye, 0, inv, 0, new float[]{0, 0, 0, 1}, 0);
@@ -1471,20 +1704,16 @@ jobs:
                       GLES20.glUniform3f(uCam, eye[0], eye[1], eye[2]);
                       GLES20.glUniform3f(uHor, 0.62f, 0.78f, 0.98f);
                       GLES20.glUniform3f(uZen, 0.10f, 0.35f, 0.92f);
-
                       GLES20.glUniform1f(uReal, 0f);
+
                       Matrix.setIdentityM(model, 0);
                       setMats(model);
-                      GLES20.glUniform3f(uTint, 0.32f, 0.32f, 0.38f);
+                      GLES20.glUniform3f(uTint, 0.30f, 0.30f, 0.36f);
                       draw(gridBuf, GLES20.GL_LINES, 80);
-
                       GLES20.glLineWidth(2f);
-                      setTint(AX_COL[0]);
-                      draw(axisX, GLES20.GL_LINES, 2);
-                      setTint(AX_COL[1]);
-                      draw(axisY, GLES20.GL_LINES, 2);
-                      setTint(AX_COL[2]);
-                      draw(axisZ, GLES20.GL_LINES, 2);
+                      setTint(AX_COL[0]); draw(axisX, GLES20.GL_LINES, 2);
+                      setTint(AX_COL[1]); draw(axisY, GLES20.GL_LINES, 2);
+                      setTint(AX_COL[2]); draw(axisZ, GLES20.GL_LINES, 2);
 
                       Obj sel = null;
                       synchronized (scene) {
@@ -1493,13 +1722,12 @@ jobs:
                               for (Obj o : scene) {
                                   if (o.isCam) continue;
                                   buildModel(o, model);
-                                  Matrix.multiplyMM(sm, 0, SHADOW_M_MAT, 0, model, 0);
+                                  Matrix.multiplyMM(sm, 0, SHADOW_M, 0, model, 0);
                                   setMats(sm);
                                   for (GLPart g : o.parts) draw(g.buf, GLES20.GL_TRIANGLES, g.count);
                               }
                               GLES20.glUniform1f(uShadow, 0f);
                           }
-
                           for (Obj o : scene) {
                               if (o.selected) sel = o;
                               if (o.isCam) {
@@ -1511,7 +1739,6 @@ jobs:
                                   draw(frustumBuf, GLES20.GL_LINES, 16);
                                   continue;
                               }
-
                               buildModel(o, model);
                               setMats(model);
                               GLES20.glUniform1f(uReal, isReal ? 1f : 0f);
@@ -1534,15 +1761,10 @@ jobs:
                               setTint(o.selected ? SEL_COL : OFF_COL);
                               draw(o.box, GLES20.GL_LINES, 24);
                           }
-
                           if (sel != null && tool != TOOL_SEL && !doCapture) drawGizmo(sel);
                       }
-
                       enableAttribs(false);
-                      if (doCapture) {
-                          capture = false;
-                          saveFrame();
-                      }
+                      if (doCapture) { capture = false; saveFrame(); }
                   }
 
                   private void saveFrame() {
@@ -1562,7 +1784,7 @@ jobs:
                       try {
                           String stamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
                           ContentValues cv = new ContentValues();
-                          cv.put(MediaStore.Images.Media.DISPLAY_NAME, "render_" + stamp + ".png");
+                          cv.put(MediaStore.Images.Media.DISPLAY_NAME, "prisma_" + stamp + ".png");
                           cv.put(MediaStore.Images.Media.MIME_TYPE, "image/png");
                           cv.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Prisma3D");
                           Uri u = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv);
@@ -1571,23 +1793,28 @@ jobs:
                           OutputStream os = getContentResolver().openOutputStream(u);
                           bmp.compress(Bitmap.CompressFormat.PNG, 100, os);
                           os.close();
-                          uiToast("Render guardado en Imagenes/Prisma3D");
+                          bmp.recycle();
+                          toast("Render guardado en Imágenes/Prisma3D");
                       } catch (Exception ex) {
-                          uiToast("Error al guardar: " + ex.getMessage());
+                          toast("Error al guardar: " + ex.getMessage());
                       }
                   }
-
-                  private final float[] SHADOW_M_MAT = SHADOW_M;
               }
-          }
-          EOF
 
+              private void uiRefresh() { runOnUiThread(this::refreshPanels); }
+          }
+          JAVA_EOF
+
+          # ---------- Compilación ----------
           javac -source 8 -target 8 -Xlint:-options -cp "$AJAR" -d out $(find src -name '*.java')
           "$BT/d8" --release --min-api 29 --lib "$AJAR" --output build $(find out -name '*.class')
           "$BT/aapt" package -f -M AndroidManifest.xml -S res -I "$AJAR" -F build/base.apk
           (cd build && zip -j base.apk classes.dex)
+
           keytool -genkeypair -keystore debug.keystore -storepass android -keypass android \
-            -alias debug -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+            -alias debug -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+
           "$BT/zipalign" -f 4 build/base.apk build/aligned.apk
           "$BT/apksigner" sign --ks debug.keystore --ks-pass pass:android \
             --ks-key-alias debug --key-pass pass:android --out build/prisma3d.apk build/aligned.apk

@@ -54,7 +54,7 @@ jobs:
           EOF
 
           # ============================================================
-          # Icono vectorial (Material style)
+          # Icono vectorial
           # ============================================================
           cat > res/drawable/ic_launcher.xml << 'EOF'
           <vector xmlns:android="http://schemas.android.com/apk/res/android"
@@ -71,13 +71,11 @@ jobs:
           EOF
 
           # ============================================================
-          # MainActivity.java — versión modernizada y sin bugs
+          # MainActivity.java
           # ============================================================
           cat > src/com/carlos/prisma3d/MainActivity.java << 'JAVA_EOF'
           package com.carlos.prisma3d;
 
-          import android.animation.ArgbEvaluator;
-          import android.animation.ObjectAnimator;
           import android.app.Activity;
           import android.content.ContentValues;
           import android.content.Intent;
@@ -86,13 +84,11 @@ jobs:
           import android.graphics.BitmapFactory;
           import android.graphics.Typeface;
           import android.graphics.drawable.GradientDrawable;
-          import android.graphics.drawable.RippleDrawable;
           import android.net.Uri;
           import android.opengl.GLES20;
           import android.opengl.GLSurfaceView;
           import android.opengl.GLUtils;
           import android.opengl.Matrix;
-          import android.os.Build;
           import android.os.Bundle;
           import android.os.HapticFeedbackConstants;
           import android.provider.MediaStore;
@@ -104,7 +100,6 @@ jobs:
           import android.view.ScaleGestureDetector;
           import android.view.View;
           import android.view.ViewGroup;
-          import android.view.animation.AccelerateDecelerateInterpolator;
           import android.widget.FrameLayout;
           import android.widget.HorizontalScrollView;
           import android.widget.LinearLayout;
@@ -121,8 +116,6 @@ jobs:
           import java.nio.ByteBuffer;
           import java.nio.ByteOrder;
           import java.nio.FloatBuffer;
-          import java.nio.IntBuffer;
-          import java.nio.ShortBuffer;
           import java.text.SimpleDateFormat;
           import java.util.ArrayList;
           import java.util.Arrays;
@@ -136,29 +129,24 @@ jobs:
 
           public class MainActivity extends Activity {
 
-              // ---------- Paleta Material You ----------
               static final int C_BG         = 0xFF0B0B10;
               static final int C_SURFACE    = 0xFF14141B;
               static final int C_SURFACE2   = 0xFF1C1C25;
-              static final int C_ELEVATED   = 0xFF23232E;
               static final int C_OUTLINE    = 0xFF2E2E3A;
               static final int C_TEXT       = 0xFFF4F4F8;
               static final int C_TEXT_DIM   = 0xFF9A9AAE;
-              static final int C_PRIMARY    = 0xFFA78BFA;   // violeta Material You
+              static final int C_PRIMARY    = 0xFFA78BFA;
               static final int C_PRIMARY_C  = 0xFF7C3AED;
-              static final int C_SECONDARY  = 0xFFF59E0B;   // ámbar
-              static final int C_TERTIARY   = 0xFF22D3EE;   // cian
-              static final int C_ERROR      = 0xFFF87171;
-              static final int C_SUCCESS    = 0xFF4ADE80;
+              static final int C_TERTIARY   = 0xFF22D3EE;
 
               static final int MATCH = ViewGroup.LayoutParams.MATCH_PARENT;
               static final int WRAP  = ViewGroup.LayoutParams.WRAP_CONTENT;
 
               static final int REQ_MODEL = 1, REQ_TEX = 2, REQ_SKY = 3;
               static final int TOOL_SEL = 0, TOOL_MOV = 1, TOOL_ROT = 2, TOOL_SCA = 3;
-              static final String[] TOOL_LABEL = {"⎚", "✥", "↻", "⤢"};
+              static final String[] TOOL_LABEL = {"Sel", "Mov", "Rot", "Sca"};
               static final String[] TOOL_NAME  = {"Seleccionar", "Mover", "Rotar", "Escalar"};
-              static final String[] MAT_NAME   = {"Mate", "Plástico", "Metal", "Brillante"};
+              static final String[] MAT_NAME   = {"Mate", "Plastico", "Metal", "Brillante"};
               static final float[] MAT_ROUGH   = {0.92f, 0.42f, 0.18f, 0.05f};
               static final float[] MAT_METAL   = {0f, 0f, 1f, 0f};
 
@@ -176,7 +164,6 @@ jobs:
               static final float[] SEL_COL = {1.00f, 0.75f, 0.20f};
               static final float[] OFF_COL = {0.55f, 0.55f, 0.62f};
 
-              // Matriz de sombra plana (luz direccional normalizada)
               static final float[] SHADOW_M = {
                   1f, 0f, 0f, 0f,
                   -0.6f, 0f, -0.45f, 0f,
@@ -184,7 +171,6 @@ jobs:
                   -0.6f, -1f, -0.45f, 1f
               };
 
-              // ---------- Modelos de datos ----------
               static class GLPart { FloatBuffer buf; int count; int tex; }
               static class Part  { float[] verts; Bitmap tex; }
               static class Model { String name; final List<Part> parts = new ArrayList<>(); }
@@ -201,24 +187,6 @@ jobs:
                   FloatBuffer box;
                   float[] bmin = {-1, -1, -1}, bmax = {1, 1, 1};
                   Obj(String n, float[] c) { name = n; col = c; }
-                  Obj snapshot() {
-                      Obj o = new Obj(name, col.clone());
-                      System.arraycopy(pos, 0, o.pos, 0, 3);
-                      System.arraycopy(rot, 0, o.rot, 0, 3);
-                      System.arraycopy(scl, 0, o.scl, 0, 3);
-                      o.mat = mat; o.isCam = isCam;
-                      o.parts.addAll(parts); o.box = box;
-                      o.bmin = bmin.clone(); o.bmax = bmax.clone();
-                      return o;
-                  }
-              }
-
-              // ---------- Snapshot para Undo/Redo ----------
-              static class SceneSnapshot {
-                  final List<Obj> objs = new ArrayList<>();
-                  SceneSnapshot(List<Obj> src) {
-                      for (Obj o : src) objs.add(o.snapshot());
-                  }
               }
 
               static class FloatList {
@@ -228,34 +196,22 @@ jobs:
                   float[] toArray() { return Arrays.copyOf(a, n); }
               }
 
-              // ---------- Estado ----------
               private final List<Obj> scene = new ArrayList<>();
               private final ConcurrentLinkedQueue<Model>  pendingModels = new ConcurrentLinkedQueue<>();
               private final ConcurrentLinkedQueue<Bitmap> pendingTex    = new ConcurrentLinkedQueue<>();
               private final ConcurrentLinkedQueue<Bitmap> pendingSky    = new ConcurrentLinkedQueue<>();
-              private final LinkedList<SceneSnapshot> undoStack = new LinkedList<>();
-              private final LinkedList<SceneSnapshot> redoStack = new LinkedList<>();
-              private static final int MAX_UNDO = 30;
 
               private Renderer renderer;
               private GLSurfaceView glView;
               private float density, lastX, lastY;
               private int tool = TOOL_SEL, counter = 1, activeAxis = -1;
-              private boolean snapEnabled = true;
-              private float snapStep = 0.25f;
 
               private final TextView[] toolBtns = new TextView[4];
-              private TextView undoBtn, redoBtn, snapBtn, camBtn, modeBtn;
-              private TextView propName, propLoc, propRot, propScale, propMat;
+              private TextView camBtn, modeBtn, propName, propLoc, propRot, propScale, propMat;
               private TextView outlinerEmpty;
               private LinearLayout outliner;
-              private FrameLayout sheetRoot;
-              private View scrim;
               private TextView statusText;
 
-              // ============================================================
-              // Ciclo de vida
-              // ============================================================
               @Override
               protected void onCreate(Bundle b) {
                   super.onCreate(b);
@@ -267,7 +223,6 @@ jobs:
                   cube.box = boxEdges(cube.bmin, cube.bmax);
                   scene.add(cube);
                   scene.add(newCamera());
-                  pushUndo();
 
                   renderer = new Renderer();
                   glView = new GLSurfaceView(this);
@@ -291,18 +246,11 @@ jobs:
                               break;
                           case MotionEvent.ACTION_UP:
                           case MotionEvent.ACTION_CANCEL:
-                              if (activeAxis >= 0) pushUndo();
                               activeAxis = -1;
                               break;
                           case MotionEvent.ACTION_MOVE:
                               if (!sgd.isInProgress() && e.getPointerCount() == 1) {
                                   onDrag(e.getX() - lastX, e.getY() - lastY);
-                              } else if (e.getPointerCount() == 2 && !sgd.isInProgress()) {
-                                  // Pan con dos dedos
-                                  float cx = (e.getX(0) + e.getX(1)) * 0.5f;
-                                  float cy = (e.getY(0) + e.getY(1)) * 0.5f;
-                                  renderer.panX += (cx - (lastX + (lastX)) * 0.5f) * 0.01f * renderer.dist * 0.1f;
-                                  renderer.panY -= (cy - (lastY + (lastY)) * 0.5f) * 0.01f * renderer.dist * 0.1f;
                               }
                               lastX = e.getX(); lastY = e.getY();
                               break;
@@ -327,9 +275,6 @@ jobs:
                   else if (req == REQ_SKY) loadImageAsync(uri, pendingSky, "Cielo cargado");
               }
 
-              // ============================================================
-              // Utilidades
-              // ============================================================
               static float clamp(float v, float lo, float hi) { return Math.max(lo, Math.min(hi, v)); }
               private int dp(int v) { return Math.round(v * density); }
               private void haptic() {
@@ -382,18 +327,13 @@ jobs:
                   return l;
               }
 
-              // ============================================================
-              // UI — Material You
-              // ============================================================
               private View buildUi() {
                   FrameLayout root = new FrameLayout(this);
                   root.setBackgroundColor(C_BG);
 
-                  // ---------- Vista 3D (fondo) ----------
                   glView.setLayoutParams(new FrameLayout.LayoutParams(MATCH, MATCH));
                   root.addView(glView);
 
-                  // ---------- Overlay superior (estado + título) ----------
                   LinearLayout topBar = hbox();
                   topBar.setGravity(Gravity.CENTER_VERTICAL);
                   topBar.setBackground(stroked(0xE614141B, C_OUTLINE, 20, 1));
@@ -401,7 +341,6 @@ jobs:
                   FrameLayout.LayoutParams tbp = new FrameLayout.LayoutParams(MATCH, WRAP,
                       Gravity.TOP | Gravity.CENTER_HORIZONTAL);
                   tbp.setMargins(dp(16), dp(16), dp(16), 0);
-                  tbp.width = MATCH;
                   topBar.setLayoutParams(tbp);
 
                   TextView title = text("Prisma 3D", 16, C_PRIMARY);
@@ -419,7 +358,6 @@ jobs:
 
                   root.addView(topBar);
 
-                  // ---------- Barra inferior de herramientas ----------
                   HorizontalScrollView toolScroll = new HorizontalScrollView(this);
                   toolScroll.setHorizontalScrollBarEnabled(false);
                   LinearLayout tools = hbox();
@@ -433,35 +371,28 @@ jobs:
                       tools.addView(toolBtns[i], chipLp());
                   }
                   tools.addView(separator());
-                  tools.addView(toolChip("✚", "Añadir cubo", this::addCube));
-                  tools.addView(toolChip("⎌", "Importar modelo", () -> pickFile(REQ_MODEL, "*/*")));
-                  tools.addView(toolChip("🎨", "Textura", () -> {
+                  tools.addView(toolChip("+", "Anadir cubo", this::addCube));
+                  tools.addView(toolChip("Imp", "Importar modelo", () -> pickFile(REQ_MODEL, "*/*")));
+                  tools.addView(toolChip("Tex", "Textura", () -> {
                       if (selected() == null) toast("Selecciona un objeto");
                       else pickFile(REQ_TEX, "image/*");
                   }));
-                  tools.addView(toolChip("☁", "Cielo HDRI", () -> pickFile(REQ_SKY, "image/*")));
+                  tools.addView(toolChip("Sky", "Cielo HDRI", () -> pickFile(REQ_SKY, "image/*")));
                   tools.addView(separator());
-                  camBtn = toolChip("◉", "Vista cámara", this::toggleCamView);
+                  camBtn = toolChip("Cam", "Vista camara", this::toggleCamView);
                   tools.addView(camBtn);
-                  tools.addView(toolChip("⟳", "Resetear vista", this::resetView));
-                  tools.addView(toolChip("✕", "Eliminar", this::deleteSelected));
-                  tools.addView(separator());
-                  undoBtn = toolChip("↶", "Deshacer", this::undo);
-                  redoBtn = toolChip("↷", "Rehacer", this::redo);
-                  snapBtn = toolChip("▦", "Snap", this::toggleSnap);
-                  tools.addView(undoBtn);
-                  tools.addView(redoBtn);
-                  tools.addView(snapBtn);
+                  tools.addView(toolChip("Mat", "Cambiar material", this::cycleMaterial));
+                  tools.addView(toolChip("Del", "Eliminar", this::deleteSelected));
+                  tools.addView(toolChip("Res", "Resetear vista", this::resetView));
+                  tools.addView(toolChip("Rdr", "Guardar render", () -> renderer.requestCapture()));
 
                   toolScroll.addView(tools);
                   FrameLayout.LayoutParams bsp = new FrameLayout.LayoutParams(MATCH, WRAP,
                       Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
                   bsp.setMargins(dp(16), 0, dp(16), dp(16));
-                  bsp.width = MATCH;
                   toolScroll.setLayoutParams(bsp);
                   root.addView(toolScroll);
 
-                  // ---------- Panel lateral de escena + propiedades ----------
                   LinearLayout side = vbox();
                   side.setBackground(stroked(0xE614141B, C_OUTLINE, 20, 1));
                   side.setPadding(dp(14), dp(14), dp(14), dp(14));
@@ -472,7 +403,7 @@ jobs:
 
                   side.addView(sectionLabel("ESCENA"));
                   outliner = vbox();
-                  outlinerEmpty = text("Vacío", 12, C_TEXT_DIM);
+                  outlinerEmpty = text("Vacio", 12, C_TEXT_DIM);
                   outlinerEmpty.setGravity(Gravity.CENTER);
                   outlinerEmpty.setPadding(0, dp(20), 0, dp(20));
                   ScrollView sc = new ScrollView(this);
@@ -484,29 +415,21 @@ jobs:
                   LinearLayout props = vbox();
                   props.setBackground(rounded(C_SURFACE2, 14));
                   props.setPadding(dp(12), dp(10), dp(12), dp(10));
-                  propName = text("—", 13, C_TEXT);
+                  propName = text("--", 13, C_TEXT);
                   propName.setTypeface(Typeface.create("sans-serif-black", Typeface.NORMAL));
                   propLoc   = text("", 11, C_TEXT_DIM);
                   propRot   = text("", 11, C_TEXT_DIM);
                   propScale = text("", 11, C_TEXT_DIM);
                   propMat   = text("", 11, C_PRIMARY);
-                  propMat.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
                   props.addView(propName);
                   props.addView(propLoc);
                   props.addView(propRot);
                   props.addView(propScale);
                   props.addView(propMat);
-
-                  TextView matBtn = pill("Cambiar material", C_PRIMARY, C_BG, this::cycleMaterial);
-                  LinearLayout.LayoutParams matLp = new LinearLayout.LayoutParams(MATCH, WRAP);
-                  matLp.setMargins(0, dp(10), 0, 0);
-                  props.addView(matBtn, matLp);
-
                   side.addView(props, new LinearLayout.LayoutParams(MATCH, WRAP));
                   root.addView(side);
 
-                  // ---------- Hint ----------
-                  TextView hint = text("1 dedo: orbitar  ·  2 dedos: pan  ·  Pellizco: zoom  ·  Toca eje: transformar",
+                  TextView hint = text("Arrastra: orbitar  |  Pellizco: zoom  |  Toca eje: transformar",
                       11, C_TEXT);
                   hint.setSingleLine(true);
                   hint.setBackground(rounded(0xCC14141B, 14));
@@ -517,7 +440,6 @@ jobs:
                   hint.setLayoutParams(hl);
                   root.addView(hint);
 
-                  // ---------- Gizmo leyenda ----------
                   TextView gizmo = text("", 12, C_TEXT);
                   gizmo.setText(Html.fromHtml(
                       "<font color='#FF5A5A'><b>X</b></font>  " +
@@ -530,8 +452,6 @@ jobs:
                   root.addView(gizmo);
 
                   highlightTools();
-                  updateUndoRedoState();
-                  updateSnapState();
                   return root;
               }
 
@@ -547,11 +467,12 @@ jobs:
               private TextView toolChip(String icon, String label, final Runnable action) {
                   TextView t = new TextView(this);
                   t.setText(icon);
-                  t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+                  t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
                   t.setTextColor(C_TEXT);
                   t.setGravity(Gravity.CENTER);
                   t.setBackground(rounded(C_SURFACE2, 16));
                   t.setPadding(dp(14), dp(12), dp(14), dp(12));
+                  t.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
                   t.setOnClickListener(v -> {
                       haptic();
                       action.run();
@@ -589,9 +510,6 @@ jobs:
                   return t;
               }
 
-              // ============================================================
-              // Archivos
-              // ============================================================
               private void pickFile(int req, String mime) {
                   Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                   i.addCategory(Intent.CATEGORY_OPENABLE);
@@ -649,7 +567,7 @@ jobs:
                           InputStream in = getContentResolver().openInputStream(uri);
                           Bitmap bmp = in == null ? null : BitmapFactory.decodeStream(in);
                           if (in != null) in.close();
-                          if (bmp == null) throw new Exception("Imagen no válida");
+                          if (bmp == null) throw new Exception("Imagen no valida");
                           q.add(bmp);
                           toast(okMsg);
                       } catch (Exception e) {
@@ -658,9 +576,6 @@ jobs:
                   }).start();
               }
 
-              // ============================================================
-              // Geometría helper
-              // ============================================================
               static int vtx(float[] a, int k, float x, float y, float z,
                              float nx, float ny, float nz, float u, float v) {
                   a[k]=x; a[k+1]=y; a[k+2]=z;
@@ -789,7 +704,7 @@ jobs:
                       }
                   }
                   float ext = Math.max(mx[0]-mn[0], Math.max(mx[1]-mn[1], mx[2]-mn[2]));
-                  if (ext <= 1e-6f) return; // FIX: modelo degenerado
+                  if (ext <= 1e-6f) return;
                   float s = 2f / ext;
                   float[] c = {(mn[0]+mx[0])/2f, (mn[1]+mx[1])/2f, (mn[2]+mx[2])/2f};
                   for (Part p : parts) {
@@ -801,9 +716,6 @@ jobs:
                   }
               }
 
-              // ============================================================
-              // Parsers
-              // ============================================================
               static Model parseObj(byte[] data, String name) throws Exception {
                   BufferedReader br = new BufferedReader(
                       new InputStreamReader(new ByteArrayInputStream(data), "UTF-8"));
@@ -855,7 +767,6 @@ jobs:
                   return m;
               }
 
-              // FIX: lectura robusta de accessors con tipos enteros correctos
               static float[] readAcc(JSONArray accessors, JSONArray views, ByteBuffer bin, int ai) throws Exception {
                   JSONObject a = accessors.getJSONObject(ai);
                   int count = a.getInt("count");
@@ -911,7 +822,7 @@ jobs:
 
               static Model parseGlb(byte[] data, String name) throws Exception {
                   ByteBuffer hb = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
-                  if (hb.getInt(0) != 0x46546C67) throw new Exception("No es un GLB válido");
+                  if (hb.getInt(0) != 0x46546C67) throw new Exception("No es un GLB valido");
                   int jsonLen = hb.getInt(12);
                   JSONObject root = new JSONObject(new String(data, 20, jsonLen, "UTF-8"));
                   int binChunk = 20 + jsonLen;
@@ -983,14 +894,11 @@ jobs:
                           if (part.verts.length > 0) m.parts.add(part);
                       }
                   }
-                  if (m.parts.isEmpty()) throw new Exception("GLB sin geometría");
+                  if (m.parts.isEmpty()) throw new Exception("GLB sin geometria");
                   normalize(m.parts);
                   return m;
               }
 
-              // ============================================================
-              // Herramientas / escena
-              // ============================================================
               private void setTool(int t) {
                   tool = t;
                   highlightTools();
@@ -1005,8 +913,8 @@ jobs:
                   }
                   if (camBtn != null && renderer != null) {
                       boolean on = renderer.camView;
-                      camBtn.setBackground(rounded(on ? C_PRIMARY_C : C_SURFACE2, 16));
-                      camBtn.setTextColor(on ? C_TEXT : C_TEXT);
+                      camBtn.setBackground(rounded(on ? C_TERTIARY : C_SURFACE2, 16));
+                      camBtn.setTextColor(on ? C_BG : C_TEXT);
                   }
               }
 
@@ -1036,12 +944,11 @@ jobs:
                       o.selected = true;
                       scene.add(o);
                   }
-                  pushUndo();
                   refreshPanels();
               }
 
               private Obj newCamera() {
-                  Obj c = new Obj("Cámara", new float[]{1f, 1f, 1f});
+                  Obj c = new Obj("Camara", new float[]{1f, 1f, 1f});
                   c.isCam = true;
                   c.pos[1] = 1.5f;
                   c.pos[2] = 5f;
@@ -1077,7 +984,7 @@ jobs:
 
               private void updateModeLabel() {
                   if (modeBtn != null) {
-                      modeBtn.setText(renderer.real ? "Real" : "Sólido");
+                      modeBtn.setText(renderer.real ? "Real" : "Solido");
                       modeBtn.setBackground(rounded(renderer.real ? C_PRIMARY : C_SURFACE2, 18));
                       modeBtn.setTextColor(renderer.real ? C_BG : C_TEXT);
                   }
@@ -1087,14 +994,11 @@ jobs:
                   renderer.rotX = 25f;
                   renderer.rotY = 35f;
                   renderer.dist = 10f;
-                  renderer.panX = 0f;
-                  renderer.panY = 0f;
               }
 
               private void cycleMaterial() {
                   Obj o = selected();
                   if (o == null || o.isCam) { toast("Selecciona un objeto"); return; }
-                  pushUndo();
                   o.mat = (o.mat + 1) % MAT_NAME.length;
                   updateProps();
               }
@@ -1107,78 +1011,16 @@ jobs:
                           if (scene.get(i).selected) { sel = scene.get(i); idx = i; break; }
                       }
                       if (sel == null) { toast("Nada que eliminar"); return; }
-                      if (sel.isCam) { toast("No puedes eliminar la cámara"); return; }
+                      if (sel.isCam) { toast("No puedes eliminar la camara"); return; }
                       scene.remove(sel);
-                      // FIX: auto-selección
                       if (!scene.isEmpty()) {
                           int next = Math.min(idx, scene.size() - 1);
                           scene.get(next).selected = true;
                       }
                   }
-                  pushUndo();
                   refreshPanels();
               }
 
-              private void toggleSnap() {
-                  snapEnabled = !snapEnabled;
-                  updateSnapState();
-              }
-
-              private void updateSnapState() {
-                  if (snapBtn == null) return;
-                  snapBtn.setBackground(rounded(snapEnabled ? C_TERTIARY : C_SURFACE2, 16));
-                  snapBtn.setTextColor(snapEnabled ? C_BG : C_TEXT);
-              }
-
-              private float snap(float v) {
-                  if (!snapEnabled) return v;
-                  return Math.round(v / snapStep) * snapStep;
-              }
-
-              // ---------- Undo / Redo ----------
-              private void pushUndo() {
-                  undoStack.addLast(new SceneSnapshot(scene));
-                  while (undoStack.size() > MAX_UNDO) undoStack.removeFirst();
-                  redoStack.clear();
-                  updateUndoRedoState();
-              }
-              private void undo() {
-                  if (undoStack.size() < 2) { toast("Nada que deshacer"); return; }
-                  redoStack.addLast(undoStack.removeLast());
-                  SceneSnapshot s = undoStack.getLast();
-                  restoreSnapshot(s);
-                  updateUndoRedoState();
-              }
-              private void redo() {
-                  if (redoStack.isEmpty()) { toast("Nada que rehacer"); return; }
-                  SceneSnapshot s = redoStack.removeLast();
-                  undoStack.addLast(s);
-                  restoreSnapshot(s);
-                  updateUndoRedoState();
-              }
-              private void restoreSnapshot(SceneSnapshot s) {
-                  synchronized (scene) {
-                      scene.clear();
-                      for (Obj o : s.objs) {
-                          Obj copy = o.snapshot();
-                          // reconstruir GLPart references desde los originales si es posible
-                          scene.add(copy);
-                      }
-                  }
-                  refreshPanels();
-              }
-              private void updateUndoRedoState() {
-                  if (undoBtn != null) {
-                      boolean canUndo = undoStack.size() >= 2;
-                      undoBtn.setAlpha(canUndo ? 1f : 0.35f);
-                  }
-                  if (redoBtn != null) {
-                      boolean canRedo = !redoStack.isEmpty();
-                      redoBtn.setAlpha(canRedo ? 1f : 0.35f);
-                  }
-              }
-
-              // ---------- Transformación por eje ----------
               private int pickAxis(float px, float py) {
                   if (tool == TOOL_SEL) return -1;
                   Obj o = selected();
@@ -1186,7 +1028,6 @@ jobs:
                   float L = renderer.dist * 0.14f;
                   float[] o2 = renderer.project(o.pos[0], o.pos[1], o.pos[2]);
                   if (o2 == null) return -1;
-                  // Umbral adaptativo según distancia
                   float best = dp(28) + renderer.dist * 1.5f;
                   int hit = -1;
                   for (int a = 0; a < 3; a++) {
@@ -1212,14 +1053,13 @@ jobs:
                   float ux = t2[0] - o2[0], uy = t2[1] - o2[1];
                   float len = (float) Math.sqrt(ux*ux + uy*uy);
                   if (len < 1f) return;
-                  // FIX: proyección correcta del drag sobre el eje en pantalla
                   float along = (dx * ux + dy * uy) / len;
                   float sign = Math.signum(ux + uy);
                   if (sign == 0) sign = 1f;
                   float delta = along * sign;
 
                   if (tool == TOOL_MOV) {
-                      o.pos[a] = snap(o.pos[a] + delta * (L / len));
+                      o.pos[a] += delta * (L / len);
                   } else if (tool == TOOL_ROT) {
                       o.rot[a] += delta * 0.8f;
                   } else if (tool == TOOL_SCA && !o.isCam) {
@@ -1233,19 +1073,18 @@ jobs:
                       applyAxis(sel, activeAxis, dx, dy);
                   } else if (!renderer.camView) {
                       renderer.rotY += dx * 0.4f;
-                      renderer.rotX = clamp(renderer.rotX + dy * 0.4f, -89f, 89f); // FIX: clamp pitch
+                      renderer.rotX = clamp(renderer.rotX + dy * 0.4f, -89f, 89f);
                   }
                   updateProps();
               }
 
-              // ---------- Refrescar paneles ----------
               private void refreshPanels() {
                   outliner.removeAllViews();
                   boolean any = false;
                   synchronized (scene) {
                       for (final Obj o : scene) {
                           any = true;
-                          String icon = o.isCam ? "◉  " : "▣  ";
+                          String icon = o.isCam ? "Cam  " : "Obj  ";
                           TextView r = text(icon + o.name, 12, o.selected ? C_TEXT : C_TEXT_DIM);
                           r.setPadding(dp(10), dp(8), dp(10), dp(8));
                           r.setBackground(rounded(o.selected ? C_PRIMARY_C : 0x00000000, 10));
@@ -1256,8 +1095,9 @@ jobs:
                       }
                   }
                   outlinerEmpty.setVisibility(any ? View.GONE : View.VISIBLE);
-                  String mode = renderer.camView && findCamera() != null ? "Cámara" : "Perspectiva";
-                  if (statusText != null) statusText.setText(mode + "  ·  " + TOOL_NAME[tool]);
+                  String mode = renderer.camView && findCamera() != null ? "Camara" : "Perspectiva";
+                  if (statusText != null && statusText.getAlpha() < 0.5f)
+                      statusText.setText(mode + "  |  " + TOOL_NAME[tool]);
                   updateProps();
                   updateModeLabel();
                   highlightTools();
@@ -1266,7 +1106,7 @@ jobs:
               private void updateProps() {
                   Obj o = selected();
                   if (o == null) {
-                      propName.setText("—");
+                      propName.setText("--");
                       propLoc.setText(""); propRot.setText("");
                       propScale.setText(""); propMat.setText("");
                       return;
@@ -1274,22 +1114,18 @@ jobs:
                   propName.setText(o.name);
                   propLoc.setText(String.format(Locale.US, "Pos   %6.2f  %6.2f  %6.2f",
                       o.pos[0], o.pos[1], o.pos[2]));
-                  propRot.setText(String.format(Locale.US, "Rot   %5.0f°  %5.0f°  %5.0f°",
+                  propRot.setText(String.format(Locale.US, "Rot   %5.0f  %5.0f  %5.0f",
                       o.rot[0], o.rot[1], o.rot[2]));
-                  propScale.setText(o.isCam ? "FOV   45°"
+                  propScale.setText(o.isCam ? "FOV   45"
                       : String.format(Locale.US, "Escala %5.2f  %5.2f  %5.2f",
                           o.scl[0], o.scl[1], o.scl[2]));
                   propMat.setText(o.isCam ? ""
-                      : MAT_NAME[o.mat] + "  ·  R " + String.format(Locale.US, "%.2f", MAT_ROUGH[o.mat])
-                          + "  ·  M " + String.format(Locale.US, "%.0f%%", MAT_METAL[o.mat] * 100f));
+                      : MAT_NAME[o.mat] + "  R " + String.format(Locale.US, "%.2f", MAT_ROUGH[o.mat])
+                          + "  M " + String.format(Locale.US, "%.0f", MAT_METAL[o.mat] * 100f));
               }
 
-              // ============================================================
-              // RENDERER
-              // ============================================================
               class Renderer implements GLSurfaceView.Renderer {
                   volatile float rotX = 25f, rotY = 35f, dist = 10f;
-                  volatile float panX = 0f, panY = 0f;
                   volatile boolean real = true, camView, capture, hasSky, ready;
                   volatile int vw = 1, vh = 1;
 
@@ -1367,7 +1203,6 @@ jobs:
                       "  gl_Position = vec4(aSky, 0.9999, 1.0);\n" +
                       "}";
 
-                  // FIX: una sola corrección gamma consistente
                   private static final String SKY_FS =
                       "precision highp float; varying vec3 vDir;\n" +
                       "uniform sampler2D uSkyTex; uniform float uHasSky; uniform vec3 uHor; uniform vec3 uZen;\n" +
@@ -1512,7 +1347,6 @@ jobs:
                       GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
                       GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bmp, 0);
                       GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
-                      // FIX: liberar bitmap escalado para evitar fugas
                       if (scaled) bmp.recycle();
                       return t[0];
                   }
@@ -1547,7 +1381,6 @@ jobs:
                               o.selected = true;
                               scene.add(o);
                           }
-                          pushUndo();
                           uiRefresh();
                       }
                       Bitmap bm;
@@ -1681,7 +1514,7 @@ jobs:
                           Matrix.invertM(view, 0, model, 0);
                       } else {
                           Matrix.setIdentityM(view, 0);
-                          Matrix.translateM(view, 0, -panX, -panY, -dist);
+                          Matrix.translateM(view, 0, 0, 0, -dist);
                           Matrix.rotateM(view, 0, rotX, 1, 0, 0);
                           Matrix.rotateM(view, 0, rotY, 0, 1, 0);
                       }
@@ -1794,7 +1627,7 @@ jobs:
                           bmp.compress(Bitmap.CompressFormat.PNG, 100, os);
                           os.close();
                           bmp.recycle();
-                          toast("Render guardado en Imágenes/Prisma3D");
+                          toast("Render guardado en Imagenes/Prisma3D");
                       } catch (Exception ex) {
                           toast("Error al guardar: " + ex.getMessage());
                       }

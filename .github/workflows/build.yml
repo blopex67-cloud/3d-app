@@ -14,13 +14,13 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - uses: android-actions/setup-android@v3
-
       - name: Compilar APK
         run: |
-          sdkmanager "platforms;android-34" "build-tools;34.0.0"
-          BT="$ANDROID_HOME/build-tools/34.0.0"
-          AJAR="$ANDROID_HOME/platforms/android-34/android.jar"
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" "build-tools;34.0.0"
+          BT="$SDK/build-tools/34.0.0"
+          AJAR="$SDK/platforms/android-34/android.jar"
 
           mkdir -p src/com/carlos/prisma3d out build
 

@@ -1,336 +1,313 @@
-name: MF Studio APK
+name: Build APK
 
 on:
-  workflow_dispatch:
   push:
-    branches: [main]
-
-permissions:
-  contents: read
+  workflow_dispatch:
 
 jobs:
-  build-apk:
+  build:
     runs-on: ubuntu-latest
+    env:
+      GODOT_VERSION: "4.3-stable"
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Preparar Java 17
+      - name: Instalar Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
-      - name: Generar el proyecto Android desde este único YAML
-        shell: bash
+      - name: Instalar Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Instalar componentes del SDK
         run: |
-          mkdir -p app/src/main/java/com/mfstudio/app app/src/main/res/values
-          cat > settings.gradle.kts <<'EOF'
-          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
-          dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-              repositories { google(); mavenCentral() }
-          }
-          rootProject.name = "MFStudio"
-          include(":app")
-          EOF
-          cat > build.gradle.kts <<'EOF'
-          plugins {
-              id("com.android.application") version "8.7.3" apply false
-              id("org.jetbrains.kotlin.android") version "2.0.21" apply false
-          }
-          EOF
-          cat > gradle.properties <<'EOF'
-          org.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8
-          android.useAndroidX=true
-          kotlin.code.style=official
-          EOF
-          cat > app/build.gradle.kts <<'EOF'
-          plugins {
-              id("com.android.application")
-              id("org.jetbrains.kotlin.android")
-          }
-          android {
-              namespace = "com.mfstudio.app"
-              compileSdk = 35
-              defaultConfig {
-                  applicationId = "com.mfstudio.app"
-                  minSdk = 23
-                  targetSdk = 35
-                  versionCode = 1
-                  versionName = "0.1.0"
-              }
-              compileOptions {
-                  sourceCompatibility = JavaVersion.VERSION_17
-                  targetCompatibility = JavaVersion.VERSION_17
-              }
-              kotlinOptions {
-                  jvmTarget = "17"
-              }
-              packaging {
-                  resources {
-                      excludes += setOf("META-INF/LICENSE*", "META-INF/NOTICE*", "META-INF/DEPENDENCIES", "META-INF/INDEX.LIST")
-                  }
-              }
-          }
-          dependencies {
-              implementation("org.luaj:luaj-jse:3.0.1")
-          }
-          EOF
-          cat > app/src/main/AndroidManifest.xml <<'EOF'
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <application android:allowBackup="false" android:label="MF Studio" android:theme="@style/AppTheme" android:usesCleartextTraffic="false">
-                  <activity android:name=".MainActivity" android:screenOrientation="landscape" android:exported="true">
-                      <intent-filter>
-                          <action android:name="android.intent.action.MAIN" />
-                          <category android:name="android.intent.category.LAUNCHER" />
-                      </intent-filter>
-                  </activity>
-              </application>
-          </manifest>
-          EOF
-          cat > app/src/main/res/values/styles.xml <<'EOF'
-          <resources>
-              <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
-                  <item name="android:fontFamily">sans</item>
-                  <item name="android:colorAccent">#58A6FF</item>
-                  <item name="android:navigationBarColor">#101820</item>
-                  <item name="android:statusBarColor">#101820</item>
-              </style>
-          </resources>
-          EOF
-          cat > app/src/main/java/com/mfstudio/app/MainActivity.kt <<'EOF'
-          package com.mfstudio.app
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" "cmdline-tools;latest"
 
-          import android.app.Activity
-          import android.app.AlertDialog
-          import android.content.Intent
-          import android.graphics.Color
-          import android.opengl.GLSurfaceView
-          import android.os.Bundle
-          import android.view.Gravity
-          import android.view.WindowManager
-          import android.widget.Button
-          import android.widget.EditText
-          import android.widget.LinearLayout
-          import android.widget.TextView
-          import org.luaj.vm2.Globals
-          import org.luaj.vm2.lib.jse.JsePlatform
-
-          class MainActivity : Activity() {
-              private lateinit var status: TextView
-              private lateinit var luaGlobals: Globals
-              private var scriptText = "print('Hola desde MF / Lua')\n"
-              private val pickModelRequest = 41
-
-              override fun onCreate(savedInstanceState: Bundle?) {
-                  super.onCreate(savedInstanceState)
-                  window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
-                  luaGlobals = JsePlatform.standardGlobals()
-                  val root = LinearLayout(this).apply {
-                      orientation = LinearLayout.VERTICAL
-                      setBackgroundColor(Color.rgb(15, 20, 29))
-                  }
-                  val header = LinearLayout(this).apply {
-                      orientation = LinearLayout.HORIZONTAL
-                      gravity = Gravity.CENTER_VERTICAL
-                      setPadding(dp(10), dp(4), dp(10), dp(4))
-                      setBackgroundColor(Color.rgb(24, 33, 47))
-                  }
-                  val title = TextView(this).apply {
-                      text = "MF STUDIO • 3D"
-                      textSize = 18f
-                      setTextColor(Color.WHITE)
-                  }
-                  header.addView(title, LinearLayout.LayoutParams(0, dp(48), 1f))
-                  header.addView(button("＋ Modelo") { chooseModel() })
-                  header.addView(button("MF / Lua") { editScript() })
-                  header.addView(button("▶ Ejecutar") { runScript() })
-                  root.addView(header)
-                  val view3d = GLSurfaceView(this).apply {
-                      setEGLContextClientVersion(2)
-                      setRenderer(CubeRenderer())
-                      renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-                  }
-                  root.addView(view3d, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
-                  status = TextView(this).apply {
-                      text = "Lua integrado • visor OpenGL ES"
-                      textSize = 13f
-                      setTextColor(Color.LTGRAY)
-                      setPadding(dp(12), dp(8), dp(12), dp(8))
-                      setBackgroundColor(Color.rgb(24, 33, 47))
-                  }
-                  root.addView(status)
-                  setContentView(root)
-              }
-
-              private fun chooseModel() {
-                  val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                      addCategory(Intent.CATEGORY_OPENABLE)
-                      type = "*/*"
-                      putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("model/gltf-binary", "model/gltf+json", "application/octet-stream"))
-                  }
-                  startActivityForResult(intent, pickModelRequest)
-              }
-
-              @Deprecated("Prototype callback")
-              override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-                  super.onActivityResult(requestCode, resultCode, data)
-                  if (requestCode == pickModelRequest && resultCode == RESULT_OK) {
-                      status.text = "Archivo seleccionado; renderizado GLB/GLTF pendiente."
-                  }
-              }
-
-              private fun editScript() {
-                  val editor = EditText(this).apply {
-                      setText(scriptText)
-                      setTextColor(Color.WHITE)
-                      setBackgroundColor(Color.rgb(20, 27, 38))
-                      setPadding(dp(12), dp(12), dp(12), dp(12))
-                      textSize = 16f
-                      minLines = 8
-                      gravity = Gravity.TOP or Gravity.START
-                  }
-                  AlertDialog.Builder(this)
-                      .setTitle("MF — Lua")
-                      .setView(editor)
-                      .setPositiveButton("Guardar") { _, _ ->
-                          scriptText = editor.text.toString()
-                          status.text = "Script guardado durante esta sesión."
-                      }
-                      .setNegativeButton("Cancelar", null)
-                      .show()
-              }
-
-              private fun runScript() {
-                  try {
-                      luaGlobals.load(scriptText, "MF").call()
-                      status.text = "Lua ejecutado correctamente."
-                  } catch (e: Exception) {
-                      status.text = "Error Lua: ${e.message ?: "revisa el script"}"
-                  }
-              }
-
-              private fun button(label: String, action: () -> Unit) = Button(this).apply {
-                  text = label
-                  isAllCaps = false
-                  textSize = 12f
-                  setOnClickListener { action() }
-              }
-
-              private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
-          }
-          EOF
-          cat > app/src/main/java/com/mfstudio/app/CubeRenderer.kt <<'EOF'
-          package com.mfstudio.app
-
-          import android.opengl.GLES20
-          import android.opengl.GLSurfaceView
-          import android.opengl.Matrix
-          import java.nio.ByteBuffer
-          import java.nio.ByteOrder
-          import java.nio.FloatBuffer
-          import java.nio.ShortBuffer
-          import javax.microedition.khronos.egl.EGLConfig
-          import javax.microedition.khronos.opengles.GL10
-
-          class CubeRenderer : GLSurfaceView.Renderer {
-              private val vertices = floatArrayOf(
-                  -1f,-1f,1f, 1f,-1f,1f, 1f,1f,1f, -1f,1f,1f,
-                  1f,-1f,-1f, -1f,-1f,-1f, -1f,1f,-1f, 1f,1f,-1f,
-                  -1f,1f,1f, 1f,1f,1f, 1f,1f,-1f, -1f,1f,-1f,
-                  -1f,-1f,-1f, 1f,-1f,-1f, 1f,-1f,1f, -1f,-1f,1f,
-                  1f,-1f,1f, 1f,-1f,-1f, 1f,1f,-1f, 1f,1f,1f,
-                  -1f,-1f,-1f, -1f,-1f,1f, -1f,1f,1f, -1f,1f,-1f
-              )
-              private val colors = FloatArray(24 * 4).also { a ->
-                  val faceColors = arrayOf(floatArrayOf(.20f,.62f,.96f,1f), floatArrayOf(.96f,.50f,.18f,1f), floatArrayOf(.36f,.80f,.48f,1f), floatArrayOf(.68f,.36f,.84f,1f), floatArrayOf(.94f,.78f,.24f,1f), floatArrayOf(.18f,.78f,.78f,1f))
-                  for (face in 0..5) for (v in 0..3) for (c in 0..3) a[face * 16 + v * 4 + c] = faceColors[face][c]
-              }
-              private val indices = shortArrayOf(0,1,2,0,2,3,4,5,6,4,6,7,8,9,10,8,10,11,12,13,14,12,14,15,16,17,18,16,18,19,20,21,22,20,22,23)
-              private lateinit var vertexBuffer: FloatBuffer
-              private lateinit var colorBuffer: FloatBuffer
-              private lateinit var indexBuffer: ShortBuffer
-              private var program = 0
-              private var positionHandle = 0
-              private var colorHandle = 0
-              private var mvpHandle = 0
-              private val projection = FloatArray(16)
-              private val view = FloatArray(16)
-              private val model = FloatArray(16)
-              private val mvp = FloatArray(16)
-              private val temp = FloatArray(16)
-              private val start = System.currentTimeMillis()
-
-              override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-                  GLES20.glClearColor(.055f, .07f, .10f, 1f)
-                  GLES20.glEnable(GLES20.GL_DEPTH_TEST)
-                  vertexBuffer = ByteBuffer.allocateDirect(vertices.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer().put(vertices).also { it.position(0) }
-                  colorBuffer = ByteBuffer.allocateDirect(colors.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer().put(colors).also { it.position(0) }
-                  indexBuffer = ByteBuffer.allocateDirect(indices.size * 2).order(ByteOrder.nativeOrder()).asShortBuffer().put(indices).also { it.position(0) }
-                  val vs = "attribute vec4 aPosition; attribute vec4 aColor; uniform mat4 uMvp; varying vec4 vColor; void main(){gl_Position=uMvp*aPosition;vColor=aColor;}"
-                  val fs = "precision mediump float; varying vec4 vColor; void main(){gl_FragColor=vColor;}"
-                  program = GLES20.glCreateProgram().also { p ->
-                      GLES20.glAttachShader(p, compile(GLES20.GL_VERTEX_SHADER, vs))
-                      GLES20.glAttachShader(p, compile(GLES20.GL_FRAGMENT_SHADER, fs))
-                      GLES20.glLinkProgram(p)
-                  }
-                  positionHandle = GLES20.glGetAttribLocation(program, "aPosition")
-                  colorHandle = GLES20.glGetAttribLocation(program, "aColor")
-                  mvpHandle = GLES20.glGetUniformLocation(program, "uMvp")
-              }
-
-              override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
-                  GLES20.glViewport(0, 0, width, height)
-                  val ratio = width.toFloat() / height.coerceAtLeast(1)
-                  Matrix.frustumM(projection, 0, -ratio, ratio, -1f, 1f, 3f, 20f)
-              }
-
-              override fun onDrawFrame(gl: GL10?) {
-                  GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
-                  GLES20.glUseProgram(program)
-                  Matrix.setLookAtM(view, 0, 0f, 0f, 7f, 0f, 0f, 0f, 0f, 1f, 0f)
-                  Matrix.setIdentityM(model, 0)
-                  Matrix.rotateM(model, 0, (System.currentTimeMillis() - start) / 1000f * 25f, .4f, 1f, .2f)
-                  Matrix.multiplyMM(temp, 0, view, 0, model, 0)
-                  Matrix.multiplyMM(mvp, 0, projection, 0, temp, 0)
-                  GLES20.glUniformMatrix4fv(mvpHandle, 1, false, mvp, 0)
-                  GLES20.glEnableVertexAttribArray(positionHandle)
-                  GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 0, vertexBuffer)
-                  GLES20.glEnableVertexAttribArray(colorHandle)
-                  GLES20.glVertexAttribPointer(colorHandle, 4, GLES20.GL_FLOAT, false, 0, colorBuffer)
-                  GLES20.glDrawElements(GLES20.GL_TRIANGLES, indices.size, GLES20.GL_UNSIGNED_SHORT, indexBuffer)
-                  GLES20.glDisableVertexAttribArray(positionHandle)
-                  GLES20.glDisableVertexAttribArray(colorHandle)
-              }
-
-              private fun compile(type: Int, source: String): Int = GLES20.glCreateShader(type).also {
-                  GLES20.glShaderSource(it, source)
-                  GLES20.glCompileShader(it)
-              }
-          }
-          EOF
-
-      - name: Preparar Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
-
-      - name: Compilar APK debug
-        shell: bash
-        run: gradle assembleDebug --console=plain --no-daemon 2>&1 | tee build.log; test ${PIPESTATUS[0]} -eq 0
-
-      - name: Resumen del error (si falla)
-        if: failure()
-        shell: bash
+      - name: Descargar Godot y templates
         run: |
-          echo "=== Líneas clave del error ==="
-          grep -nE "^e: |error:|What went wrong|Execution failed|Caused by|Could not resolve|AAPT|Duplicate|Manifest merger|Missing class" build.log | head -40
+          mkdir -p $HOME/godot && cd $HOME/godot
+          wget -q https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip
+          unzip -q Godot_v${GODOT_VERSION}_linux.x86_64.zip
+          mv Godot_v${GODOT_VERSION}_linux.x86_64 godot
+          chmod +x godot
+          wget -q https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_export_templates.tpz
+          unzip -q Godot_v${GODOT_VERSION}_export_templates.tpz
+          mkdir -p $HOME/.local/share/godot/export_templates/4.3.stable
+          mv templates/* $HOME/.local/share/godot/export_templates/4.3.stable/
 
-      - name: Dejar APK descargable
+      - name: Configurar Godot y keystore de debug
+        run: |
+          mkdir -p $HOME/.config/godot $HOME/.android
+          keytool -genkey -v -keystore $HOME/.android/debug.keystore -storepass android \
+            -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
+            -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          cat > $HOME/.config/godot/editor_settings-4.3.tres <<EOF
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/android_sdk_path = "$ANDROID_HOME"
+          export/android/java_sdk_path = "$JAVA_HOME"
+          export/android/debug_keystore = "$HOME/.android/debug.keystore"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
+          EOF
+
+      - name: Crear proyecto
+        run: |
+          mkdir -p juego/build && cd juego
+          cat > project.godot <<'EOF'
+          config_version=5
+
+          [application]
+
+          config/name="VideoEditor"
+          run/main_scene="res://main.tscn"
+          config/features=PackedStringArray("4.3", "Mobile")
+          EOF
+          cat > main.tscn <<'EOF'
+          [gd_scene load_steps=2 format=3]
+
+          [ext_resource type="Script" path="res://editor.gd" id="1"]
+
+          [node name="Main" type="Control"]
+          script = ExtResource("1")
+          EOF
+          cat > export_presets.cfg <<'EOF'
+          [preset.0]
+
+          name="Android"
+          platform="Android"
+          runnable=true
+          export_filter="all_resources"
+          include_filter=""
+          exclude_filter=""
+          export_path="build/app-debug.apk"
+          encrypt_pck=false
+          encrypt_directory=false
+
+          [preset.0.options]
+
+          custom_template/debug=""
+          custom_template/release=""
+          gradle_build/use_gradle_build=false
+          package/unique_name="com.carlos.videoeditor"
+          package/name="VideoEditor"
+          package/signed=true
+          permissions/read_media_images=true
+          permissions/read_external_storage=true
+          permissions/write_external_storage=true
+          EOF
+          cat > editor.gd <<'EOF'
+          extends Control
+
+          const SHADER_CODE := """
+          shader_type canvas_item;
+          uniform float brillo = 1.0;
+          uniform float contraste = 1.0;
+          void fragment() {
+              vec4 c = texture(TEXTURE, UV);
+              c.rgb = (c.rgb - 0.5) * contraste + 0.5;
+              c.rgb *= brillo;
+              COLOR = c;
+          }
+          """
+
+          var clips: Array = []
+          var idx := -1
+          var preview: TextureRect
+          var overlay: Label
+          var mat: ShaderMaterial
+          var lista: ItemList
+          var ini: SpinBox
+          var fin: SpinBox
+          var texto: LineEdit
+          var brillo: HSlider
+          var contraste: HSlider
+          var timer: Timer
+          var dlg: FileDialog
+          var estado: Label
+
+          func _ready() -> void:
+              set_anchors_preset(Control.PRESET_FULL_RECT)
+              var raiz := VBoxContainer.new()
+              raiz.set_anchors_preset(Control.PRESET_FULL_RECT)
+              add_child(raiz)
+
+              preview = TextureRect.new()
+              preview.size_flags_vertical = Control.SIZE_EXPAND_FILL
+              preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+              preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+              var sh := Shader.new()
+              sh.code = SHADER_CODE
+              mat = ShaderMaterial.new()
+              mat.shader = sh
+              preview.material = mat
+              raiz.add_child(preview)
+
+              overlay = Label.new()
+              overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+              overlay.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+              overlay.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+              overlay.add_theme_font_size_override("font_size", 40)
+              preview.add_child(overlay)
+
+              lista = ItemList.new()
+              lista.custom_minimum_size = Vector2(0, 120)
+              lista.item_selected.connect(_seleccionar)
+              raiz.add_child(lista)
+
+              var fila := HBoxContainer.new()
+              raiz.add_child(fila)
+              fila.add_child(_boton("+ Imagen", func(): dlg.popup_centered_ratio(0.8)))
+              fila.add_child(_boton("▶ Reproducir", _reproducir))
+              fila.add_child(_boton("■ Parar", func(): timer.stop()))
+              fila.add_child(_boton("Quitar", _quitar))
+
+              var fila2 := HBoxContainer.new()
+              raiz.add_child(fila2)
+              ini = SpinBox.new()
+              ini.prefix = "Inicio "
+              ini.max_value = 600
+              ini.step = 0.1
+              ini.value_changed.connect(func(v): _set_campo("start", v))
+              fin = SpinBox.new()
+              fin.prefix = "Fin "
+              fin.max_value = 600
+              fin.step = 0.1
+              fin.value = 3
+              fin.value_changed.connect(func(v): _set_campo("end", v))
+              fila2.add_child(ini)
+              fila2.add_child(fin)
+
+              texto = LineEdit.new()
+              texto.placeholder_text = "Texto sobre el clip"
+              texto.text_changed.connect(func(t): _set_campo("text", t))
+              raiz.add_child(texto)
+
+              brillo = _slider(0.0, 2.0, 1.0, "brillo")
+              raiz.add_child(brillo)
+              contraste = _slider(0.0, 2.0, 1.0, "contraste")
+              raiz.add_child(contraste)
+
+              estado = Label.new()
+              raiz.add_child(estado)
+              raiz.add_child(_boton("Exportar proyecto", _exportar))
+
+              timer = Timer.new()
+              timer.one_shot = true
+              timer.timeout.connect(_siguiente)
+              add_child(timer)
+
+              dlg = FileDialog.new()
+              dlg.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+              dlg.access = FileDialog.ACCESS_FILESYSTEM
+              dlg.filters = PackedStringArray(["*.png, *.jpg, *.jpeg, *.webp ; Imágenes"])
+              dlg.file_selected.connect(_agregar)
+              add_child(dlg)
+
+          func _boton(t: String, cb: Callable) -> Button:
+              var b := Button.new()
+              b.text = t
+              b.pressed.connect(cb)
+              return b
+
+          func _slider(mn: float, mx: float, v: float, campo: String) -> HSlider:
+              var s := HSlider.new()
+              s.min_value = mn
+              s.max_value = mx
+              s.step = 0.01
+              s.value = v
+              s.custom_minimum_size.x = 200
+              s.value_changed.connect(func(x): _set_campo(campo, x))
+              return s
+
+          func _agregar(path: String) -> void:
+              var img := Image.load_from_file(path)
+              if img == null:
+                  estado.text = "No se pudo abrir la imagen"
+                  return
+              clips.append({
+                  "path": path, "start": 0.0, "end": 3.0, "text": "",
+                  "brillo": 1.0, "contraste": 1.0,
+                  "tex": ImageTexture.create_from_image(img)
+              })
+              lista.add_item(path.get_file())
+              _seleccionar(clips.size() - 1)
+
+          func _seleccionar(i: int) -> void:
+              idx = i
+              var c: Dictionary = clips[i]
+              ini.set_value_no_signal(c.start)
+              fin.set_value_no_signal(c.end)
+              texto.text = c.text
+              brillo.set_value_no_signal(c.brillo)
+              contraste.set_value_no_signal(c.contraste)
+              mat.set_shader_parameter("brillo", c.brillo)
+              mat.set_shader_parameter("contraste", c.contraste)
+              preview.texture = c.tex
+              overlay.text = c.text
+
+          func _set_campo(campo: String, v) -> void:
+              if idx < 0:
+                  return
+              clips[idx][campo] = v
+              match campo:
+                  "brillo", "contraste":
+                      mat.set_shader_parameter(campo, v)
+                  "text":
+                      overlay.text = v
+
+          func _reproducir() -> void:
+              if clips.is_empty():
+                  return
+              _mostrar(0)
+
+          func _mostrar(i: int) -> void:
+              _seleccionar(i)
+              lista.select(i)
+              var c: Dictionary = clips[i]
+              timer.start(max(c.end - c.start, 0.1))
+
+          func _siguiente() -> void:
+              var n := idx + 1
+              if n >= clips.size():
+                  estado.text = "Fin de la reproducción"
+                  return
+              _mostrar(n)
+
+          func _quitar() -> void:
+              if idx < 0:
+                  return
+              clips.remove_at(idx)
+              lista.remove_item(idx)
+              idx = -1
+              preview.texture = null
+              overlay.text = ""
+
+          func _exportar() -> void:
+              var datos: Array = []
+              for c in clips:
+                  datos.append({
+                      "path": c.path, "start": c.start, "end": c.end,
+                      "text": c.text, "brillo": c.brillo, "contraste": c.contraste
+                  })
+              var f := FileAccess.open("user://proyecto.json", FileAccess.WRITE)
+              f.store_string(JSON.stringify(datos, "\t"))
+              f.close()
+              estado.text = "Proyecto guardado en user://proyecto.json"
+          EOF
+
+      - name: Importar proyecto
+        working-directory: juego
+        run: $HOME/godot/godot --headless --import || true
+
+      - name: Exportar APK
+        working-directory: juego
+        run: $HOME/godot/godot --headless --export-debug "Android" build/app-debug.apk
+
+      - name: Subir APK
         uses: actions/upload-artifact@v4
         with:
-          name: MF-Studio-debug-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-          retention-days: 14
+          name: apk
+          path: juego/build/*.apk

@@ -1,1658 +1,314 @@
-name: build-apk
+name: MF Studio APK
+
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
-  build:
+  build-apk:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - name: Preparar Java 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: '17'
 
-      - name: Compilar APK
+      - name: Generar el proyecto Android desde este único YAML
+        shell: bash
         run: |
-          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
-          yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
-          "$SDK/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" "build-tools;34.0.0"
-          BT="$SDK/build-tools/34.0.0"
-          AJAR="$SDK/platforms/android-34/android.jar"
-
-          mkdir -p src/com/carlos/prisma3d out build res/drawable res/values
-
-          # ============================================================
-          # AndroidManifest.xml
-          # ============================================================
-          cat > AndroidManifest.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-              package="com.carlos.prisma3d"
-              android:versionCode="7"
-              android:versionName="0.7">
-            <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="34"/>
-            <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
-            <application
-                android:label="Prisma 3D"
-                android:icon="@drawable/ic_launcher"
-                android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen"
-                android:hardwareAccelerated="true"
-                android:largeHeap="true">
-              <activity android:name=".MainActivity"
-                  android:exported="true"
-                  android:screenOrientation="landscape"
-                  android:configChanges="orientation|screenSize|keyboardHidden">
-                <intent-filter>
-                  <action android:name="android.intent.action.MAIN"/>
-                  <category android:name="android.intent.category.LAUNCHER"/>
-                </intent-filter>
-              </activity>
-            </application>
+          mkdir -p app/src/main/java/com/mfstudio/app app/src/main/res/values
+          cat > settings.gradle.kts <<'EOF'
+          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories { google(); mavenCentral() }
+          }
+          rootProject.name = "MFStudio"
+          include(":app")
+          EOF
+          cat > build.gradle.kts <<'EOF'
+          plugins {
+              id("com.android.application") version "8.7.3" apply false
+              id("org.jetbrains.kotlin.android") version "2.0.21" apply false
+          }
+          EOF
+          cat > gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          kotlin.code.style=official
+          EOF
+          cat > app/build.gradle.kts <<'EOF'
+          plugins {
+              id("com.android.application")
+              id("org.jetbrains.kotlin.android")
+          }
+          android {
+              namespace = "com.mfstudio.app"
+              compileSdk = 35
+              defaultConfig {
+                  applicationId = "com.mfstudio.app"
+                  minSdk = 23
+                  targetSdk = 35
+                  versionCode = 1
+                  versionName = "0.1.0"
+              }
+          }
+          dependencies {
+              implementation("org.luaj:luaj-jse:3.0.1")
+          }
+          EOF
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <application android:allowBackup="false" android:label="MF Studio" android:theme="@style/AppTheme" android:usesCleartextTraffic="false">
+                  <activity android:name=".MainActivity" android:screenOrientation="landscape" android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
           </manifest>
           EOF
+          cat > app/src/main/res/values/styles.xml <<'EOF'
+          <resources>
+              <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+                  <item name="android:fontFamily">sans</item>
+                  <item name="android:colorAccent">#58A6FF</item>
+                  <item name="android:navigationBarColor">#101820</item>
+                  <item name="android:statusBarColor">#101820</item>
+              </style>
+          </resources>
+          EOF
+          cat > app/src/main/java/com/mfstudio/app/MainActivity.kt <<'EOF'
+          package com.mfstudio.app
 
-          # ============================================================
-          # Icono vectorial
-          # ============================================================
-          cat > res/drawable/ic_launcher.xml << 'EOF'
-          <vector xmlns:android="http://schemas.android.com/apk/res/android"
-              android:width="108dp" android:height="108dp"
-              android:viewportWidth="108" android:viewportHeight="108">
-            <path android:fillColor="#0E0E14" android:pathData="M0,0H108V108H0Z"/>
-            <path android:fillColor="#A78BFA" android:pathData="M54,22L82,38L54,54L26,38Z"/>
-            <path android:fillColor="#7C3AED" android:pathData="M26,38L54,54L54,86L26,70Z"/>
-            <path android:fillColor="#4C1D95" android:pathData="M54,54L82,38L82,70L54,86Z"/>
-            <path android:strokeColor="#F59E0B" android:strokeWidth="2"
-                android:strokeLineJoin="round"
-                android:pathData="M54,22L82,38L82,70L54,86L26,70L26,38Z"/>
-          </vector>
+          import android.app.Activity
+          import android.app.AlertDialog
+          import android.content.Intent
+          import android.graphics.Color
+          import android.opengl.GLSurfaceView
+          import android.os.Bundle
+          import android.view.Gravity
+          import android.view.WindowManager
+          import android.widget.Button
+          import android.widget.EditText
+          import android.widget.LinearLayout
+          import android.widget.TextView
+          import org.luaj.vm2.Globals
+          import org.luaj.vm2.lib.jse.JsePlatform
+
+          class MainActivity : Activity() {
+              private lateinit var status: TextView
+              private lateinit var luaGlobals: Globals
+              private var scriptText = "print('Hola desde MF / Lua')\n"
+              private val pickModelRequest = 41
+
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
+                  luaGlobals = JsePlatform.standardGlobals()
+                  val root = LinearLayout(this).apply {
+                      orientation = LinearLayout.VERTICAL
+                      setBackgroundColor(Color.rgb(15, 20, 29))
+                  }
+                  val header = LinearLayout(this).apply {
+                      orientation = LinearLayout.HORIZONTAL
+                      gravity = Gravity.CENTER_VERTICAL
+                      setPadding(dp(10), dp(4), dp(10), dp(4))
+                      setBackgroundColor(Color.rgb(24, 33, 47))
+                  }
+                  val title = TextView(this).apply {
+                      text = "MF STUDIO • 3D"
+                      textSize = 18f
+                      setTextColor(Color.WHITE)
+                  }
+                  header.addView(title, LinearLayout.LayoutParams(0, dp(48), 1f))
+                  header.addView(button("＋ Modelo") { chooseModel() })
+                  header.addView(button("MF / Lua") { editScript() })
+                  header.addView(button("▶ Ejecutar") { runScript() })
+                  root.addView(header)
+                  val view3d = GLSurfaceView(this).apply {
+                      setEGLContextClientVersion(2)
+                      setRenderer(CubeRenderer())
+                      renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                  }
+                  root.addView(view3d, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
+                  status = TextView(this).apply {
+                      text = "Lua integrado • visor OpenGL ES"
+                      textSize = 13f
+                      setTextColor(Color.LTGRAY)
+                      setPadding(dp(12), dp(8), dp(12), dp(8))
+                      setBackgroundColor(Color.rgb(24, 33, 47))
+                  }
+                  root.addView(status)
+                  setContentView(root)
+              }
+
+              private fun chooseModel() {
+                  val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                      addCategory(Intent.CATEGORY_OPENABLE)
+                      type = "*/*"
+                      putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("model/gltf-binary", "model/gltf+json", "application/octet-stream"))
+                  }
+                  startActivityForResult(intent, pickModelRequest)
+              }
+
+              @Deprecated("Prototype callback")
+              override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+                  super.onActivityResult(requestCode, resultCode, data)
+                  if (requestCode == pickModelRequest && resultCode == RESULT_OK) {
+                      status.text = "Archivo seleccionado; renderizado GLB/GLTF pendiente."
+                  }
+              }
+
+              private fun editScript() {
+                  val editor = EditText(this).apply {
+                      setText(scriptText)
+                      setTextColor(Color.WHITE)
+                      setBackgroundColor(Color.rgb(20, 27, 38))
+                      setPadding(dp(12), dp(12), dp(12), dp(12))
+                      textSize = 16f
+                      minLines = 8
+                      gravity = Gravity.TOP or Gravity.START
+                  }
+                  AlertDialog.Builder(this)
+                      .setTitle("MF — Lua")
+                      .setView(editor)
+                      .setPositiveButton("Guardar") { _, _ ->
+                          scriptText = editor.text.toString()
+                          status.text = "Script guardado durante esta sesión."
+                      }
+                      .setNegativeButton("Cancelar", null)
+                      .show()
+              }
+
+              private fun runScript() {
+                  try {
+                      luaGlobals.load(scriptText, "MF").call()
+                      status.text = "Lua ejecutado correctamente."
+                  } catch (e: Exception) {
+                      status.text = "Error Lua: ${e.message ?: "revisa el script"}"
+                  }
+              }
+
+              private fun button(label: String, action: () -> Unit) = Button(this).apply {
+                  text = label
+                  isAllCaps = false
+                  textSize = 12f
+                  setOnClickListener { action() }
+              }
+
+              private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
+          }
+          EOF
+          cat > app/src/main/java/com/mfstudio/app/CubeRenderer.kt <<'EOF'
+          package com.mfstudio.app
+
+          import android.opengl.GLES20
+          import android.opengl.GLSurfaceView
+          import android.opengl.Matrix
+          import java.nio.ByteBuffer
+          import java.nio.ByteOrder
+          import java.nio.FloatBuffer
+          import java.nio.ShortBuffer
+          import javax.microedition.khronos.egl.EGLConfig
+          import javax.microedition.khronos.opengles.GL10
+
+          class CubeRenderer : GLSurfaceView.Renderer {
+              private val vertices = floatArrayOf(
+                  -1f,-1f,1f, 1f,-1f,1f, 1f,1f,1f, -1f,1f,1f,
+                  1f,-1f,-1f, -1f,-1f,-1f, -1f,1f,-1f, 1f,1f,-1f,
+                  -1f,1f,1f, 1f,1f,1f, 1f,1f,-1f, -1f,1f,-1f,
+                  -1f,-1f,-1f, 1f,-1f,-1f, 1f,-1f,1f, -1f,-1f,1f,
+                  1f,-1f,1f, 1f,-1f,-1f, 1f,1f,-1f, 1f,1f,1f,
+                  -1f,-1f,-1f, -1f,-1f,1f, -1f,1f,1f, -1f,1f,-1f
+              )
+              private val colors = FloatArray(24 * 4).also { a ->
+                  val faceColors = arrayOf(floatArrayOf(.20f,.62f,.96f,1f), floatArrayOf(.96f,.50f,.18f,1f), floatArrayOf(.36f,.80f,.48f,1f), floatArrayOf(.68f,.36f,.84f,1f), floatArrayOf(.94f,.78f,.24f,1f), floatArrayOf(.18f,.78f,.78f,1f))
+                  for (face in 0..5) for (v in 0..3) for (c in 0..3) a[face * 16 + v * 4 + c] = faceColors[face][c]
+              }
+              private val indices = shortArrayOf(0,1,2,0,2,3,4,5,6,4,6,7,8,9,10,8,10,11,12,13,14,12,14,15,16,17,18,16,18,19,20,21,22,20,22,23)
+              private lateinit var vertexBuffer: FloatBuffer
+              private lateinit var colorBuffer: FloatBuffer
+              private lateinit var indexBuffer: ShortBuffer
+              private var program = 0
+              private var positionHandle = 0
+              private var colorHandle = 0
+              private var mvpHandle = 0
+              private val projection = FloatArray(16)
+              private val view = FloatArray(16)
+              private val model = FloatArray(16)
+              private val mvp = FloatArray(16)
+              private val temp = FloatArray(16)
+              private val start = System.currentTimeMillis()
+
+              override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+                  GLES20.glClearColor(.055f, .07f, .10f, 1f)
+                  GLES20.glEnable(GLES20.GL_DEPTH_TEST)
+                  vertexBuffer = ByteBuffer.allocateDirect(vertices.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer().put(vertices).also { it.position(0) }
+                  colorBuffer = ByteBuffer.allocateDirect(colors.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer().put(colors).also { it.position(0) }
+                  indexBuffer = ByteBuffer.allocateDirect(indices.size * 2).order(ByteOrder.nativeOrder()).asShortBuffer().put(indices).also { it.position(0) }
+                  val vs = "attribute vec4 aPosition; attribute vec4 aColor; uniform mat4 uMvp; varying vec4 vColor; void main(){gl_Position=uMvp*aPosition;vColor=aColor;}"
+                  val fs = "precision mediump float; varying vec4 vColor; void main(){gl_FragColor=vColor;}"
+                  program = GLES20.glCreateProgram().also { p ->
+                      GLES20.glAttachShader(p, compile(GLES20.GL_VERTEX_SHADER, vs))
+                      GLES20.glAttachShader(p, compile(GLES20.GL_FRAGMENT_SHADER, fs))
+                      GLES20.glLinkProgram(p)
+                  }
+                  positionHandle = GLES20.glGetAttribLocation(program, "aPosition")
+                  colorHandle = GLES20.glGetAttribLocation(program, "aColor")
+                  mvpHandle = GLES20.glGetUniformLocation(program, "uMvp")
+              }
+
+              override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+                  GLES20.glViewport(0, 0, width, height)
+                  val ratio = width.toFloat() / height.coerceAtLeast(1)
+                  Matrix.frustumM(projection, 0, -ratio, ratio, -1f, 1f, 3f, 20f)
+              }
+
+              override fun onDrawFrame(gl: GL10?) {
+                  GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
+                  GLES20.glUseProgram(program)
+                  Matrix.setLookAtM(view, 0, 0f, 0f, 7f, 0f, 0f, 0f, 1f, 0f)
+                  Matrix.setIdentityM(model, 0)
+                  Matrix.rotateM(model, 0, (System.currentTimeMillis() - start) / 1000f * 25f, .4f, 1f, .2f)
+                  Matrix.multiplyMM(temp, 0, view, 0, model, 0)
+                  Matrix.multiplyMM(mvp, 0, projection, 0, temp, 0)
+                  GLES20.glUniformMatrix4fv(mvpHandle, 1, false, mvp, 0)
+                  GLES20.glEnableVertexAttribArray(positionHandle)
+                  GLES20.glVertexAttribPointer(positionHandle, 3, GLES20.GL_FLOAT, false, 0, vertexBuffer)
+                  GLES20.glEnableVertexAttribArray(colorHandle)
+                  GLES20.glVertexAttribPointer(colorHandle, 4, GLES20.GL_FLOAT, false, 0, colorBuffer)
+                  GLES20.glDrawElements(GLES20.GL_TRIANGLES, indices.size, GLES20.GL_UNSIGNED_SHORT, indexBuffer)
+                  GLES20.glDisableVertexAttribArray(positionHandle)
+                  GLES20.glDisableVertexAttribArray(colorHandle)
+              }
+
+              private fun compile(type: Int, source: String): Int = GLES20.glCreateShader(type).also {
+                  GLES20.glShaderSource(it, source)
+                  GLES20.glCompileShader(it)
+              }
+          }
           EOF
 
-          # ============================================================
-          # MainActivity.java
-          # ============================================================
-          cat > src/com/carlos/prisma3d/MainActivity.java << 'JAVA_EOF'
-          package com.carlos.prisma3d;
-
-          import android.app.Activity;
-          import android.content.ContentValues;
-          import android.content.Intent;
-          import android.database.Cursor;
-          import android.graphics.Bitmap;
-          import android.graphics.BitmapFactory;
-          import android.graphics.Typeface;
-          import android.graphics.drawable.GradientDrawable;
-          import android.net.Uri;
-          import android.opengl.GLES20;
-          import android.opengl.GLSurfaceView;
-          import android.opengl.GLUtils;
-          import android.opengl.Matrix;
-          import android.os.Bundle;
-          import android.os.HapticFeedbackConstants;
-          import android.provider.MediaStore;
-          import android.provider.OpenableColumns;
-          import android.text.Html;
-          import android.util.TypedValue;
-          import android.view.Gravity;
-          import android.view.MotionEvent;
-          import android.view.ScaleGestureDetector;
-          import android.view.View;
-          import android.view.ViewGroup;
-          import android.widget.FrameLayout;
-          import android.widget.HorizontalScrollView;
-          import android.widget.LinearLayout;
-          import android.widget.ScrollView;
-          import android.widget.TextView;
-          import org.json.JSONArray;
-          import org.json.JSONObject;
-          import java.io.BufferedReader;
-          import java.io.ByteArrayInputStream;
-          import java.io.ByteArrayOutputStream;
-          import java.io.InputStream;
-          import java.io.InputStreamReader;
-          import java.io.OutputStream;
-          import java.nio.ByteBuffer;
-          import java.nio.ByteOrder;
-          import java.nio.FloatBuffer;
-          import java.text.SimpleDateFormat;
-          import java.util.ArrayList;
-          import java.util.Arrays;
-          import java.util.Date;
-          import java.util.LinkedList;
-          import java.util.List;
-          import java.util.Locale;
-          import java.util.concurrent.ConcurrentLinkedQueue;
-          import javax.microedition.khronos.egl.EGLConfig;
-          import javax.microedition.khronos.opengles.GL10;
-
-          public class MainActivity extends Activity {
-
-              static final int C_BG         = 0xFF0B0B10;
-              static final int C_SURFACE    = 0xFF14141B;
-              static final int C_SURFACE2   = 0xFF1C1C25;
-              static final int C_OUTLINE    = 0xFF2E2E3A;
-              static final int C_TEXT       = 0xFFF4F4F8;
-              static final int C_TEXT_DIM   = 0xFF9A9AAE;
-              static final int C_PRIMARY    = 0xFFA78BFA;
-              static final int C_PRIMARY_C  = 0xFF7C3AED;
-              static final int C_TERTIARY   = 0xFF22D3EE;
-
-              static final int MATCH = ViewGroup.LayoutParams.MATCH_PARENT;
-              static final int WRAP  = ViewGroup.LayoutParams.WRAP_CONTENT;
-
-              static final int REQ_MODEL = 1, REQ_TEX = 2, REQ_SKY = 3;
-              static final int TOOL_SEL = 0, TOOL_MOV = 1, TOOL_ROT = 2, TOOL_SCA = 3;
-              static final String[] TOOL_LABEL = {"Sel", "Mov", "Rot", "Sca"};
-              static final String[] TOOL_NAME  = {"Seleccionar", "Mover", "Rotar", "Escalar"};
-              static final String[] MAT_NAME   = {"Mate", "Plastico", "Metal", "Brillante"};
-              static final float[] MAT_ROUGH   = {0.92f, 0.42f, 0.18f, 0.05f};
-              static final float[] MAT_METAL   = {0f, 0f, 1f, 0f};
-
-              static final float[][] PALETTE = {
-                  {0.96f, 0.55f, 0.20f}, {0.40f, 0.70f, 1.0f},
-                  {0.45f, 0.90f, 0.55f}, {0.95f, 0.45f, 0.80f},
-                  {1.00f, 0.85f, 0.35f}, {0.65f, 0.55f, 1.00f}
-              };
-
-              static final float[][] AX_COL = {
-                  {1.00f, 0.35f, 0.35f},
-                  {0.45f, 1.00f, 0.55f},
-                  {0.40f, 0.70f, 1.00f}
-              };
-              static final float[] SEL_COL = {1.00f, 0.75f, 0.20f};
-              static final float[] OFF_COL = {0.55f, 0.55f, 0.62f};
-
-              static final float[] SHADOW_M = {
-                  1f, 0f, 0f, 0f,
-                  -0.6f, 0f, -0.45f, 0f,
-                  0f, 0f, 1f, 0f,
-                  -0.6f, -1f, -0.45f, 1f
-              };
-
-              static class GLPart { FloatBuffer buf; int count; int tex; }
-              static class Part  { float[] verts; Bitmap tex; }
-              static class Model { String name; final List<Part> parts = new ArrayList<>(); }
-
-              static class Obj {
-                  String name;
-                  final float[] pos = new float[3];
-                  final float[] rot = new float[3];
-                  final float[] scl = {1f, 1f, 1f};
-                  float[] col;
-                  boolean selected, isCam;
-                  int mat = 1;
-                  final List<GLPart> parts = new ArrayList<>();
-                  FloatBuffer box;
-                  float[] bmin = {-1, -1, -1}, bmax = {1, 1, 1};
-                  Obj(String n, float[] c) { name = n; col = c; }
-              }
-
-              static class FloatList {
-                  float[] a = new float[4096];
-                  int n;
-                  void add(float v) { if (n == a.length) a = Arrays.copyOf(a, n * 2); a[n++] = v; }
-                  float[] toArray() { return Arrays.copyOf(a, n); }
-              }
-
-              private final List<Obj> scene = new ArrayList<>();
-              private final ConcurrentLinkedQueue<Model>  pendingModels = new ConcurrentLinkedQueue<>();
-              private final ConcurrentLinkedQueue<Bitmap> pendingTex    = new ConcurrentLinkedQueue<>();
-              private final ConcurrentLinkedQueue<Bitmap> pendingSky    = new ConcurrentLinkedQueue<>();
-
-              private Renderer renderer;
-              private GLSurfaceView glView;
-              private float density, lastX, lastY;
-              private int tool = TOOL_SEL, counter = 1, activeAxis = -1;
-
-              private final TextView[] toolBtns = new TextView[4];
-              private TextView camBtn, modeBtn, propName, propLoc, propRot, propScale, propMat;
-              private TextView outlinerEmpty;
-              private LinearLayout outliner;
-              private TextView statusText;
-
-              @Override
-              protected void onCreate(Bundle b) {
-                  super.onCreate(b);
-                  density = getResources().getDisplayMetrics().density;
-
-                  Obj cube = new Obj("Cubo", PALETTE[0]);
-                  cube.selected = true;
-                  cube.parts.add(cubeGL());
-                  cube.box = boxEdges(cube.bmin, cube.bmax);
-                  scene.add(cube);
-                  scene.add(newCamera());
-
-                  renderer = new Renderer();
-                  glView = new GLSurfaceView(this);
-                  glView.setEGLContextClientVersion(2);
-                  glView.setRenderer(renderer);
-
-                  final ScaleGestureDetector sgd = new ScaleGestureDetector(this,
-                      new ScaleGestureDetector.SimpleOnScaleGestureListener() {
-                          @Override public boolean onScale(ScaleGestureDetector d) {
-                              renderer.dist = clamp(renderer.dist / d.getScaleFactor(), 2f, 40f);
-                              return true;
-                          }
-                      });
-
-                  glView.setOnTouchListener((v, e) -> {
-                      sgd.onTouchEvent(e);
-                      switch (e.getActionMasked()) {
-                          case MotionEvent.ACTION_DOWN:
-                              lastX = e.getX(); lastY = e.getY();
-                              activeAxis = pickAxis(lastX, lastY);
-                              break;
-                          case MotionEvent.ACTION_UP:
-                          case MotionEvent.ACTION_CANCEL:
-                              activeAxis = -1;
-                              break;
-                          case MotionEvent.ACTION_MOVE:
-                              if (!sgd.isInProgress() && e.getPointerCount() == 1) {
-                                  onDrag(e.getX() - lastX, e.getY() - lastY);
-                              }
-                              lastX = e.getX(); lastY = e.getY();
-                              break;
-                      }
-                      return true;
-                  });
-
-                  setContentView(buildUi());
-                  refreshPanels();
-              }
-
-              @Override protected void onPause()  { super.onPause();  glView.onPause(); }
-              @Override protected void onResume() { super.onResume(); glView.onResume(); }
-
-              @Override
-              protected void onActivityResult(int req, int res, Intent data) {
-                  super.onActivityResult(req, res, data);
-                  if (res != RESULT_OK || data == null || data.getData() == null) return;
-                  Uri uri = data.getData();
-                  if (req == REQ_MODEL) loadModelAsync(uri);
-                  else if (req == REQ_TEX) loadImageAsync(uri, pendingTex, "Textura aplicada");
-                  else if (req == REQ_SKY) loadImageAsync(uri, pendingSky, "Cielo cargado");
-              }
-
-              static float clamp(float v, float lo, float hi) { return Math.max(lo, Math.min(hi, v)); }
-              private int dp(int v) { return Math.round(v * density); }
-              private void haptic() {
-                  View v = getWindow().getDecorView();
-                  if (v != null) v.performHapticFeedback(HapticFeedbackConstants.CONFIRM);
-              }
-
-              private void toast(String s) {
-                  runOnUiThread(() -> {
-                      if (statusText != null) {
-                          statusText.setText(s);
-                          statusText.setAlpha(1f);
-                          statusText.animate().alpha(0f).setStartDelay(2200).setDuration(600).start();
-                      }
-                  });
-              }
-
-              private GradientDrawable rounded(int color, int radiusDp) {
-                  GradientDrawable g = new GradientDrawable();
-                  g.setColor(color);
-                  g.setCornerRadius(dp(radiusDp));
-                  return g;
-              }
-
-              private GradientDrawable stroked(int fill, int stroke, int radiusDp, int strokeDp) {
-                  GradientDrawable g = new GradientDrawable();
-                  g.setColor(fill);
-                  g.setCornerRadius(dp(radiusDp));
-                  g.setStroke(dp(strokeDp), stroke);
-                  return g;
-              }
-
-              private TextView text(String s, int sp, int color) {
-                  TextView t = new TextView(this);
-                  t.setText(s);
-                  t.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
-                  t.setTextColor(color);
-                  t.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-                  return t;
-              }
-
-              private LinearLayout hbox() {
-                  LinearLayout l = new LinearLayout(this);
-                  l.setOrientation(LinearLayout.HORIZONTAL);
-                  return l;
-              }
-              private LinearLayout vbox() {
-                  LinearLayout l = new LinearLayout(this);
-                  l.setOrientation(LinearLayout.VERTICAL);
-                  return l;
-              }
-
-              private View buildUi() {
-                  FrameLayout root = new FrameLayout(this);
-                  root.setBackgroundColor(C_BG);
-
-                  glView.setLayoutParams(new FrameLayout.LayoutParams(MATCH, MATCH));
-                  root.addView(glView);
-
-                  LinearLayout topBar = hbox();
-                  topBar.setGravity(Gravity.CENTER_VERTICAL);
-                  topBar.setBackground(stroked(0xE614141B, C_OUTLINE, 20, 1));
-                  topBar.setPadding(dp(18), dp(10), dp(18), dp(10));
-                  FrameLayout.LayoutParams tbp = new FrameLayout.LayoutParams(MATCH, WRAP,
-                      Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-                  tbp.setMargins(dp(16), dp(16), dp(16), 0);
-                  topBar.setLayoutParams(tbp);
-
-                  TextView title = text("Prisma 3D", 16, C_PRIMARY);
-                  title.setTypeface(Typeface.create("sans-serif-black", Typeface.NORMAL));
-                  topBar.addView(title, new LinearLayout.LayoutParams(0, WRAP, 1f));
-
-                  statusText = text("", 12, C_TEXT_DIM);
-                  statusText.setSingleLine(true);
-                  topBar.addView(statusText);
-
-                  modeBtn = pill("Real", 0xE6A78BFA, 0xFF0B0B10, this::toggleReal);
-                  LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(WRAP, WRAP);
-                  mp.setMargins(dp(10), 0, 0, 0);
-                  topBar.addView(modeBtn, mp);
-
-                  root.addView(topBar);
-
-                  HorizontalScrollView toolScroll = new HorizontalScrollView(this);
-                  toolScroll.setHorizontalScrollBarEnabled(false);
-                  LinearLayout tools = hbox();
-                  tools.setPadding(dp(10), dp(8), dp(10), dp(8));
-                  tools.setGravity(Gravity.CENTER_VERTICAL);
-                  tools.setBackground(stroked(0xE614141B, C_OUTLINE, 28, 1));
-
-                  for (int i = 0; i < 4; i++) {
-                      final int idx = i;
-                      toolBtns[i] = toolChip(TOOL_LABEL[i], TOOL_NAME[i], () -> setTool(idx));
-                      tools.addView(toolBtns[i], chipLp());
-                  }
-                  tools.addView(separator());
-                  tools.addView(toolChip("+", "Anadir cubo", this::addCube));
-                  tools.addView(toolChip("Imp", "Importar modelo", () -> pickFile(REQ_MODEL, "*/*")));
-                  tools.addView(toolChip("Tex", "Textura", () -> {
-                      if (selected() == null) toast("Selecciona un objeto");
-                      else pickFile(REQ_TEX, "image/*");
-                  }));
-                  tools.addView(toolChip("Sky", "Cielo HDRI", () -> pickFile(REQ_SKY, "image/*")));
-                  tools.addView(separator());
-                  camBtn = toolChip("Cam", "Vista camara", this::toggleCamView);
-                  tools.addView(camBtn);
-                  tools.addView(toolChip("Mat", "Cambiar material", this::cycleMaterial));
-                  tools.addView(toolChip("Del", "Eliminar", this::deleteSelected));
-                  tools.addView(toolChip("Res", "Resetear vista", this::resetView));
-                  tools.addView(toolChip("Rdr", "Guardar render", () -> renderer.requestCapture()));
-
-                  toolScroll.addView(tools);
-                  FrameLayout.LayoutParams bsp = new FrameLayout.LayoutParams(MATCH, WRAP,
-                      Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-                  bsp.setMargins(dp(16), 0, dp(16), dp(16));
-                  toolScroll.setLayoutParams(bsp);
-                  root.addView(toolScroll);
-
-                  LinearLayout side = vbox();
-                  side.setBackground(stroked(0xE614141B, C_OUTLINE, 20, 1));
-                  side.setPadding(dp(14), dp(14), dp(14), dp(14));
-                  FrameLayout.LayoutParams sp = new FrameLayout.LayoutParams(dp(220), MATCH,
-                      Gravity.END | Gravity.CENTER_VERTICAL);
-                  sp.setMargins(0, dp(90), dp(16), dp(90));
-                  side.setLayoutParams(sp);
-
-                  side.addView(sectionLabel("ESCENA"));
-                  outliner = vbox();
-                  outlinerEmpty = text("Vacio", 12, C_TEXT_DIM);
-                  outlinerEmpty.setGravity(Gravity.CENTER);
-                  outlinerEmpty.setPadding(0, dp(20), 0, dp(20));
-                  ScrollView sc = new ScrollView(this);
-                  sc.addView(outliner);
-                  sc.addView(outlinerEmpty);
-                  side.addView(sc, new LinearLayout.LayoutParams(MATCH, 0, 1f));
-
-                  side.addView(sectionLabel("PROPIEDADES"));
-                  LinearLayout props = vbox();
-                  props.setBackground(rounded(C_SURFACE2, 14));
-                  props.setPadding(dp(12), dp(10), dp(12), dp(10));
-                  propName = text("--", 13, C_TEXT);
-                  propName.setTypeface(Typeface.create("sans-serif-black", Typeface.NORMAL));
-                  propLoc   = text("", 11, C_TEXT_DIM);
-                  propRot   = text("", 11, C_TEXT_DIM);
-                  propScale = text("", 11, C_TEXT_DIM);
-                  propMat   = text("", 11, C_PRIMARY);
-                  props.addView(propName);
-                  props.addView(propLoc);
-                  props.addView(propRot);
-                  props.addView(propScale);
-                  props.addView(propMat);
-                  side.addView(props, new LinearLayout.LayoutParams(MATCH, WRAP));
-                  root.addView(side);
-
-                  TextView hint = text("Arrastra: orbitar  |  Pellizco: zoom  |  Toca eje: transformar",
-                      11, C_TEXT);
-                  hint.setSingleLine(true);
-                  hint.setBackground(rounded(0xCC14141B, 14));
-                  hint.setPadding(dp(12), dp(6), dp(12), dp(6));
-                  FrameLayout.LayoutParams hl = new FrameLayout.LayoutParams(WRAP, WRAP,
-                      Gravity.BOTTOM | Gravity.START);
-                  hl.setMargins(dp(16), 0, dp(250), dp(90));
-                  hint.setLayoutParams(hl);
-                  root.addView(hint);
-
-                  TextView gizmo = text("", 12, C_TEXT);
-                  gizmo.setText(Html.fromHtml(
-                      "<font color='#FF5A5A'><b>X</b></font>  " +
-                      "<font color='#72FF8A'><b>Y</b></font>  " +
-                      "<font color='#6BB3FF'><b>Z</b></font>"));
-                  FrameLayout.LayoutParams gl = new FrameLayout.LayoutParams(WRAP, WRAP,
-                      Gravity.TOP | Gravity.END);
-                  gl.setMargins(0, dp(90), dp(250), 0);
-                  gizmo.setLayoutParams(gl);
-                  root.addView(gizmo);
-
-                  highlightTools();
-                  return root;
-              }
-
-              private TextView sectionLabel(String s) {
-                  TextView t = text(s, 10, C_TEXT_DIM);
-                  t.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
-                  LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(MATCH, WRAP);
-                  lp.setMargins(0, dp(10), 0, dp(6));
-                  t.setLayoutParams(lp);
-                  return t;
-              }
-
-              private TextView toolChip(String icon, String label, final Runnable action) {
-                  TextView t = new TextView(this);
-                  t.setText(icon);
-                  t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
-                  t.setTextColor(C_TEXT);
-                  t.setGravity(Gravity.CENTER);
-                  t.setBackground(rounded(C_SURFACE2, 16));
-                  t.setPadding(dp(14), dp(12), dp(14), dp(12));
-                  t.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
-                  t.setOnClickListener(v -> {
-                      haptic();
-                      action.run();
-                  });
-                  t.setOnLongClickListener(v -> {
-                      toast(label);
-                      return true;
-                  });
-                  return t;
-              }
-
-              private LinearLayout.LayoutParams chipLp() {
-                  LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(WRAP, WRAP);
-                  p.setMargins(dp(4), 0, dp(4), 0);
-                  return p;
-              }
-
-              private View separator() {
-                  View v = new View(this);
-                  v.setBackgroundColor(C_OUTLINE);
-                  LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(dp(1), dp(24));
-                  p.setMargins(dp(10), 0, dp(10), 0);
-                  v.setLayoutParams(p);
-                  return v;
-              }
-
-              private TextView pill(String s, int bg, int fg, final Runnable r) {
-                  TextView t = text(s, 12, fg);
-                  t.setSingleLine(true);
-                  t.setGravity(Gravity.CENTER);
-                  t.setBackground(rounded(bg, 18));
-                  t.setPadding(dp(18), dp(10), dp(18), dp(10));
-                  t.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
-                  t.setOnClickListener(v -> { haptic(); r.run(); });
-                  return t;
-              }
-
-              private void pickFile(int req, String mime) {
-                  Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-                  i.addCategory(Intent.CATEGORY_OPENABLE);
-                  i.setType(mime);
-                  startActivityForResult(i, req);
-              }
-
-              private String displayName(Uri uri) {
-                  Cursor c = getContentResolver().query(uri, null, null, null, null);
-                  try {
-                      if (c != null && c.moveToFirst()) {
-                          int i = c.getColumnIndex(OpenableColumns.DISPLAY_NAME);
-                          if (i >= 0) return c.getString(i);
-                      }
-                  } finally { if (c != null) c.close(); }
-                  String seg = uri.getLastPathSegment();
-                  return seg == null ? "modelo" : seg;
-              }
-
-              private byte[] readAll(Uri uri) throws Exception {
-                  InputStream in = getContentResolver().openInputStream(uri);
-                  if (in == null) throw new Exception("No se pudo abrir el archivo");
-                  ByteArrayOutputStream bos = new ByteArrayOutputStream();
-                  byte[] buf = new byte[65536];
-                  int n;
-                  while ((n = in.read(buf)) != -1) bos.write(buf, 0, n);
-                  in.close();
-                  return bos.toByteArray();
-              }
-
-              private void loadModelAsync(final Uri uri) {
-                  toast("Cargando modelo...");
-                  new Thread(() -> {
-                      try {
-                          String name = displayName(uri);
-                          String lower = name.toLowerCase(Locale.US);
-                          byte[] data = readAll(uri);
-                          Model m;
-                          if (lower.endsWith(".glb"))       m = parseGlb(data, name);
-                          else if (lower.endsWith(".obj"))  m = parseObj(data, name);
-                          else if (lower.endsWith(".fbx"))  throw new Exception("FBX no soportado. Exporta como .glb");
-                          else throw new Exception("Formato no soportado: usa .glb u .obj");
-                          pendingModels.add(m);
-                          toast("Modelo cargado: " + name);
-                      } catch (Exception e) {
-                          toast("Error: " + e.getMessage());
-                      }
-                  }).start();
-              }
-
-              private void loadImageAsync(final Uri uri, final ConcurrentLinkedQueue<Bitmap> q, final String okMsg) {
-                  toast("Cargando imagen...");
-                  new Thread(() -> {
-                      try {
-                          InputStream in = getContentResolver().openInputStream(uri);
-                          Bitmap bmp = in == null ? null : BitmapFactory.decodeStream(in);
-                          if (in != null) in.close();
-                          if (bmp == null) throw new Exception("Imagen no valida");
-                          q.add(bmp);
-                          toast(okMsg);
-                      } catch (Exception e) {
-                          toast("Error: " + e.getMessage());
-                      }
-                  }).start();
-              }
-
-              static int vtx(float[] a, int k, float x, float y, float z,
-                             float nx, float ny, float nz, float u, float v) {
-                  a[k]=x; a[k+1]=y; a[k+2]=z;
-                  a[k+3]=nx; a[k+4]=ny; a[k+5]=nz;
-                  a[k+6]=u; a[k+7]=v;
-                  return k + 8;
-              }
-              static FloatBuffer toBuffer(float[] a) {
-                  FloatBuffer fb = ByteBuffer.allocateDirect(a.length * 4)
-                      .order(ByteOrder.nativeOrder()).asFloatBuffer();
-                  fb.put(a).position(0);
-                  return fb;
-              }
-
-              static GLPart cubeGL() {
-                  float[][] p = {
-                      {-1,-1,-1},{1,-1,-1},{1,1,-1},{-1,1,-1},
-                      {-1,-1, 1},{1,-1, 1},{1,1, 1},{-1,1, 1}
-                  };
-                  int[][] faces = {
-                      {0,3,2,1},{4,5,6,7},{0,4,7,3},
-                      {1,2,6,5},{3,7,6,2},{0,1,5,4}
-                  };
-                  float[][] nrm = {
-                      {0,0,-1},{0,0,1},{-1,0,0},
-                      {1,0,0},{0,1,0},{0,-1,0}
-                  };
-                  float[][] uv = {{0,0},{1,0},{1,1},{0,0},{1,1},{0,1}};
-                  float[] v = new float[36 * 8];
-                  int k = 0;
-                  for (int f = 0; f < 6; f++) {
-                      int[] q = faces[f];
-                      int[] ord = {q[0], q[1], q[2], q[0], q[2], q[3]};
-                      for (int j = 0; j < 6; j++) {
-                          float[] pt = p[ord[j]];
-                          k = vtx(v, k, pt[0], pt[1], pt[2],
-                              nrm[f][0], nrm[f][1], nrm[f][2], uv[j][0], uv[j][1]);
-                      }
-                  }
-                  GLPart g = new GLPart();
-                  g.buf = toBuffer(v);
-                  g.count = 36;
-                  return g;
-              }
-
-              static FloatBuffer lineBuf(float ax, float ay, float az, float bx, float by, float bz) {
-                  float[] v = new float[16];
-                  vtx(v, 0, ax, ay, az, 0, 1, 0, 0, 0);
-                  vtx(v, 8, bx, by, bz, 0, 1, 0, 0, 0);
-                  return toBuffer(v);
-              }
-
-              static FloatBuffer boxEdges(float[] mn, float[] mx) {
-                  float[][] c = {
-                      {mn[0],mn[1],mn[2]},{mx[0],mn[1],mn[2]},
-                      {mx[0],mx[1],mn[2]},{mn[0],mx[1],mn[2]},
-                      {mn[0],mn[1],mx[2]},{mx[0],mn[1],mx[2]},
-                      {mx[0],mx[1],mx[2]},{mn[0],mx[1],mx[2]}
-                  };
-                  int[][] e = {
-                      {0,1},{1,2},{2,3},{3,0},{4,5},{5,6},
-                      {6,7},{7,4},{0,4},{1,5},{2,6},{3,7}
-                  };
-                  float[] v = new float[24 * 8];
-                  int k = 0;
-                  for (int[] ed : e) for (int idx : ed) {
-                      k = vtx(v, k, c[idx][0], c[idx][1], c[idx][2], 0, 1, 0, 0, 0);
-                  }
-                  return toBuffer(v);
-              }
-
-              static float[] ringPt(int ax, double a) {
-                  float c = (float) Math.cos(a), s = (float) Math.sin(a);
-                  if (ax == 0) return new float[]{0, c, s};
-                  if (ax == 1) return new float[]{c, 0, s};
-                  return new float[]{c, s, 0};
-              }
-
-              static void buildModel(Obj o, float[] m) {
-                  Matrix.setIdentityM(m, 0);
-                  Matrix.translateM(m, 0, o.pos[0], o.pos[1], o.pos[2]);
-                  Matrix.rotateM(m, 0, o.rot[0], 1, 0, 0);
-                  Matrix.rotateM(m, 0, o.rot[1], 0, 1, 0);
-                  Matrix.rotateM(m, 0, o.rot[2], 0, 0, 1);
-                  Matrix.scaleM(m, 0, o.scl[0], o.scl[1], o.scl[2]);
-              }
-
-              static void camModel(Obj o, float[] m) {
-                  Matrix.setIdentityM(m, 0);
-                  Matrix.translateM(m, 0, o.pos[0], o.pos[1], o.pos[2]);
-                  Matrix.rotateM(m, 0, o.rot[1], 0, 1, 0);
-                  Matrix.rotateM(m, 0, o.rot[0], 1, 0, 0);
-              }
-
-              static float pf(String s) { return Float.parseFloat(s); }
-              static int resolve(String s, int size) {
-                  int i = Integer.parseInt(s);
-                  return i > 0 ? i - 1 : size + i;
-              }
-
-              static float[] faceNormal(float[] a, float[] b, float[] c) {
-                  float ex=b[0]-a[0], ey=b[1]-a[1], ez=b[2]-a[2];
-                  float fx=c[0]-a[0], fy=c[1]-a[1], fz=c[2]-a[2];
-                  float nx=ey*fz-ez*fy, ny=ez*fx-ex*fz, nz=ex*fy-ey*fx;
-                  float len = (float) Math.sqrt(nx*nx+ny*ny+nz*nz);
-                  if (len < 1e-8f) return new float[]{0, 1, 0};
-                  return new float[]{nx/len, ny/len, nz/len};
-              }
-
-              static float segDist(float px, float py, float ax, float ay, float bx, float by) {
-                  float dx = bx-ax, dy = by-ay;
-                  float l2 = dx*dx + dy*dy;
-                  float t = l2 == 0 ? 0 : clamp(((px-ax)*dx + (py-ay)*dy) / l2, 0, 1);
-                  float cx = ax + t*dx - px, cy = ay + t*dy - py;
-                  return (float) Math.sqrt(cx*cx + cy*cy);
-              }
-
-              static void normalize(List<Part> parts) {
-                  float[] mn = {1e9f,1e9f,1e9f}, mx = {-1e9f,-1e9f,-1e9f};
-                  for (Part p : parts) {
-                      for (int i = 0; i < p.verts.length; i += 8) {
-                          for (int a = 0; a < 3; a++) {
-                              mn[a] = Math.min(mn[a], p.verts[i+a]);
-                              mx[a] = Math.max(mx[a], p.verts[i+a]);
-                          }
-                      }
-                  }
-                  float ext = Math.max(mx[0]-mn[0], Math.max(mx[1]-mn[1], mx[2]-mn[2]));
-                  if (ext <= 1e-6f) return;
-                  float s = 2f / ext;
-                  float[] c = {(mn[0]+mx[0])/2f, (mn[1]+mx[1])/2f, (mn[2]+mx[2])/2f};
-                  for (Part p : parts) {
-                      for (int i = 0; i < p.verts.length; i += 8) {
-                          for (int a = 0; a < 3; a++) {
-                              p.verts[i+a] = (p.verts[i+a] - c[a]) * s;
-                          }
-                      }
-                  }
-              }
-
-              static Model parseObj(byte[] data, String name) throws Exception {
-                  BufferedReader br = new BufferedReader(
-                      new InputStreamReader(new ByteArrayInputStream(data), "UTF-8"));
-                  List<float[]> v = new ArrayList<>(), vt = new ArrayList<>(), vn = new ArrayList<>();
-                  FloatList out = new FloatList();
-                  String line;
-                  while ((line = br.readLine()) != null) {
-                      line = line.trim();
-                      if (line.startsWith("v ")) {
-                          String[] p = line.split("\\s+");
-                          v.add(new float[]{pf(p[1]), pf(p[2]), pf(p[3])});
-                      } else if (line.startsWith("vt ")) {
-                          String[] p = line.split("\\s+");
-                          vt.add(new float[]{pf(p[1]), p.length > 2 ? pf(p[2]) : 0f});
-                      } else if (line.startsWith("vn ")) {
-                          String[] p = line.split("\\s+");
-                          vn.add(new float[]{pf(p[1]), pf(p[2]), pf(p[3])});
-                      } else if (line.startsWith("f ")) {
-                          String[] p = line.substring(2).trim().split("\\s+");
-                          int[][] cs = new int[p.length][3];
-                          for (int i = 0; i < p.length; i++) {
-                              String[] ix = p[i].split("/", -1);
-                              cs[i][0] = resolve(ix[0], v.size());
-                              cs[i][1] = ix.length > 1 && !ix[1].isEmpty() ? resolve(ix[1], vt.size()) : -1;
-                              cs[i][2] = ix.length > 2 && !ix[2].isEmpty() ? resolve(ix[2], vn.size()) : -1;
-                          }
-                          for (int i = 1; i + 1 < p.length; i++) {
-                              int[][] tri = {cs[0], cs[i], cs[i+1]};
-                              float[] fn = faceNormal(v.get(tri[0][0]), v.get(tri[1][0]), v.get(tri[2][0]));
-                              for (int[] c : tri) {
-                                  float[] pos = v.get(c[0]);
-                                  float[] nrm = c[2] >= 0 ? vn.get(c[2]) : fn;
-                                  float[] uv  = c[1] >= 0 ? vt.get(c[1]) : new float[]{0f, 0f};
-                                  out.add(pos[0]); out.add(pos[1]); out.add(pos[2]);
-                                  out.add(nrm[0]); out.add(nrm[1]); out.add(nrm[2]);
-                                  out.add(uv[0]);  out.add(uv[1]);
-                              }
-                          }
-                      }
-                  }
-                  br.close();
-                  Part part = new Part();
-                  part.verts = out.toArray();
-                  if (part.verts.length == 0) throw new Exception("El OBJ no tiene caras");
-                  Model m = new Model();
-                  m.name = name;
-                  m.parts.add(part);
-                  normalize(m.parts);
-                  return m;
-              }
-
-              static float[] readAcc(JSONArray accessors, JSONArray views, ByteBuffer bin, int ai) throws Exception {
-                  JSONObject a = accessors.getJSONObject(ai);
-                  int count = a.getInt("count");
-                  int ctype = a.getInt("componentType");
-                  String type = a.getString("type");
-                  int comps = type.equals("SCALAR") ? 1 : type.equals("VEC2") ? 2 : type.equals("VEC3") ? 3 : 4;
-                  JSONObject bv = views.getJSONObject(a.getInt("bufferView"));
-                  int csize;
-                  switch (ctype) {
-                      case 5120: case 5121: csize = 1; break;
-                      case 5122: case 5123: csize = 2; break;
-                      case 5125: case 5126: csize = 4; break;
-                      default: csize = 4;
-                  }
-                  int stride = bv.optInt("byteStride", csize * comps);
-                  int base = bv.optInt("byteOffset", 0) + a.optInt("byteOffset", 0);
-                  float[] out = new float[count * comps];
-                  for (int i = 0; i < count; i++) {
-                      for (int c = 0; c < comps; c++) {
-                          int pos = base + i * stride + c * csize;
-                          float val;
-                          switch (ctype) {
-                              case 5126: val = bin.getFloat(pos); break;
-                              case 5125: val = (float) (bin.getInt(pos) & 0xFFFFFFFFL); break;
-                              case 5123: val = bin.getShort(pos) & 0xFFFF; break;
-                              case 5122: val = bin.getShort(pos); break;
-                              case 5121: val = bin.get(pos) & 0xFF; break;
-                              case 5120: val = bin.get(pos); break;
-                              default: val = 0f;
-                          }
-                          out[i * comps + c] = val;
-                      }
-                  }
-                  return out;
-              }
-
-              static Bitmap materialTexture(JSONArray mats, JSONArray texs, JSONArray imgs,
-                                            JSONArray views, byte[] data, int binStart, int matIdx) throws Exception {
-                  if (mats == null || texs == null || imgs == null || matIdx < 0) return null;
-                  JSONObject mat = mats.getJSONObject(matIdx);
-                  JSONObject pbr = mat.optJSONObject("pbrMetallicRoughness");
-                  if (pbr == null) return null;
-                  JSONObject bct = pbr.optJSONObject("baseColorTexture");
-                  if (bct == null) return null;
-                  int src = texs.getJSONObject(bct.getInt("index")).getInt("source");
-                  JSONObject img = imgs.getJSONObject(src);
-                  if (!img.has("bufferView")) return null;
-                  JSONObject bv = views.getJSONObject(img.getInt("bufferView"));
-                  int off = bv.optInt("byteOffset", 0);
-                  int len = bv.getInt("byteLength");
-                  return BitmapFactory.decodeByteArray(data, binStart + off, len);
-              }
-
-              static Model parseGlb(byte[] data, String name) throws Exception {
-                  ByteBuffer hb = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
-                  if (hb.getInt(0) != 0x46546C67) throw new Exception("No es un GLB valido");
-                  int jsonLen = hb.getInt(12);
-                  JSONObject root = new JSONObject(new String(data, 20, jsonLen, "UTF-8"));
-                  int binChunk = 20 + jsonLen;
-                  int binLen = hb.getInt(binChunk);
-                  int binStart = binChunk + 8;
-                  ByteBuffer bin = ByteBuffer.wrap(data, binStart, binLen).slice()
-                      .order(ByteOrder.LITTLE_ENDIAN);
-
-                  JSONArray accessors = root.getJSONArray("accessors");
-                  JSONArray views = root.getJSONArray("bufferViews");
-                  JSONArray meshes = root.optJSONArray("meshes");
-                  if (meshes == null || meshes.length() == 0) throw new Exception("GLB sin mallas");
-                  JSONArray mats = root.optJSONArray("materials");
-                  JSONArray texs = root.optJSONArray("textures");
-                  JSONArray imgs = root.optJSONArray("images");
-
-                  Model m = new Model();
-                  m.name = name;
-                  for (int mi = 0; mi < meshes.length(); mi++) {
-                      JSONArray prims = meshes.getJSONObject(mi).getJSONArray("primitives");
-                      for (int pi = 0; pi < prims.length(); pi++) {
-                          JSONObject prim = prims.getJSONObject(pi);
-                          JSONObject at = prim.getJSONObject("attributes");
-                          float[] pos = readAcc(accessors, views, bin, at.getInt("POSITION"));
-                          float[] nrm = at.has("NORMAL") ? readAcc(accessors, views, bin, at.getInt("NORMAL")) : null;
-                          float[] uv  = at.has("TEXCOORD_0") ? readAcc(accessors, views, bin, at.getInt("TEXCOORD_0")) : null;
-
-                          int idxCount;
-                          int[] idxInt;
-                          if (prim.has("indices")) {
-                              JSONObject ia = accessors.getJSONObject(prim.getInt("indices"));
-                              idxCount = ia.getInt("count");
-                              int ctype = ia.getInt("componentType");
-                              JSONObject bv = views.getJSONObject(ia.getInt("bufferView"));
-                              int base = bv.optInt("byteOffset", 0) + ia.optInt("byteOffset", 0);
-                              idxInt = new int[idxCount];
-                              for (int i = 0; i < idxCount; i++) {
-                                  int p = base + i * (ctype == 5123 ? 2 : ctype == 5125 ? 4 : 1);
-                                  switch (ctype) {
-                                      case 5123: idxInt[i] = bin.getShort(p) & 0xFFFF; break;
-                                      case 5125: idxInt[i] = bin.getInt(p); break;
-                                      case 5121: idxInt[i] = bin.get(p) & 0xFF; break;
-                                      default:   idxInt[i] = i;
-                                  }
-                              }
-                          } else {
-                              idxCount = pos.length / 3;
-                              idxInt = new int[idxCount];
-                              for (int i = 0; i < idxCount; i++) idxInt[i] = i;
-                          }
-
-                          float[] verts = new float[idxCount * 8];
-                          int k = 0;
-                          for (int i = 0; i < idxCount; i++) {
-                              int vi = idxInt[i];
-                              if (vi < 0 || vi * 3 + 2 >= pos.length) continue;
-                              k = vtx(verts, k,
-                                  pos[vi*3], pos[vi*3+1], pos[vi*3+2],
-                                  nrm != null && vi*3+2 < nrm.length ? nrm[vi*3]   : 0f,
-                                  nrm != null && vi*3+2 < nrm.length ? nrm[vi*3+1] : 1f,
-                                  nrm != null && vi*3+2 < nrm.length ? nrm[vi*3+2] : 0f,
-                                  uv  != null && vi*2+1 < uv.length  ? uv[vi*2]    : 0f,
-                                  uv  != null && vi*2+1 < uv.length  ? uv[vi*2+1]  : 0f);
-                          }
-                          Part part = new Part();
-                          part.verts = Arrays.copyOf(verts, k);
-                          part.tex = materialTexture(mats, texs, imgs, views, data, binStart,
-                              prim.optInt("material", -1));
-                          if (part.verts.length > 0) m.parts.add(part);
-                      }
-                  }
-                  if (m.parts.isEmpty()) throw new Exception("GLB sin geometria");
-                  normalize(m.parts);
-                  return m;
-              }
-
-              private void setTool(int t) {
-                  tool = t;
-                  highlightTools();
-                  refreshPanels();
-              }
-
-              private void highlightTools() {
-                  for (int i = 0; i < toolBtns.length; i++) {
-                      boolean on = i == tool;
-                      toolBtns[i].setBackground(rounded(on ? C_PRIMARY : C_SURFACE2, 16));
-                      toolBtns[i].setTextColor(on ? C_BG : C_TEXT);
-                  }
-                  if (camBtn != null && renderer != null) {
-                      boolean on = renderer.camView;
-                      camBtn.setBackground(rounded(on ? C_TERTIARY : C_SURFACE2, 16));
-                      camBtn.setTextColor(on ? C_BG : C_TEXT);
-                  }
-              }
-
-              private Obj selected() {
-                  synchronized (scene) {
-                      for (Obj o : scene) if (o.selected) return o;
-                  }
-                  return null;
-              }
-              private Obj findCamera() {
-                  synchronized (scene) {
-                      for (Obj o : scene) if (o.isCam) return o;
-                  }
-                  return null;
-              }
-
-              private void select(Obj o) {
-                  synchronized (scene) {
-                      for (Obj x : scene) x.selected = (x == o);
-                  }
-                  refreshPanels();
-              }
-
-              private void addObj(Obj o) {
-                  synchronized (scene) {
-                      for (Obj x : scene) x.selected = false;
-                      o.selected = true;
-                      scene.add(o);
-                  }
-                  refreshPanels();
-              }
-
-              private Obj newCamera() {
-                  Obj c = new Obj("Camara", new float[]{1f, 1f, 1f});
-                  c.isCam = true;
-                  c.pos[1] = 1.5f;
-                  c.pos[2] = 5f;
-                  c.rot[0] = -16.7f;
-                  return c;
-              }
-
-              private void addCube() {
-                  counter++;
-                  Obj o = new Obj("Cubo " + String.format(Locale.US, "%03d", counter),
-                      PALETTE[counter % PALETTE.length]);
-                  o.pos[0] = (counter % 3 - 1) * 2.5f;
-                  o.pos[2] = (counter / 3 % 3 - 1) * 2.5f;
-                  o.parts.add(cubeGL());
-                  o.box = boxEdges(o.bmin, o.bmax);
-                  addObj(o);
-              }
-
-              private void toggleCamView() {
-                  if (findCamera() == null) {
-                      addObj(newCamera());
-                      renderer.camView = true;
-                  } else {
-                      renderer.camView = !renderer.camView;
-                  }
-                  refreshPanels();
-              }
-
-              private void toggleReal() {
-                  renderer.real = !renderer.real;
-                  updateModeLabel();
-              }
-
-              private void updateModeLabel() {
-                  if (modeBtn != null) {
-                      modeBtn.setText(renderer.real ? "Real" : "Solido");
-                      modeBtn.setBackground(rounded(renderer.real ? C_PRIMARY : C_SURFACE2, 18));
-                      modeBtn.setTextColor(renderer.real ? C_BG : C_TEXT);
-                  }
-              }
-
-              private void resetView() {
-                  renderer.rotX = 25f;
-                  renderer.rotY = 35f;
-                  renderer.dist = 10f;
-              }
-
-              private void cycleMaterial() {
-                  Obj o = selected();
-                  if (o == null || o.isCam) { toast("Selecciona un objeto"); return; }
-                  o.mat = (o.mat + 1) % MAT_NAME.length;
-                  updateProps();
-              }
-
-              private void deleteSelected() {
-                  synchronized (scene) {
-                      Obj sel = null;
-                      int idx = -1;
-                      for (int i = 0; i < scene.size(); i++) {
-                          if (scene.get(i).selected) { sel = scene.get(i); idx = i; break; }
-                      }
-                      if (sel == null) { toast("Nada que eliminar"); return; }
-                      if (sel.isCam) { toast("No puedes eliminar la camara"); return; }
-                      scene.remove(sel);
-                      if (!scene.isEmpty()) {
-                          int next = Math.min(idx, scene.size() - 1);
-                          scene.get(next).selected = true;
-                      }
-                  }
-                  refreshPanels();
-              }
-
-              private int pickAxis(float px, float py) {
-                  if (tool == TOOL_SEL) return -1;
-                  Obj o = selected();
-                  if (o == null) return -1;
-                  float L = renderer.dist * 0.14f;
-                  float[] o2 = renderer.project(o.pos[0], o.pos[1], o.pos[2]);
-                  if (o2 == null) return -1;
-                  float best = dp(28) + renderer.dist * 1.5f;
-                  int hit = -1;
-                  for (int a = 0; a < 3; a++) {
-                      float[] t2 = renderer.project(
-                          o.pos[0] + (a == 0 ? L : 0),
-                          o.pos[1] + (a == 1 ? L : 0),
-                          o.pos[2] + (a == 2 ? L : 0));
-                      if (t2 == null) continue;
-                      float d = segDist(px, py, o2[0], o2[1], t2[0], t2[1]);
-                      if (d < best) { best = d; hit = a; }
-                  }
-                  return hit;
-              }
-
-              private void applyAxis(Obj o, int a, float dx, float dy) {
-                  float L = renderer.dist * 0.14f;
-                  float[] o2 = renderer.project(o.pos[0], o.pos[1], o.pos[2]);
-                  float[] t2 = renderer.project(
-                      o.pos[0] + (a == 0 ? L : 0),
-                      o.pos[1] + (a == 1 ? L : 0),
-                      o.pos[2] + (a == 2 ? L : 0));
-                  if (o2 == null || t2 == null) return;
-                  float ux = t2[0] - o2[0], uy = t2[1] - o2[1];
-                  float len = (float) Math.sqrt(ux*ux + uy*uy);
-                  if (len < 1f) return;
-                  float along = (dx * ux + dy * uy) / len;
-                  float sign = Math.signum(ux + uy);
-                  if (sign == 0) sign = 1f;
-                  float delta = along * sign;
-
-                  if (tool == TOOL_MOV) {
-                      o.pos[a] += delta * (L / len);
-                  } else if (tool == TOOL_ROT) {
-                      o.rot[a] += delta * 0.8f;
-                  } else if (tool == TOOL_SCA && !o.isCam) {
-                      o.scl[a] = clamp(o.scl[a] + delta * 0.015f, 0.05f, 20f);
-                  }
-              }
-
-              private void onDrag(float dx, float dy) {
-                  Obj sel = selected();
-                  if (activeAxis >= 0 && sel != null && tool != TOOL_SEL) {
-                      applyAxis(sel, activeAxis, dx, dy);
-                  } else if (!renderer.camView) {
-                      renderer.rotY += dx * 0.4f;
-                      renderer.rotX = clamp(renderer.rotX + dy * 0.4f, -89f, 89f);
-                  }
-                  updateProps();
-              }
-
-              private void refreshPanels() {
-                  outliner.removeAllViews();
-                  boolean any = false;
-                  synchronized (scene) {
-                      for (final Obj o : scene) {
-                          any = true;
-                          String icon = o.isCam ? "Cam  " : "Obj  ";
-                          TextView r = text(icon + o.name, 12, o.selected ? C_TEXT : C_TEXT_DIM);
-                          r.setPadding(dp(10), dp(8), dp(10), dp(8));
-                          r.setBackground(rounded(o.selected ? C_PRIMARY_C : 0x00000000, 10));
-                          r.setOnClickListener(v -> { haptic(); select(o); });
-                          LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(MATCH, WRAP);
-                          p.setMargins(0, 0, 0, dp(4));
-                          outliner.addView(r, p);
-                      }
-                  }
-                  outlinerEmpty.setVisibility(any ? View.GONE : View.VISIBLE);
-                  String mode = renderer.camView && findCamera() != null ? "Camara" : "Perspectiva";
-                  if (statusText != null && statusText.getAlpha() < 0.5f)
-                      statusText.setText(mode + "  |  " + TOOL_NAME[tool]);
-                  updateProps();
-                  updateModeLabel();
-                  highlightTools();
-              }
-
-              private void updateProps() {
-                  Obj o = selected();
-                  if (o == null) {
-                      propName.setText("--");
-                      propLoc.setText(""); propRot.setText("");
-                      propScale.setText(""); propMat.setText("");
-                      return;
-                  }
-                  propName.setText(o.name);
-                  propLoc.setText(String.format(Locale.US, "Pos   %6.2f  %6.2f  %6.2f",
-                      o.pos[0], o.pos[1], o.pos[2]));
-                  propRot.setText(String.format(Locale.US, "Rot   %5.0f  %5.0f  %5.0f",
-                      o.rot[0], o.rot[1], o.rot[2]));
-                  propScale.setText(o.isCam ? "FOV   45"
-                      : String.format(Locale.US, "Escala %5.2f  %5.2f  %5.2f",
-                          o.scl[0], o.scl[1], o.scl[2]));
-                  propMat.setText(o.isCam ? ""
-                      : MAT_NAME[o.mat] + "  R " + String.format(Locale.US, "%.2f", MAT_ROUGH[o.mat])
-                          + "  M " + String.format(Locale.US, "%.0f", MAT_METAL[o.mat] * 100f));
-              }
-
-              class Renderer implements GLSurfaceView.Renderer {
-                  volatile float rotX = 25f, rotY = 35f, dist = 10f;
-                  volatile boolean real = true, camView, capture, hasSky, ready;
-                  volatile int vw = 1, vh = 1;
-
-                  private int skyId, prog, progSky;
-                  private int aPos, aNrm, aUv, uMvp, uModel, uTint, uUseTex, uTex,
-                              uReal, uShadow, uCam, uRough, uMetal, uHor, uZen;
-                  private int aSky, uInvVP, sSkyTex, sHas, sHor, sZen;
-                  private FloatBuffer gridBuf, axisX, axisY, axisZ, skyBuf, frustumBuf, markerCube;
-                  private final FloatBuffer[] gAxis = new FloatBuffer[3];
-                  private final FloatBuffer[] ringBufs = new FloatBuffer[3];
-                  private final float[] proj = new float[16], view = new float[16], inv = new float[16];
-                  private final float[] model = new float[16], tmp = new float[16], mvp = new float[16];
-                  private final float[] vp = new float[16], vr = new float[16], invVP = new float[16];
-                  private final float[] sm = new float[16], gm = new float[16];
-                  private final float[] lastVP = new float[16];
-
-                  private static final String MAIN_VS =
-                      "attribute vec3 aPos; attribute vec3 aNrm; attribute vec2 aUv;\n" +
-                      "uniform mat4 uMvp; uniform mat4 uModel;\n" +
-                      "varying vec3 vN; varying vec3 vW; varying vec2 vUv;\n" +
-                      "void main(){\n" +
-                      "  vec4 w = uModel * vec4(aPos,1.0); vW = w.xyz;\n" +
-                      "  vN = (uModel * vec4(aNrm,0.0)).xyz; vUv = aUv;\n" +
-                      "  gl_Position = uMvp * vec4(aPos,1.0);\n" +
-                      "}";
-
-                  private static final String MAIN_FS =
-                      "precision highp float;\n" +
-                      "varying vec3 vN; varying vec3 vW; varying vec2 vUv;\n" +
-                      "uniform vec3 uTint; uniform sampler2D uTex; uniform float uUseTex;\n" +
-                      "uniform float uReal; uniform float uShadow; uniform vec3 uCam;\n" +
-                      "uniform float uRough; uniform float uMetal; uniform vec3 uHor; uniform vec3 uZen;\n" +
-                      "const vec3 SUN = normalize(vec3(0.5, 0.8, 0.35));\n" +
-                      "vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.0,1.0); }\n" +
-                      "vec3 skyCol(vec3 d){\n" +
-                      "  vec3 c = mix(uHor, uZen, pow(clamp(d.y,0.0,1.0),0.6));\n" +
-                      "  c = mix(c, vec3(0.30,0.24,0.20), step(d.y,0.0));\n" +
-                      "  c += vec3(1.0,0.9,0.7)*pow(max(dot(d,SUN),0.0),400.0)*3.5;\n" +
-                      "  return c;\n" +
-                      "}\n" +
-                      "void main(){\n" +
-                      "  if (uShadow > 0.5) { gl_FragColor = vec4(0.0,0.0,0.0,0.35); return; }\n" +
-                      "  vec3 base = uTint;\n" +
-                      "  if (uUseTex > 0.5) base = texture2D(uTex, vUv).rgb * uTint;\n" +
-                      "  vec3 N = normalize(vN);\n" +
-                      "  if (uReal < 0.5) {\n" +
-                      "    float d = max(dot(N,SUN),0.0);\n" +
-                      "    gl_FragColor = vec4(base*(0.35+0.65*d),1.0); return;\n" +
-                      "  }\n" +
-                      "  vec3 V = normalize(uCam - vW);\n" +
-                      "  vec3 R = reflect(-V, N);\n" +
-                      "  float ndl = max(dot(N,SUN),0.0);\n" +
-                      "  vec3 H = normalize(SUN + V);\n" +
-                      "  float shin = mix(220.0, 6.0, uRough);\n" +
-                      "  float spec = pow(max(dot(N,H),0.0), shin) * (shin+8.0)/25.13;\n" +
-                      "  vec3 amb = mix(vec3(0.22,0.18,0.16), vec3(0.35,0.5,0.85), N.y*0.5+0.5);\n" +
-                      "  vec3 F0 = mix(vec3(0.04), base, uMetal);\n" +
-                      "  float fres = pow(1.0-max(dot(N,V),0.0),5.0);\n" +
-                      "  vec3 kd = base*(1.0-uMetal);\n" +
-                      "  vec3 sunCol = vec3(1.0,0.93,0.82);\n" +
-                      "  vec3 col = kd*(sunCol*ndl*1.7 + amb*0.9);\n" +
-                      "  col += F0*sunCol*spec*ndl*1.5;\n" +
-                      "  col += (F0+(1.0-F0)*fres)*skyCol(R)*(1.0-uRough*0.6)*0.8;\n" +
-                      "  col = aces(col*1.15);\n" +
-                      "  float lum = dot(col, vec3(0.299,0.587,0.114));\n" +
-                      "  col = clamp(mix(vec3(lum), col, 1.3), 0.0, 1.0);\n" +
-                      "  gl_FragColor = vec4(pow(col, vec3(0.4545)), 1.0);\n" +
-                      "}";
-
-                  private static final String SKY_VS =
-                      "attribute vec2 aSky; uniform mat4 uInvVP; varying vec3 vDir;\n" +
-                      "void main(){\n" +
-                      "  vec4 q = uInvVP * vec4(aSky, 0.9999, 1.0);\n" +
-                      "  vDir = q.xyz / q.w;\n" +
-                      "  gl_Position = vec4(aSky, 0.9999, 1.0);\n" +
-                      "}";
-
-                  private static final String SKY_FS =
-                      "precision highp float; varying vec3 vDir;\n" +
-                      "uniform sampler2D uSkyTex; uniform float uHasSky; uniform vec3 uHor; uniform vec3 uZen;\n" +
-                      "const vec3 SUN = normalize(vec3(0.5, 0.8, 0.35));\n" +
-                      "vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.0,1.0); }\n" +
-                      "vec3 skyCol(vec3 d){\n" +
-                      "  vec3 c = mix(uHor, uZen, pow(clamp(d.y,0.0,1.0),0.6));\n" +
-                      "  c = mix(c, vec3(0.30,0.24,0.20), step(d.y,0.0));\n" +
-                      "  c += vec3(1.0,0.9,0.7)*pow(max(dot(d,SUN),0.0),400.0)*3.5;\n" +
-                      "  return c;\n" +
-                      "}\n" +
-                      "void main(){\n" +
-                      "  vec3 d = normalize(vDir); vec3 col;\n" +
-                      "  if (uHasSky > 0.5) {\n" +
-                      "    float u = atan(d.z, d.x)/6.28318 + 0.5;\n" +
-                      "    float v = 0.5 + asin(clamp(d.y,-1.0,1.0))/3.14159;\n" +
-                      "    col = pow(texture2D(uSkyTex, vec2(u, 1.0-v)).rgb, vec3(2.2));\n" +
-                      "  } else { col = skyCol(d); }\n" +
-                      "  col = aces(col*1.1);\n" +
-                      "  gl_FragColor = vec4(pow(col, vec3(0.4545)), 1.0);\n" +
-                      "}";
-
-                  void requestCapture() { capture = true; }
-
-                  @Override
-                  public void onSurfaceCreated(GL10 gl, EGLConfig c) {
-                      GLES20.glClearColor(0.05f, 0.05f, 0.07f, 1f);
-                      GLES20.glEnable(GLES20.GL_DEPTH_TEST);
-                      GLES20.glEnable(GLES20.GL_BLEND);
-                      GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
-                      prog = link(MAIN_VS, MAIN_FS);
-                      progSky = link(SKY_VS, SKY_FS);
-                      aPos = GLES20.glGetAttribLocation(prog, "aPos");
-                      aNrm = GLES20.glGetAttribLocation(prog, "aNrm");
-                      aUv  = GLES20.glGetAttribLocation(prog, "aUv");
-                      uMvp = GLES20.glGetUniformLocation(prog, "uMvp");
-                      uModel = GLES20.glGetUniformLocation(prog, "uModel");
-                      uTint = GLES20.glGetUniformLocation(prog, "uTint");
-                      uUseTex = GLES20.glGetUniformLocation(prog, "uUseTex");
-                      uTex = GLES20.glGetUniformLocation(prog, "uTex");
-                      uReal = GLES20.glGetUniformLocation(prog, "uReal");
-                      uShadow = GLES20.glGetUniformLocation(prog, "uShadow");
-                      uCam = GLES20.glGetUniformLocation(prog, "uCam");
-                      uRough = GLES20.glGetUniformLocation(prog, "uRough");
-                      uMetal = GLES20.glGetUniformLocation(prog, "uMetal");
-                      uHor = GLES20.glGetUniformLocation(prog, "uHor");
-                      uZen = GLES20.glGetUniformLocation(prog, "uZen");
-                      aSky = GLES20.glGetAttribLocation(progSky, "aSky");
-                      uInvVP = GLES20.glGetUniformLocation(progSky, "uInvVP");
-                      sSkyTex = GLES20.glGetUniformLocation(progSky, "uSkyTex");
-                      sHas = GLES20.glGetUniformLocation(progSky, "uHasSky");
-                      sHor = GLES20.glGetUniformLocation(progSky, "uHor");
-                      sZen = GLES20.glGetUniformLocation(progSky, "uZen");
-                      buildStatic();
-                  }
-
-                  private int link(String vs, String fs) {
-                      int p = GLES20.glCreateProgram();
-                      GLES20.glAttachShader(p, compile(GLES20.GL_VERTEX_SHADER, vs));
-                      GLES20.glAttachShader(p, compile(GLES20.GL_FRAGMENT_SHADER, fs));
-                      GLES20.glLinkProgram(p);
-                      return p;
-                  }
-                  private int compile(int type, String src) {
-                      int s = GLES20.glCreateShader(type);
-                      GLES20.glShaderSource(s, src);
-                      GLES20.glCompileShader(s);
-                      return s;
-                  }
-
-                  private FloatBuffer ring(int ax) {
-                      int seg = 48;
-                      float[] v = new float[seg * 2 * 8];
-                      int k = 0;
-                      for (int i = 0; i < seg; i++) {
-                          double a0 = 2 * Math.PI * i / seg, a1 = 2 * Math.PI * (i + 1) / seg;
-                          float[] p0 = ringPt(ax, a0), p1 = ringPt(ax, a1);
-                          k = vtx(v, k, p0[0], p0[1], p0[2], 0, 1, 0, 0, 0);
-                          k = vtx(v, k, p1[0], p1[1], p1[2], 0, 1, 0, 0, 0);
-                      }
-                      return toBuffer(v);
-                  }
-
-                  private FloatBuffer frustum() {
-                      float[][] c = {
-                          {-0.6f,-0.4f,-1.2f},{0.6f,-0.4f,-1.2f},
-                          {0.6f, 0.4f,-1.2f},{-0.6f, 0.4f,-1.2f}
-                      };
-                      float[] v = new float[16 * 8];
-                      int k = 0;
-                      for (float[] p : c) {
-                          k = vtx(v, k, 0, 0, 0, 0, 1, 0, 0, 0);
-                          k = vtx(v, k, p[0], p[1], p[2], 0, 1, 0, 0, 0);
-                      }
-                      for (int i = 0; i < 4; i++) {
-                          float[] a = c[i], b = c[(i + 1) % 4];
-                          k = vtx(v, k, a[0], a[1], a[2], 0, 1, 0, 0, 0);
-                          k = vtx(v, k, b[0], b[1], b[2], 0, 1, 0, 0, 0);
-                      }
-                      return toBuffer(v);
-                  }
-
-                  private void buildStatic() {
-                      float[] g = new float[80 * 8];
-                      int k = 0;
-                      for (int i = -10; i <= 10; i++) {
-                          if (i == 0) continue;
-                          k = vtx(g, k, -10, -1, i, 0, 1, 0, 0, 0);
-                          k = vtx(g, k,  10, -1, i, 0, 1, 0, 0, 0);
-                          k = vtx(g, k, i, -1, -10, 0, 1, 0, 0, 0);
-                          k = vtx(g, k, i, -1,  10, 0, 1, 0, 0, 0);
-                      }
-                      gridBuf = toBuffer(g);
-                      axisX = lineBuf(-10, -1, 0, 10, -1, 0);
-                      axisZ = lineBuf(0, -1, -10, 0, -1, 10);
-                      axisY = lineBuf(0, -1, 0, 0, 4, 0);
-                      for (int a = 0; a < 3; a++) {
-                          gAxis[a] = lineBuf(0, 0, 0, a == 0 ? 1 : 0, a == 1 ? 1 : 0, a == 2 ? 1 : 0);
-                          ringBufs[a] = ring(a);
-                      }
-                      skyBuf = toBuffer(new float[]{-1, -1, 3, -1, -1, 3});
-                      markerCube = cubeGL().buf;
-                      frustumBuf = frustum();
-                  }
-
-                  private int uploadTex(Bitmap src) {
-                      Bitmap bmp = src;
-                      boolean scaled = false;
-                      if (src.getWidth() > 2048 || src.getHeight() > 2048) {
-                          float sc = 2048f / Math.max(src.getWidth(), src.getHeight());
-                          bmp = Bitmap.createScaledBitmap(src,
-                              Math.round(src.getWidth() * sc),
-                              Math.round(src.getHeight() * sc), true);
-                          scaled = true;
-                      }
-                      int[] t = new int[1];
-                      GLES20.glGenTextures(1, t, 0);
-                      GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, t[0]);
-                      GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR);
-                      GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR);
-                      GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE);
-                      GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE);
-                      GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bmp, 0);
-                      GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0);
-                      if (scaled) bmp.recycle();
-                      return t[0];
-                  }
-
-                  private Obj makeObj(Model m) {
-                      Obj o = new Obj(m.name, new float[]{1f, 1f, 1f});
-                      float[] mn = {1e9f,1e9f,1e9f}, mx = {-1e9f,-1e9f,-1e9f};
-                      for (Part p : m.parts) {
-                          GLPart g = new GLPart();
-                          g.buf = toBuffer(p.verts);
-                          g.count = p.verts.length / 8;
-                          g.tex = p.tex != null ? uploadTex(p.tex) : 0;
-                          o.parts.add(g);
-                          for (int i = 0; i < p.verts.length; i += 8) {
-                              for (int a = 0; a < 3; a++) {
-                                  mn[a] = Math.min(mn[a], p.verts[i+a]);
-                                  mx[a] = Math.max(mx[a], p.verts[i+a]);
-                              }
-                          }
-                      }
-                      o.bmin = mn; o.bmax = mx;
-                      o.box = boxEdges(mn, mx);
-                      return o;
-                  }
-
-                  private void processPending() {
-                      Model m;
-                      while ((m = pendingModels.poll()) != null) {
-                          Obj o = makeObj(m);
-                          synchronized (scene) {
-                              for (Obj x : scene) x.selected = false;
-                              o.selected = true;
-                              scene.add(o);
-                          }
-                          uiRefresh();
-                      }
-                      Bitmap bm;
-                      while ((bm = pendingTex.poll()) != null) {
-                          final int id = uploadTex(bm);
-                          synchronized (scene) {
-                              for (Obj x : scene) {
-                                  if (x.selected) {
-                                      for (GLPart g : x.parts) g.tex = id;
-                                  }
-                              }
-                          }
-                          uiRefresh();
-                      }
-                      while ((bm = pendingSky.poll()) != null) {
-                          skyId = uploadTex(bm);
-                          hasSky = true;
-                          real = true;
-                          uiRefresh();
-                      }
-                  }
-
-                  float[] project(float x, float y, float z) {
-                      if (!ready) return null;
-                      float[] src = {x, y, z, 1f};
-                      float[] out = new float[4];
-                      synchronized (lastVP) {
-                          Matrix.multiplyMV(out, 0, lastVP, 0, src, 0);
-                      }
-                      if (out[3] <= 0.0001f) return null;
-                      return new float[]{
-                          (out[0] / out[3] + 1f) * 0.5f * vw,
-                          (1f - out[1] / out[3]) * 0.5f * vh
-                      };
-                  }
-
-                  private void setMats(float[] m) {
-                      Matrix.multiplyMM(tmp, 0, view, 0, m, 0);
-                      Matrix.multiplyMM(mvp, 0, proj, 0, tmp, 0);
-                      GLES20.glUniformMatrix4fv(uMvp, 1, false, mvp, 0);
-                      GLES20.glUniformMatrix4fv(uModel, 1, false, m, 0);
-                  }
-                  private void setTint(float[] c) { GLES20.glUniform3f(uTint, c[0], c[1], c[2]); }
-
-                  private void draw(FloatBuffer b, int mode, int count) {
-                      b.position(0);
-                      GLES20.glVertexAttribPointer(aPos, 3, GLES20.GL_FLOAT, false, 32, b);
-                      b.position(3);
-                      GLES20.glVertexAttribPointer(aNrm, 3, GLES20.GL_FLOAT, false, 32, b);
-                      b.position(6);
-                      GLES20.glVertexAttribPointer(aUv, 2, GLES20.GL_FLOAT, false, 32, b);
-                      b.position(0);
-                      GLES20.glDrawArrays(mode, 0, count);
-                  }
-
-                  private void enableAttribs(boolean on) {
-                      if (on) {
-                          GLES20.glEnableVertexAttribArray(aPos);
-                          GLES20.glEnableVertexAttribArray(aNrm);
-                          GLES20.glEnableVertexAttribArray(aUv);
-                      } else {
-                          GLES20.glDisableVertexAttribArray(aPos);
-                          GLES20.glDisableVertexAttribArray(aNrm);
-                          GLES20.glDisableVertexAttribArray(aUv);
-                      }
-                  }
-
-                  private void drawSky() {
-                      System.arraycopy(view, 0, vr, 0, 16);
-                      vr[12] = 0; vr[13] = 0; vr[14] = 0;
-                      Matrix.multiplyMM(tmp, 0, proj, 0, vr, 0);
-                      Matrix.invertM(invVP, 0, tmp, 0);
-                      GLES20.glDepthMask(false);
-                      GLES20.glUseProgram(progSky);
-                      GLES20.glEnableVertexAttribArray(aSky);
-                      GLES20.glUniformMatrix4fv(uInvVP, 1, false, invVP, 0);
-                      GLES20.glUniform3f(sHor, 0.62f, 0.78f, 0.98f);
-                      GLES20.glUniform3f(sZen, 0.10f, 0.35f, 0.92f);
-                      GLES20.glUniform1f(sHas, hasSky ? 1f : 0f);
-                      GLES20.glActiveTexture(GLES20.GL_TEXTURE1);
-                      GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, skyId);
-                      GLES20.glUniform1i(sSkyTex, 1);
-                      skyBuf.position(0);
-                      GLES20.glVertexAttribPointer(aSky, 2, GLES20.GL_FLOAT, false, 0, skyBuf);
-                      GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 3);
-                      GLES20.glDisableVertexAttribArray(aSky);
-                      GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
-                      GLES20.glDepthMask(true);
-                  }
-
-                  private void drawGizmo(Obj o) {
-                      float L = dist * 0.14f;
-                      GLES20.glDisable(GLES20.GL_DEPTH_TEST);
-                      GLES20.glUniform1f(uReal, 0f);
-                      GLES20.glUniform1f(uUseTex, 0f);
-                      GLES20.glLineWidth(4f);
-                      for (int a = 0; a < 3; a++) {
-                          float ex = a == 0 ? 1 : 0, ey = a == 1 ? 1 : 0, ez = a == 2 ? 1 : 0;
-                          setTint(AX_COL[a]);
-                          Matrix.setIdentityM(gm, 0);
-                          Matrix.translateM(gm, 0, o.pos[0], o.pos[1], o.pos[2]);
-                          Matrix.scaleM(gm, 0, L, L, L);
-                          setMats(gm);
-                          draw(gAxis[a], GLES20.GL_LINES, 2);
-                          if (tool == TOOL_ROT) draw(ringBufs[a], GLES20.GL_LINES, 96);
-                          float ms = L * (tool == TOOL_SCA ? 0.09f : 0.12f);
-                          Matrix.setIdentityM(gm, 0);
-                          Matrix.translateM(gm, 0, o.pos[0] + ex * L, o.pos[1] + ey * L, o.pos[2] + ez * L);
-                          Matrix.scaleM(gm, 0, ms, ms, ms);
-                          setMats(gm);
-                          draw(markerCube, GLES20.GL_TRIANGLES, 36);
-                      }
-                      GLES20.glLineWidth(2f);
-                      GLES20.glEnable(GLES20.GL_DEPTH_TEST);
-                  }
-
-                  @Override
-                  public void onSurfaceChanged(GL10 gl, int w, int h) {
-                      vw = w; vh = h;
-                      GLES20.glViewport(0, 0, w, h);
-                      Matrix.perspectiveM(proj, 0, 45f, w / (float) h, 0.1f, 100f);
-                  }
-
-                  @Override
-                  public void onDrawFrame(GL10 gl) {
-                      processPending();
-                      GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
-                      Obj cam = camView ? findCamera() : null;
-                      if (cam != null) {
-                          camModel(cam, model);
-                          Matrix.invertM(view, 0, model, 0);
-                      } else {
-                          Matrix.setIdentityM(view, 0);
-                          Matrix.translateM(view, 0, 0, 0, -dist);
-                          Matrix.rotateM(view, 0, rotX, 1, 0, 0);
-                          Matrix.rotateM(view, 0, rotY, 0, 1, 0);
-                      }
-                      Matrix.multiplyMM(vp, 0, proj, 0, view, 0);
-                      synchronized (lastVP) { System.arraycopy(vp, 0, lastVP, 0, 16); }
-                      ready = true;
-                      Matrix.invertM(inv, 0, view, 0);
-                      float[] eye = new float[4];
-                      Matrix.multiplyMV(eye, 0, inv, 0, new float[]{0, 0, 0, 1}, 0);
-
-                      boolean isReal = real;
-                      boolean doCapture = capture;
-                      if (isReal) drawSky();
-
-                      GLES20.glUseProgram(prog);
-                      enableAttribs(true);
-                      GLES20.glUniform1i(uTex, 0);
-                      GLES20.glUniform1f(uUseTex, 0f);
-                      GLES20.glUniform1f(uShadow, 0f);
-                      GLES20.glUniform3f(uCam, eye[0], eye[1], eye[2]);
-                      GLES20.glUniform3f(uHor, 0.62f, 0.78f, 0.98f);
-                      GLES20.glUniform3f(uZen, 0.10f, 0.35f, 0.92f);
-                      GLES20.glUniform1f(uReal, 0f);
-
-                      Matrix.setIdentityM(model, 0);
-                      setMats(model);
-                      GLES20.glUniform3f(uTint, 0.30f, 0.30f, 0.36f);
-                      draw(gridBuf, GLES20.GL_LINES, 80);
-                      GLES20.glLineWidth(2f);
-                      setTint(AX_COL[0]); draw(axisX, GLES20.GL_LINES, 2);
-                      setTint(AX_COL[1]); draw(axisY, GLES20.GL_LINES, 2);
-                      setTint(AX_COL[2]); draw(axisZ, GLES20.GL_LINES, 2);
-
-                      Obj sel = null;
-                      synchronized (scene) {
-                          if (isReal) {
-                              GLES20.glUniform1f(uShadow, 1f);
-                              for (Obj o : scene) {
-                                  if (o.isCam) continue;
-                                  buildModel(o, model);
-                                  Matrix.multiplyMM(sm, 0, SHADOW_M, 0, model, 0);
-                                  setMats(sm);
-                                  for (GLPart g : o.parts) draw(g.buf, GLES20.GL_TRIANGLES, g.count);
-                              }
-                              GLES20.glUniform1f(uShadow, 0f);
-                          }
-                          for (Obj o : scene) {
-                              if (o.selected) sel = o;
-                              if (o.isCam) {
-                                  camModel(o, model);
-                                  setMats(model);
-                                  GLES20.glUniform1f(uReal, 0f);
-                                  setTint(o.selected ? SEL_COL : OFF_COL);
-                                  GLES20.glLineWidth(2f);
-                                  draw(frustumBuf, GLES20.GL_LINES, 16);
-                                  continue;
-                              }
-                              buildModel(o, model);
-                              setMats(model);
-                              GLES20.glUniform1f(uReal, isReal ? 1f : 0f);
-                              GLES20.glUniform1f(uRough, MAT_ROUGH[o.mat]);
-                              GLES20.glUniform1f(uMetal, MAT_METAL[o.mat]);
-                              for (GLPart g : o.parts) {
-                                  if (g.tex != 0) {
-                                      GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
-                                      GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, g.tex);
-                                      GLES20.glUniform1f(uUseTex, 1f);
-                                      GLES20.glUniform3f(uTint, 1f, 1f, 1f);
-                                  } else {
-                                      GLES20.glUniform1f(uUseTex, 0f);
-                                      GLES20.glUniform3f(uTint, o.col[0], o.col[1], o.col[2]);
-                                  }
-                                  draw(g.buf, GLES20.GL_TRIANGLES, g.count);
-                              }
-                              GLES20.glUniform1f(uUseTex, 0f);
-                              GLES20.glUniform1f(uReal, 0f);
-                              setTint(o.selected ? SEL_COL : OFF_COL);
-                              draw(o.box, GLES20.GL_LINES, 24);
-                          }
-                          if (sel != null && tool != TOOL_SEL && !doCapture) drawGizmo(sel);
-                      }
-                      enableAttribs(false);
-                      if (doCapture) { capture = false; saveFrame(); }
-                  }
-
-                  private void saveFrame() {
-                      int w = vw, h = vh;
-                      ByteBuffer buf = ByteBuffer.allocateDirect(w * h * 4).order(ByteOrder.nativeOrder());
-                      GLES20.glReadPixels(0, 0, w, h, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, buf);
-                      int[] px = new int[w * h];
-                      for (int y = 0; y < h; y++) {
-                          for (int x = 0; x < w; x++) {
-                              int i = (y * w + x) * 4;
-                              int r = buf.get(i) & 0xFF;
-                              int g = buf.get(i + 1) & 0xFF;
-                              int bl = buf.get(i + 2) & 0xFF;
-                              px[(h - 1 - y) * w + x] = 0xFF000000 | (r << 16) | (g << 8) | bl;
-                          }
-                      }
-                      try {
-                          String stamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
-                          ContentValues cv = new ContentValues();
-                          cv.put(MediaStore.Images.Media.DISPLAY_NAME, "prisma_" + stamp + ".png");
-                          cv.put(MediaStore.Images.Media.MIME_TYPE, "image/png");
-                          cv.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Prisma3D");
-                          Uri u = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv);
-                          if (u == null) throw new Exception("No se pudo crear el archivo");
-                          Bitmap bmp = Bitmap.createBitmap(px, w, h, Bitmap.Config.ARGB_8888);
-                          OutputStream os = getContentResolver().openOutputStream(u);
-                          bmp.compress(Bitmap.CompressFormat.PNG, 100, os);
-                          os.close();
-                          bmp.recycle();
-                          toast("Render guardado en Imagenes/Prisma3D");
-                      } catch (Exception ex) {
-                          toast("Error al guardar: " + ex.getMessage());
-                      }
-                  }
-              }
-
-              private void uiRefresh() { runOnUiThread(this::refreshPanels); }
-          }
-          JAVA_EOF
-
-          # ---------- Compilación ----------
-          javac -source 8 -target 8 -Xlint:-options -cp "$AJAR" -d out $(find src -name '*.java')
-          "$BT/d8" --release --min-api 29 --lib "$AJAR" --output build $(find out -name '*.class')
-          "$BT/aapt" package -f -M AndroidManifest.xml -S res -I "$AJAR" -F build/base.apk
-          (cd build && zip -j base.apk classes.dex)
-
-          keytool -genkeypair -keystore debug.keystore -storepass android -keypass android \
-            -alias debug -keyalg RSA -keysize 2048 -validity 10000 \
-            -dname "CN=Android Debug,O=Android,C=US"
-
-          "$BT/zipalign" -f 4 build/base.apk build/aligned.apk
-          "$BT/apksigner" sign --ks debug.keystore --ks-pass pass:android \
-            --ks-key-alias debug --key-pass pass:android --out build/prisma3d.apk build/aligned.apk
-
-      - uses: actions/upload-artifact@v4
+      - name: Compilar APK debug
+        uses: gradle/gradle-build-action@v3
         with:
-          name: prisma3d-apk
-          path: build/prisma3d.apk
+          gradle-version: '8.9'
+          arguments: assembleDebug --stacktrace
+
+      - name: Dejar APK descargable
+        uses: actions/upload-artifact@v4
+        with:
+          name: MF-Studio-debug-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14

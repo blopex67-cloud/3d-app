@@ -60,6 +60,18 @@ jobs:
                   versionCode = 1
                   versionName = "0.1.0"
               }
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
+              packaging {
+                  resources {
+                      excludes += setOf("META-INF/LICENSE*", "META-INF/NOTICE*", "META-INF/DEPENDENCIES", "META-INF/INDEX.LIST")
+                  }
+              }
           }
           dependencies {
               implementation("org.luaj:luaj-jse:3.0.1")
@@ -232,7 +244,7 @@ jobs:
                   -1f,-1f,-1f, -1f,-1f,1f, -1f,1f,1f, -1f,1f,-1f
               )
               private val colors = FloatArray(24 * 4).also { a ->
-                  val faceColors = arrayOf(floatArrayOf(0.20f,0.62f,0.96f,1f), floatArrayOf(0.96f,0.50f,0.18f,1f), floatArrayOf(0.36f,0.80f,0.48f,1f), floatArrayOf(0.68f,0.36f,0.84f,1f), floatArrayOf(0.94f,0.78f,0.24f,1f), floatArrayOf(0.18f,0.78f,0.78f,1f))
+                  val faceColors = arrayOf(floatArrayOf(.20f,.62f,.96f,1f), floatArrayOf(.96f,.50f,.18f,1f), floatArrayOf(.36f,.80f,.48f,1f), floatArrayOf(.68f,.36f,.84f,1f), floatArrayOf(.94f,.78f,.24f,1f), floatArrayOf(.18f,.78f,.78f,1f))
                   for (face in 0..5) for (v in 0..3) for (c in 0..3) a[face * 16 + v * 4 + c] = faceColors[face][c]
               }
               private val indices = shortArrayOf(0,1,2,0,2,3,4,5,6,4,6,7,8,9,10,8,10,11,12,13,14,12,14,15,16,17,18,16,18,19,20,21,22,20,22,23)
@@ -251,7 +263,7 @@ jobs:
               private val start = System.currentTimeMillis()
 
               override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-                  GLES20.glClearColor(0.055f, 0.07f, 0.10f, 1f)
+                  GLES20.glClearColor(.055f, .07f, .10f, 1f)
                   GLES20.glEnable(GLES20.GL_DEPTH_TEST)
                   vertexBuffer = ByteBuffer.allocateDirect(vertices.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer().put(vertices).also { it.position(0) }
                   colorBuffer = ByteBuffer.allocateDirect(colors.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer().put(colors).also { it.position(0) }
@@ -279,7 +291,7 @@ jobs:
                   GLES20.glUseProgram(program)
                   Matrix.setLookAtM(view, 0, 0f, 0f, 7f, 0f, 0f, 0f, 1f, 0f)
                   Matrix.setIdentityM(model, 0)
-                  Matrix.rotateM(model, 0, (System.currentTimeMillis() - start) / 1000f * 25f, 0.4f, 1f, 0.2f)
+                  Matrix.rotateM(model, 0, (System.currentTimeMillis() - start) / 1000f * 25f, .4f, 1f, .2f)
                   Matrix.multiplyMM(temp, 0, view, 0, model, 0)
                   Matrix.multiplyMM(mvp, 0, projection, 0, temp, 0)
                   GLES20.glUniformMatrix4fv(mvpHandle, 1, false, mvp, 0)
@@ -299,11 +311,21 @@ jobs:
           }
           EOF
 
-      - name: Compilar APK debug
-        uses: gradle/gradle-build-action@v3
+      - name: Preparar Gradle
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-          arguments: assembleDebug --stacktrace
+
+      - name: Compilar APK debug
+        shell: bash
+        run: gradle assembleDebug --console=plain --no-daemon 2>&1 | tee build.log; test ${PIPESTATUS[0]} -eq 0
+
+      - name: Resumen del error (si falla)
+        if: failure()
+        shell: bash
+        run: |
+          echo "=== Líneas clave del error ==="
+          grep -nE "^e: |error:|What went wrong|Execution failed|Caused by|Could not resolve|AAPT|Duplicate|Manifest merger|Missing class" build.log | head -40
 
       - name: Dejar APK descargable
         uses: actions/upload-artifact@v4

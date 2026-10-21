@@ -30,7 +30,7 @@ jobs:
               package="com.carlos.prisma3d" android:versionCode="1" android:versionName="0.1">
               <uses-sdk android:minSdkVersion="16" android:targetSdkVersion="34"/>
               <application android:label="Prisma 3D">
-                  <activity android:name=".MainActivity">
+                  <activity android:name=".MainActivity" android:exported="true">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN"/>
                           <category android:name="android.intent.category.LAUNCHER"/>

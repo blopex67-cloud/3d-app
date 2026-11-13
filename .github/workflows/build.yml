@@ -21,6 +21,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Descargar three.js (para que funcione sin internet en el APK)
+        run: |
+          mkdir -p /tmp/t site/lib/three/build site/lib/three/examples/jsm/loaders site/lib/three/examples/jsm/utils
+          cd /tmp/t && npm init -y >/dev/null && npm install three@0.160.0 >/dev/null
+          cd "$GITHUB_WORKSPACE"
+          cp /tmp/t/node_modules/three/build/three.module.js site/lib/three/build/
+          cp /tmp/t/node_modules/three/examples/jsm/loaders/GLTFLoader.js site/lib/three/examples/jsm/loaders/
+          cp /tmp/t/node_modules/three/examples/jsm/utils/BufferGeometryUtils.js site/lib/three/examples/jsm/utils/
+
       - name: Generar el juego
         run: |
           mkdir -p site
@@ -30,13 +39,13 @@ jobs:
           <html lang="es">
           <head>
           <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width,initial-scale=1">
+          <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
           <title>EL ALMACÉN - Terror en primera persona</title>
           <style>
-            *{box-sizing:border-box}
-            html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:'Segoe UI',Tahoma,Arial,sans-serif;color:#e8e6f0;user-select:none}
+            *{box-sizing:border-box;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+            html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:'Segoe UI',Tahoma,Arial,sans-serif;color:#e8e6f0;user-select:none;-webkit-user-select:none;touch-action:none}
             #c{position:fixed;inset:0;width:100%;height:100%;display:block}
-            .screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;background:radial-gradient(ellipse at center,rgba(20,8,30,.80),rgba(0,0,0,.98));z-index:10;transition:opacity .4s}
+            .screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;background:radial-gradient(ellipse at center,rgba(20,8,30,.80),rgba(0,0,0,.98));z-index:10;transition:opacity .4s;overflow-y:auto}
             .screen.hidden{opacity:0;pointer-events:none}
             h1{font-size:clamp(34px,7vw,76px);letter-spacing:6px;margin:0 0 6px;color:#ff3b5c;text-shadow:0 0 18px #ff3b5c99;font-weight:800}
             h2{letter-spacing:4px;color:#ff3b5c;margin:0 0 18px}
@@ -60,6 +69,20 @@ jobs:
             #danger{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 35%,rgba(255,0,40,.55));opacity:0;z-index:4}
             #flash{position:fixed;inset:0;pointer-events:none;background:#ff1030;opacity:0;z-index:9;transition:opacity 1.2s}
             @media (max-width:700px){.panel{font-size:12px}.bar{width:130px}#msg{white-space:normal;width:90%;text-align:center}}
+
+            /* ---- Controles táctiles ---- */
+            body.touch .kb{display:none}
+            body.touch .bl{bottom:auto;top:84px;width:200px!important}
+            body.touch #msg{bottom:auto;top:16px}
+            #tc{position:fixed;inset:0;z-index:7;display:none;touch-action:none}
+            #lookZone{position:absolute;top:0;bottom:0;left:40%;right:0;touch-action:none}
+            #joyZone{position:absolute;left:0;bottom:0;width:40%;height:65%;touch-action:none}
+            #joyBase{position:absolute;left:40px;bottom:40px;width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.25);pointer-events:none}
+            #knob{position:absolute;left:35px;top:35px;width:60px;height:60px;border-radius:50%;background:rgba(255,59,92,.55);pointer-events:none}
+            .tbtn{position:absolute;width:76px;height:76px;border-radius:50%;background:rgba(0,0,0,.5);border:2px solid rgba(255,255,255,.35);color:#fff;font-size:12px;letter-spacing:1px;display:flex;align-items:center;justify-content:center;touch-action:none}
+            #btnRun{right:28px;bottom:28px}
+            #btnFlash{right:28px;bottom:116px}
+            #btnPause{right:16px;top:16px;width:50px;height:50px;font-size:16px}
           </style>
           </head>
           <body>
@@ -73,18 +96,27 @@ jobs:
               <div id="keysTxt">LLAVES 0/3</div>
               <div id="timer" style="font-size:13px;opacity:.7;margin-top:4px">00:00</div>
             </div>
-            <div class="panel" style="bottom:16px;left:16px;width:240px">
+            <div class="panel bl" style="bottom:16px;left:16px;width:240px">
               <div>LINTERNA <span id="batPct"></span></div>
               <div class="bar"><div id="batBar" style="background:#ffd166;width:100%"></div></div>
               <div style="margin-top:10px">RESISTENCIA</div>
               <div class="bar"><div id="stBar" style="background:#06d6a0;width:100%"></div></div>
             </div>
-            <div class="panel" style="bottom:16px;right:16px;font-size:13px;opacity:.8;line-height:1.8">
+            <div class="panel kb" style="bottom:16px;right:16px;font-size:13px;opacity:.8;line-height:1.8">
               <b>WASD</b> mover &nbsp;·&nbsp; <b>Ratón</b> mirar &nbsp;·&nbsp; <b>Shift</b> correr<br>
               <b>F</b> linterna &nbsp;·&nbsp; <b>Esc</b> pausa
             </div>
           </div>
           <div id="msg"></div>
+
+          <div id="tc">
+            <div id="lookZone"></div>
+            <div id="joyZone"></div>
+            <div id="joyBase"><div id="knob"></div></div>
+            <div class="tbtn" id="btnFlash">LUZ</div>
+            <div class="tbtn" id="btnRun">CORRER</div>
+            <div class="tbtn" id="btnPause">II</div>
+          </div>
 
           <div id="menu" class="screen">
             <h1>EL ALMACÉN</h1>
@@ -105,7 +137,9 @@ jobs:
             <div class="help">
               Estás atrapado en un almacén oscuro y laberíntico. Tienes que encontrar <b>3 llaves</b> dispersas por el lugar y llegar a la <b>puerta verde</b> para escapar.<br><br>
               Un robot de peluche te persigue. Es <b>lento</b>, pero nunca se detiene y no pierde tu rastro. Si la alcanza, es el final.<br><br>
-              La <b>linterna</b> la aturde si la iluminas de frente, pero gasta batería. Usa <b>Shift</b> para correr, aunque la resistencia se agota.<br><br>
+              La <b>linterna</b> la aturde si la iluminas de frente, pero gasta batería. Puedes <b>correr</b>, aunque la resistencia se agota.<br><br>
+              <b>Móvil:</b> joystick a la izquierda para moverte, desliza a la derecha para mirar, botones LUZ y CORRER.<br>
+              <b>PC:</b> WASD, ratón, Shift y F.<br><br>
               <b>Consejo:</b> escucha el latido. Cuanto más cerca esté, más rápido late.
             </div>
             <button class="btn sec" id="helpBack">VOLVER</button>
@@ -135,8 +169,8 @@ jobs:
           <script type="importmap">
           {
             "imports": {
-              "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-              "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+              "three": "./lib/three/build/three.module.js",
+              "three/addons/": "./lib/three/examples/jsm/"
             }
           }
           </script>
@@ -154,6 +188,12 @@ jobs:
             dificil: { speed: 2.0, delay: 4 }
           };
 
+          const IS_TOUCH = matchMedia('(pointer:coarse)').matches || 'ontouchstart' in window;
+          if (IS_TOUCH) document.body.classList.add('touch');
+          document.addEventListener('contextmenu', e => e.preventDefault());
+          const joy = { x: 0, y: 0 };
+          let runHeld = false;
+
           let diff = 'normal', state = 'menu';
           let grid, keys = [], keyMeshes = [], exitCell, exitMesh;
           let keysGot = 0, battery = 100, stamina = 100, flashOn = true, elapsed = 0;
@@ -161,6 +201,9 @@ jobs:
           const input = {};
           const player = { x: CELL, z: CELL, yaw: 0, pitch: 0 };
           const bonnie = { x: 0, z: 0, heading: 0, path: [], timer: 0, active: false, ready: false, delay: 8, stun: 0, group: new THREE.Group() };
+
+          function lock() { if (!IS_TOUCH) $('c').requestPointerLock(); }
+          function setTC(on) { $('tc').style.display = (IS_TOUCH && on) ? 'block' : 'none'; }
 
           // ---------- Renderer / escena ----------
           const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true });
@@ -287,19 +330,21 @@ jobs:
             $('vig').style.display = 'block';
             $('flash').style.opacity = 0;
             state = 'playing';
-            $('c').requestPointerLock();
+            setTC(true);
+            lock();
             say('Encuentra 3 llaves y escapa por la puerta verde.', 4000);
           }
 
-          function pause() { state = 'paused'; show('pause'); document.exitPointerLock(); }
-          function resume() { state = 'playing'; show(null); $('c').requestPointerLock(); }
+          function pause() { state = 'paused'; setTC(false); show('pause'); document.exitPointerLock(); }
+          function resume() { state = 'playing'; show(null); setTC(true); lock(); }
           function toMenu() {
-            state = 'menu'; show('menu');
+            state = 'menu'; show('menu'); setTC(false);
             $('hud').style.display = 'none'; $('vig').style.display = 'none';
             newGame();
           }
           function endGame(type) {
             state = type;
+            setTC(false);
             document.exitPointerLock();
             $('hud').style.display = 'none';
             if (type === 'won') { $('winStats').textContent = `Tiempo: ${fmt(elapsed)} · Llaves: 3/3`; show('win'); }
@@ -317,13 +362,23 @@ jobs:
           }
           const fmt = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
+          function toggleFlash() {
+            if (state !== 'playing') return;
+            flashOn = !flashOn;
+            torch.visible = flashOn && battery > 0;
+          }
+
           // ---------- Movimiento del jugador ----------
           function movePlayer(dt) {
             const w = input.KeyW || input.ArrowUp, s = input.KeyS || input.ArrowDown;
             const a = input.KeyA || input.ArrowLeft, d = input.KeyD || input.ArrowRight;
-            const fwd = (w ? 1 : 0) - (s ? 1 : 0), strafe = (d ? 1 : 0) - (a ? 1 : 0);
-            const moving = fwd !== 0 || strafe !== 0;
-            const sprint = (input.ShiftLeft || input.ShiftRight) && moving && stamina > 0;
+            let fwd = (w ? 1 : 0) - (s ? 1 : 0) - joy.y;
+            let strafe = (d ? 1 : 0) - (a ? 1 : 0) + joy.x;
+            fwd = Math.max(-1, Math.min(1, fwd));
+            strafe = Math.max(-1, Math.min(1, strafe));
+            const mag = Math.min(1, Math.hypot(fwd, strafe));
+            const moving = mag > 0.12;
+            const sprint = (input.ShiftLeft || input.ShiftRight || runHeld) && moving && stamina > 0;
             if (sprint) stamina = Math.max(0, stamina - 24 * dt);
             else stamina = Math.min(100, stamina + 15 * dt);
             if (!moving) return;
@@ -331,7 +386,7 @@ jobs:
             let fx = -Math.sin(player.yaw) * fwd + Math.cos(player.yaw) * strafe;
             let fz = -Math.cos(player.yaw) * fwd - Math.sin(player.yaw) * strafe;
             const len = Math.hypot(fx, fz) || 1; fx /= len; fz /= len;
-            const step = (sprint ? 4.4 : 2.7) * dt;
+            const step = (sprint ? 4.4 : 2.7) * dt * mag;
 
             const nx = player.x + fx * step; if (!blocked(nx, player.z)) player.x = nx;
             const nz = player.z + fz * step; if (!blocked(player.x, nz)) player.z = nz;
@@ -372,7 +427,7 @@ jobs:
               bonnie.path = bfsPath(bc, br, pc, pr) || [];
             }
 
-            // la linterna la aturda si la iluminas de frente
+            // la linterna la aturde si la iluminas de frente
             bonnie.stun = Math.max(0, bonnie.stun - dt);
             if (flashOn && battery > 0) {
               const dx = bonnie.x - player.x, dz = bonnie.z - player.z, d = Math.hypot(dx, dz);
@@ -400,6 +455,7 @@ jobs:
 
           function caught() {
             state = 'caught';
+            setTC(false);
             sfxScare();
             $('flash').style.opacity = 1;
             const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
@@ -442,14 +498,11 @@ jobs:
             tone(90, 0.8, 1, 'sawtooth');
           }
 
-          // ---------- Entrada ----------
+          // ---------- Entrada: teclado y ratón ----------
           addEventListener('keydown', e => {
             input[e.code] = true;
             if (e.repeat) return;
-            if (e.code === 'KeyF' && state === 'playing') {
-              flashOn = !flashOn;
-              torch.visible = flashOn && battery > 0;
-            }
+            if (e.code === 'KeyF') toggleFlash();
             if (e.code === 'Escape' && state === 'paused') resume();
           });
           addEventListener('keyup', e => input[e.code] = false);
@@ -460,12 +513,72 @@ jobs:
             player.pitch = Math.max(-1.45, Math.min(1.45, player.pitch));
           });
           $('c').addEventListener('click', () => {
-            if (state === 'playing' && !document.pointerLockElement) $('c').requestPointerLock();
+            if (state === 'playing' && !document.pointerLockElement) lock();
           });
           document.addEventListener('pointerlockchange', () => {
-            if (!document.pointerLockElement && state === 'playing') pause();
+            if (!IS_TOUCH && !document.pointerLockElement && state === 'playing') pause();
           });
 
+          // ---------- Entrada: táctil ----------
+          const JR = 45;
+          let jId = null, jcx = 0, jcy = 0;
+          function jset(t) {
+            let dx = t.clientX - jcx, dy = t.clientY - jcy;
+            const d = Math.hypot(dx, dy);
+            if (d > JR) { dx = dx / d * JR; dy = dy / d * JR; }
+            joy.x = dx / JR; joy.y = dy / JR;
+            $('knob').style.transform = `translate(${dx}px,${dy}px)`;
+          }
+          function jend() { jId = null; joy.x = 0; joy.y = 0; $('knob').style.transform = 'translate(0,0)'; }
+          const jz = $('joyZone');
+          jz.addEventListener('touchstart', e => {
+            e.preventDefault();
+            if (jId !== null) return;
+            const t = e.changedTouches[0]; jId = t.identifier;
+            const r = $('joyBase').getBoundingClientRect();
+            jcx = r.left + r.width / 2; jcy = r.top + r.height / 2;
+            jset(t);
+          }, { passive: false });
+          jz.addEventListener('touchmove', e => {
+            e.preventDefault();
+            for (const t of e.changedTouches) if (t.identifier === jId) jset(t);
+          }, { passive: false });
+          ['touchend', 'touchcancel'].forEach(n => jz.addEventListener(n, e => {
+            for (const t of e.changedTouches) if (t.identifier === jId) jend();
+          }));
+
+          let lId = null, lx = 0, ly = 0;
+          const lz = $('lookZone');
+          lz.addEventListener('touchstart', e => {
+            e.preventDefault();
+            if (lId !== null) return;
+            const t = e.changedTouches[0]; lId = t.identifier; lx = t.clientX; ly = t.clientY;
+          }, { passive: false });
+          lz.addEventListener('touchmove', e => {
+            e.preventDefault();
+            for (const t of e.changedTouches) if (t.identifier === lId) {
+              if (state === 'playing') {
+                player.yaw -= (t.clientX - lx) * 0.0055;
+                player.pitch -= (t.clientY - ly) * 0.0055;
+                player.pitch = Math.max(-1.45, Math.min(1.45, player.pitch));
+              }
+              lx = t.clientX; ly = t.clientY;
+            }
+          }, { passive: false });
+          ['touchend', 'touchcancel'].forEach(n => lz.addEventListener(n, e => {
+            for (const t of e.changedTouches) if (t.identifier === lId) lId = null;
+          }));
+
+          function bindBtn(id, down, up) {
+            const el = $(id);
+            el.addEventListener('touchstart', e => { e.preventDefault(); down(); }, { passive: false });
+            ['touchend', 'touchcancel'].forEach(n => el.addEventListener(n, e => { e.preventDefault(); if (up) up(); }, { passive: false }));
+          }
+          bindBtn('btnRun', () => { runHeld = true; }, () => { runHeld = false; });
+          bindBtn('btnFlash', toggleFlash);
+          bindBtn('btnPause', () => { if (state === 'playing') pause(); });
+
+          // ---------- Menús ----------
           $('playBtn').onclick = startGame;
           $('helpBtn').onclick = () => show('help');
           $('helpBack').onclick = () => show('menu');
@@ -627,6 +740,12 @@ jobs:
         with:
           path: site
 
+      - name: Guardar el juego para el APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: site
+
   deploy:
     needs: build
     runs-on: ubuntu-latest
@@ -637,3 +756,48 @@ jobs:
       - name: Desplegar en GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  apk:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el juego
+        uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: www
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Crear proyecto Android con Capacitor
+        run: |
+          npm init -y
+          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
+          npx cap init "El Almacen" com.elalmacen.juego --web-dir=www
+          npx cap add android
+          npx cap sync android
+          M=android/app/src/main/AndroidManifest.xml
+          sed -i '0,/<activity/s//<activity android:screenOrientation="sensorLandscape"/' "$M"
+          S=android/app/src/main/res/values/styles.xml
+          sed -i 's#<style name="AppTheme.NoActionBar"[^>]*>#&\n        <item name="android:windowFullscreen">true</item>#' "$S"
+
+      - name: Compilar APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Subir APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: El-Almacen-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk

@@ -66,14 +66,14 @@ jobs:
 
           window/size/viewport_width=1280
           window/size/viewport_height=720
-          window/handheld/orientation=6
+          window/handheld/orientation=0
           window/stretch/mode="canvas_items"
           window/stretch/aspect="expand"
 
           [input_devices]
 
-          pointing/emulate_mouse_from_touch=false
           pointing/emulate_touch_from_mouse=false
+          pointing/emulate_mouse_from_touch=true
 
           [rendering]
 
@@ -101,7 +101,7 @@ jobs:
           package/name="Battle Royale"
           package/signed=true
           package/app_category=3
-          screen/orientation=6
+          screen/orientation=0
           screen/immersive_mode=true
           keystore/debug=""
           keystore/debug_user=""
@@ -124,26 +124,36 @@ jobs:
           const NUM_BOTS := 19
           const ZONE_PHASES := [[50.0, 85.0], [110.0, 45.0], [170.0, 20.0], [230.0, 6.0]]
           const WEAPON_ORDER := ["pistola", "rifle", "escopeta"]
+          const FIRE_R := 62.0
+          const JUMP_R := 42.0
+          const RELOAD_R := 36.0
+          const ARMA_R := 32.0
+          const JOY_R := 70.0
 
           var WEAPONS := {
-              "pistola": {"name": "PISTOLA", "dmg": 18.0, "rate": 0.25, "mag": 12, "reserve": 48, "reload": 1.0, "dist": 120.0, "spread": 0.012, "pellets": 1},
-              "rifle": {"name": "RIFLE AK", "dmg": 14.0, "rate": 0.1, "mag": 30, "reserve": 90, "reload": 1.9, "dist": 150.0, "spread": 0.02, "pellets": 1},
-              "escopeta": {"name": "ESCOPETA", "dmg": 11.0, "rate": 0.75, "mag": 6, "reserve": 12, "reload": 2.2, "dist": 45.0, "spread": 0.07, "pellets": 6}
+              "pistola": {"name": "PISTOLA", "dmg": 18.0, "rate": 0.25, "mag": 12, "reserve": 48, "reload": 1.0, "dist": 120.0, "spread": 0.012, "pellets": 1, "auto": false},
+              "rifle": {"name": "RIFLE AK", "dmg": 14.0, "rate": 0.1, "mag": 30, "reserve": 90, "reload": 1.9, "dist": 150.0, "spread": 0.02, "pellets": 1, "auto": true},
+              "escopeta": {"name": "ESCOPETA", "dmg": 11.0, "rate": 0.75, "mag": 6, "reserve": 12, "reload": 2.2, "dist": 45.0, "spread": 0.07, "pellets": 6, "auto": false}
           }
 
           var SKINS := [
-              {"name": "Operador", "rarity": "Común", "type": "soldier"},
-              {"name": "Springtrap", "rarity": "Legendario", "type": "animatronic", "color": Color(0.85, 0.8, 0.17), "eye": Color(0.22, 1.0, 0.42)},
-              {"name": "Freddy", "rarity": "Épico", "type": "animatronic", "color": Color(0.48, 0.29, 0.16), "eye": Color(0.31, 0.76, 1.0)}
+              {"name": "Operador V", "rarity": "Común", "kind": "soldier", "cloth": Color(0.55, 0.57, 0.6), "armor": Color(0.72, 0.74, 0.76), "pants": Color(0.22, 0.23, 0.25), "boots": Color(0.25, 0.15, 0.08), "mask": Color(0.04, 0.04, 0.05), "glow": true},
+              {"name": "Camuflaje", "rarity": "Raro", "kind": "soldier", "cloth": Color(0.33, 0.37, 0.2), "armor": Color(0.22, 0.25, 0.15), "pants": Color(0.3, 0.32, 0.18), "boots": Color(0.2, 0.14, 0.08), "mask": Color(0.25, 0.28, 0.16), "glow": false},
+              {"name": "Springtrap", "rarity": "Legendario", "kind": "animatronic", "body": Color(0.85, 0.8, 0.17), "eye": Color(0.22, 1.0, 0.42), "bow": Color(0.42, 0.17, 0.57)},
+              {"name": "Freddy", "rarity": "Épico", "kind": "animatronic", "body": Color(0.48, 0.29, 0.16), "eye": Color(0.31, 0.76, 1.0), "bow": Color(0.75, 0.15, 0.17)}
           ]
 
-          var _mats := {}
           var env_node: WorldEnvironment
           var lobby_root: Node3D
           var lobby_ui: CanvasLayer
           var lobby_char: CharacterBody3D
-          var skin_label: Label
+          var lobby_btns: Array = []
           var skin_index := 0
+
+          var mats := {}
+          var mcache := {}
+          var bump_tex: Texture2D
+          var haz_tex: Texture2D
 
           var in_match := false
           var started := false
@@ -176,20 +186,22 @@ jobs:
           var look_id := -1
           var fire_id := -1
           var firing := false
+          var fire_edge := false
 
           var hud: CanvasLayer
           var overlay: Control
-          var hud_hp: ProgressBar
-          var hud_top: Label
-          var hud_ammo: Label
-          var hud_msg: Label
-          var msg_t := 0.0
-          var feed_label: Label
-          var feed_t := 0.0
-          var hurt_rect: ColorRect
+          var hud_hurt: ColorRect
           var end_panel: VBoxContainer
           var end_title: Label
           var end_sub: Label
+          var msg_text := ""
+          var msg_t := 0.0
+          var feed_items: Array = []
+          var hit_t := 0.0
+          var sb_panel: StyleBoxFlat
+          var sb_slot: StyleBoxFlat
+          var sb_on: StyleBoxFlat
+          var sb_red: StyleBoxFlat
 
           func _ready() -> void:
               randomize()
@@ -214,120 +226,716 @@ jobs:
                   _update_player(delta)
                   _update_bots(delta)
                   _update_zone(delta)
-                  if _alive_bots() == 0 and player.get_meta("st").alive:
+                  if _alive_bots() == 0 and player.get_meta("st")["alive"]:
                       _show_end(true)
               _animate_all(delta)
               _update_camera(delta)
               _update_hud(delta)
               overlay.queue_redraw()
 
-          func _input(e):
+          func _input(e: InputEvent) -> void:
+              if e is InputEventKey:
+                  if in_match and not ended and e.pressed and not e.echo:
+                      match e.keycode:
+                          KEY_1:
+                              _switch_weapon(0)
+                          KEY_2:
+                              _switch_weapon(1)
+                          KEY_3:
+                              _switch_weapon(2)
+                          KEY_R:
+                              _start_reload()
+                          KEY_SPACE:
+                              _jump()
+                          KEY_F:
+                              firing = true
+                              fire_edge = true
+                  elif e.keycode == KEY_F and not e.pressed:
+                      firing = false
+                  return
               if not in_match or ended:
                   return
-              var vs := get_viewport().get_visible_rect().size
               if e is InputEventScreenTouch:
-                  if e.pressed:
-                      if e.position.x < vs.x * 0.45 and joy_id == -1:
-                          joy_id = e.index
-                          joy_origin = e.position
-                          joy_vec = Vector2.ZERO
-                      elif e.position.distance_to(_fire_pos()) < 70.0:
-                          fire_id = e.index
-                          firing = true
-                      elif e.position.distance_to(_jump_pos()) < 50.0:
-                          _jump()
-                      elif e.position.distance_to(_weap_pos()) < 40.0:
-                          _switch_weapon((weapon_idx + 1) % WEAPON_ORDER.size())
-                      elif look_id == -1:
-                          look_id = e.index
-                  else:
-                      if e.index == joy_id:
-                          joy_id = -1
-                          joy_vec = Vector2.ZERO
-                      if e.index == fire_id:
-                          fire_id = -1
-                          firing = false
-                      if e.index == look_id:
-                          look_id = -1
+                  _on_touch(e)
               elif e is InputEventScreenDrag:
-                  if e.index == joy_id:
-                      var d: Vector2 = e.position - joy_origin
-                      joy_vec = (Vector2(d.x, -d.y) / 60.0).limit_length(1.0)
-                  elif e.index == look_id:
-                      _look(e.relative)
-              elif e is InputEventMouseButton:
-                  if e.button_index == MOUSE_BUTTON_LEFT:
+                  _on_drag(e)
+              elif not OS.has_feature("mobile"):
+                  if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT:
                       firing = e.pressed
-              elif e is InputEventMouseMotion:
-                  if e.button_mask & MOUSE_BUTTON_MASK_RIGHT:
+                      if e.pressed:
+                          fire_edge = true
+                  elif e is InputEventMouseMotion and (e.button_mask & MOUSE_BUTTON_MASK_RIGHT) != 0:
                       _look(e.relative)
-              elif e is InputEventKey and e.pressed and not e.echo:
-                  match e.keycode:
-                      KEY_1: _switch_weapon(0)
-                      KEY_2: _switch_weapon(1)
-                      KEY_3: _switch_weapon(2)
-                      KEY_R: _start_reload()
-                      KEY_SPACE: _jump()
+
+          func _vs() -> Vector2:
+              return get_viewport().get_visible_rect().size
+
+          func _in(p: Vector2, c: Vector2, r: float) -> bool:
+              return p.distance_to(c) <= r
+
+          func _fire_c() -> Vector2:
+              var v := _vs()
+              return Vector2(v.x - 120.0, v.y - 105.0)
+
+          func _jump_c() -> Vector2:
+              var v := _vs()
+              return Vector2(v.x - 252.0, v.y - 112.0)
+
+          func _reload_c() -> Vector2:
+              var v := _vs()
+              return Vector2(v.x - 60.0, v.y - 200.0)
+
+          func _arma_c() -> Vector2:
+              var v := _vs()
+              return Vector2(v.x - 368.0, v.y - 92.0)
+
+          func _slot_rect(i: int) -> Rect2:
+              var v := _vs()
+              return Rect2(v.x - 350.0 + i * 84.0, v.y - 268.0, 78.0, 42.0)
+
+          func _ammo_rect() -> Rect2:
+              var v := _vs()
+              return Rect2(v.x - 350.0, v.y - 216.0, 250.0, 52.0)
+
+          func _on_touch(e: InputEventScreenTouch) -> void:
+              var p: Vector2 = e.position
+              if e.pressed:
+                  if _in(p, _fire_c(), FIRE_R + 18.0):
+                      fire_id = e.index
+                      firing = true
+                      fire_edge = true
+                      return
+                  if _in(p, _jump_c(), JUMP_R + 12.0):
+                      _jump()
+                      return
+                  if _in(p, _reload_c(), RELOAD_R + 12.0):
+                      _start_reload()
+                      return
+                  if _in(p, _arma_c(), ARMA_R + 12.0):
+                      _switch_weapon((weapon_idx + 1) % WEAPON_ORDER.size())
+                      return
+                  for i in 3:
+                      if _slot_rect(i).has_point(p):
+                          _switch_weapon(i)
+                          return
+                  if p.x < _vs().x * 0.45 and joy_id == -1:
+                      joy_id = e.index
+                      joy_origin = p
+                      joy_vec = Vector2.ZERO
+                      return
+                  if look_id == -1:
+                      look_id = e.index
+              else:
+                  if e.index == fire_id:
+                      fire_id = -1
+                      firing = false
+                  if e.index == joy_id:
+                      joy_id = -1
+                      joy_vec = Vector2.ZERO
+                  if e.index == look_id:
+                      look_id = -1
+
+          func _on_drag(e: InputEventScreenDrag) -> void:
+              if e.index == joy_id:
+                  var d: Vector2 = e.position - joy_origin
+                  joy_vec = (Vector2(d.x, -d.y) / JOY_R).limit_length(1.0)
+              elif e.index == look_id:
+                  _look(e.relative)
+
+          func _look(rel: Vector2) -> void:
+              yaw -= rel.x * 0.0065
+              pitch = clampf(pitch - rel.y * 0.004, -0.5, 0.5)
+
+          func _aim_dir() -> Vector3:
+              return Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch))
+
+          # ================= MATERIALES Y MALLAS =================
+          func _bump() -> Texture2D:
+              if bump_tex == null:
+                  var fl := FastNoiseLite.new()
+                  fl.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+                  fl.frequency = 0.06
+                  var nt := NoiseTexture2D.new()
+                  nt.noise = fl
+                  nt.width = 256
+                  nt.height = 256
+                  nt.seamless = true
+                  nt.as_normal_map = true
+                  nt.bump_strength = 3.0
+                  bump_tex = nt
+              return bump_tex
+
+          func _haz() -> Texture2D:
+              if haz_tex == null:
+                  var img := Image.create(64, 64, false, Image.FORMAT_RGBA8)
+                  for y in 64:
+                      for x in 64:
+                          var s := ((x + y) / 8) % 2
+                          img.set_pixel(x, y, Color(1.0, 0.8, 0.0) if s == 0 else Color(0.08, 0.08, 0.08))
+                  haz_tex = ImageTexture.create_from_image(img)
+              return haz_tex
+
+          func _m(c: Color, rough: float = 0.75, metal: float = 0.0, bump: bool = true) -> StandardMaterial3D:
+              var key := "%s|%.2f|%.2f|%s" % [c.to_html(), rough, metal, str(bump)]
+              if mats.has(key):
+                  return mats[key]
+              var m := StandardMaterial3D.new()
+              m.albedo_color = c
+              m.roughness = rough
+              m.metallic = metal
+              if bump:
+                  m.normal_enabled = true
+                  m.normal_texture = _bump()
+                  m.normal_scale = 0.5
+              mats[key] = m
+              return m
+
+          func _haz_mat() -> StandardMaterial3D:
+              if mats.has("haz"):
+                  return mats["haz"]
+              var m := StandardMaterial3D.new()
+              m.albedo_texture = _haz()
+              m.roughness = 0.5
+              mats["haz"] = m
+              return m
+
+          func _glow(c: Color, e: float) -> StandardMaterial3D:
+              var key := "g|%s|%.2f" % [c.to_html(), e]
+              if mats.has(key):
+                  return mats[key]
+              var m := StandardMaterial3D.new()
+              m.albedo_color = Color(0.05, 0.05, 0.05)
+              m.emission_enabled = true
+              m.emission = c
+              m.emission_energy_multiplier = e
+              m.roughness = 0.3
+              mats[key] = m
+              return m
+
+          func _unlit(c: Color) -> StandardMaterial3D:
+              var key := "u|%s" % c.to_html()
+              if mats.has(key):
+                  return mats[key]
+              var m := StandardMaterial3D.new()
+              m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+              m.albedo_color = c
+              mats[key] = m
+              return m
+
+          func _alpha_mat(c: Color) -> StandardMaterial3D:
+              var m := StandardMaterial3D.new()
+              m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+              m.albedo_color = c
+              m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+              return m
+
+          func _grass_mat() -> StandardMaterial3D:
+              if mats.has("grass"):
+                  return mats["grass"]
+              var m := StandardMaterial3D.new()
+              m.albedo_color = Color(0.4, 0.6, 0.27)
+              m.roughness = 0.95
+              m.normal_enabled = true
+              m.normal_texture = _bump()
+              m.normal_scale = 0.8
+              m.uv1_scale = Vector3(40, 40, 1)
+              mats["grass"] = m
+              return m
+
+          func _water_mat() -> StandardMaterial3D:
+              if mats.has("water"):
+                  return mats["water"]
+              var m := StandardMaterial3D.new()
+              m.albedo_color = Color(0.1, 0.42, 0.6)
+              m.roughness = 0.08
+              m.metallic = 0.2
+              mats["water"] = m
+              return m
+
+          func _boxm(size: Vector3) -> BoxMesh:
+              var key := "b%s" % size
+              if mcache.has(key):
+                  return mcache[key]
+              var bm := BoxMesh.new()
+              bm.size = size
+              mcache[key] = bm
+              return bm
+
+          func _box(p: Node, size: Vector3, pos: Vector3, m: Material, rot: Vector3 = Vector3.ZERO) -> MeshInstance3D:
+              var mi := MeshInstance3D.new()
+              mi.mesh = _boxm(size)
+              mi.material_override = m
+              mi.position = pos
+              mi.rotation_degrees = rot
+              p.add_child(mi)
+              return mi
+
+          func _sph(p: Node, r: float, pos: Vector3, m: Material, sc: Vector3 = Vector3.ONE) -> MeshInstance3D:
+              var key := "s%.3f" % r
+              var sm: SphereMesh
+              if mcache.has(key):
+                  sm = mcache[key]
+              else:
+                  sm = SphereMesh.new()
+                  sm.radius = r
+                  sm.height = r * 2.0
+                  mcache[key] = sm
+              var mi := MeshInstance3D.new()
+              mi.mesh = sm
+              mi.material_override = m
+              mi.position = pos
+              mi.scale = sc
+              p.add_child(mi)
+              return mi
+
+          # Cápsula entre dos puntos (músculos, miembros, torso)
+          func _seg(p: Node, a: Vector3, b: Vector3, r: float, m: Material) -> void:
+              var d := b - a
+              var L := d.length()
+              var holder := Node3D.new()
+              p.add_child(holder)
+              holder.position = (a + b) * 0.5
+              var dn := d.normalized()
+              var up := Vector3.UP if absf(dn.dot(Vector3.UP)) < 0.95 else Vector3.RIGHT
+              holder.basis = Basis.looking_at(dn, up)
+              var key := "c%.3f|%.3f" % [r, L + 2.0 * r]
+              var cm: CapsuleMesh
+              if mcache.has(key):
+                  cm = mcache[key]
+              else:
+                  cm = CapsuleMesh.new()
+                  cm.radius = r
+                  cm.height = L + 2.0 * r
+                  mcache[key] = cm
+              var mi := MeshInstance3D.new()
+              mi.mesh = cm
+              mi.material_override = m
+              mi.rotation_degrees = Vector3(90, 0, 0)
+              holder.add_child(mi)
+
+          # ================= PERSONAJES HUMANOIDES =================
+          func _skin_col(s: Dictionary) -> Color:
+              if s["kind"] == "animatronic":
+                  return s["body"]
+              return Color(0.86, 0.66, 0.5)
+
+          func _build_char(s: Dictionary, weapon: String, is_bot: bool) -> CharacterBody3D:
+              var root := CharacterBody3D.new()
+              var cs := CollisionShape3D.new()
+              var cap := CapsuleShape3D.new()
+              cap.radius = 0.38
+              cap.height = 1.9
+              cs.shape = cap
+              cs.position = Vector3(0, 0.95, 0)
+              root.add_child(cs)
+
+              var body := Node3D.new()
+              root.add_child(body)
+              var anim: bool = s["kind"] == "animatronic"
+              var skin_c: Color = _skin_col(s)
+              var cloth_c: Color = skin_c.darkened(0.2)
+              if not anim:
+                  cloth_c = s["cloth"]
+
+              var m_skin := _m(skin_c, 0.45, 0.0, false)
+              var m_cloth := _m(cloth_c, 0.9, 0.0, true)
+              var m_boot := _m(Color(0.2, 0.13, 0.07), 0.5, 0.0, true)
+              var m_glove := _m(Color(0.18, 0.13, 0.09), 0.8, 0.0, true)
+              var m_mask := _m(s.get("mask", Color(0.04, 0.04, 0.05)), 0.97, 0.0, true)
+              var m_dark := _m(Color(0.08, 0.08, 0.09), 0.5, 0.4, false)
+              var m_white := _m(Color(0.95, 0.95, 0.92), 0.35, 0.0, false)
+              var m_bow := _m(s.get("bow", Color(0.4, 0.15, 0.55)), 0.5, 0.0, true)
+              var m_pants: StandardMaterial3D
+              var m_armor: StandardMaterial3D
+              if anim:
+                  m_pants = _m(Color(0.14, 0.14, 0.15), 0.9, 0.0, true)
+                  m_armor = m_dark
+              else:
+                  m_pants = _m(s["pants"], 0.9, 0.0, true)
+                  m_armor = _m(s["armor"], 0.35, 0.55, false)
+              var m_haz := _haz_mat()
+
+              # Piernas con rodilla y bota
+              var legs: Array = []
+              for sx in [-0.16, 0.16]:
+                  var hip := Node3D.new()
+                  hip.position = Vector3(sx, 0.94, 0)
+                  body.add_child(hip)
+                  _seg(hip, Vector3.ZERO, Vector3(0, -0.46, 0), 0.115, m_pants)
+                  var knee := Node3D.new()
+                  knee.position = Vector3(0, -0.46, 0)
+                  hip.add_child(knee)
+                  _sph(knee, 0.12, Vector3.ZERO, m_pants)
+                  if not anim:
+                      _box(knee, Vector3(0.2, 0.16, 0.08), Vector3(0, 0.0, 0.12), m_armor)
+                  _seg(knee, Vector3.ZERO, Vector3(0, -0.38, 0), 0.105, m_pants)
+                  _box(knee, Vector3(0.2, 0.14, 0.4), Vector3(0, -0.42, 0.06), m_boot)
+                  legs.append(hip)
+
+              # Pelvis, cinturón y gancho
+              _box(body, Vector3(0.44, 0.2, 0.26), Vector3(0, 0.98, 0), m_pants)
+              _box(body, Vector3(0.48, 0.07, 0.3), Vector3(0, 1.08, 0), m_dark)
+
+              # Torso
+              if anim:
+                  _seg(body, Vector3(0, 1.02, 0), Vector3(0, 1.6, 0), 0.2, m_skin)
+                  _box(body, Vector3(0.36, 0.26, 0.05), Vector3(0, 1.28, 0.2), m_dark)
+                  _box(body, Vector3(0.14, 0.1, 0.06), Vector3(-0.08, 1.66, 0.2), m_bow)
+                  _box(body, Vector3(0.14, 0.1, 0.06), Vector3(0.08, 1.66, 0.2), m_bow)
+                  _box(body, Vector3(0.05, 0.06, 0.07), Vector3(0, 1.66, 0.21), m_bow)
+              else:
+                  _box(body, Vector3(0.44, 0.12, 0.26), Vector3(0, 1.14, 0), m_cloth)
+                  _box(body, Vector3(0.46, 0.46, 0.28), Vector3(0, 1.42, 0), m_cloth)
+                  _box(body, Vector3(0.5, 0.5, 0.12), Vector3(0, 1.4, 0.19), m_armor)
+                  _box(body, Vector3(0.48, 0.46, 0.1), Vector3(0, 1.4, -0.19), m_armor)
+                  _box(body, Vector3(0.14, 0.18, 0.1), Vector3(-0.27, 0.98, 0.2), m_haz)
+                  _box(body, Vector3(0.06, 0.12, 0.1), Vector3(-0.27, 1.12, 0.2), m_dark)
+                  _box(body, Vector3(0.1, 0.14, 0.2), Vector3(0.26, 0.98, -0.12), m_dark)
+                  _box(body, Vector3(0.42, 0.5, 0.2), Vector3(0, 1.42, -0.27), m_pants)
+                  _box(body, Vector3(0.05, 0.07, 0.95), Vector3(0.12, 1.66, -0.5), m_dark)
+                  _sph(body, 0.12, Vector3(-0.3, 1.6, 0), m_armor, Vector3(1, 0.7, 1))
+                  _sph(body, 0.12, Vector3(0.3, 1.6, 0), m_armor, Vector3(1, 0.7, 1))
+              _seg(body, Vector3(0, 1.66, 0), Vector3(0, 1.74, 0), 0.065, m_skin)
+
+              # Brazo izquierdo
+              var arm_l := Node3D.new()
+              arm_l.position = Vector3(-0.31, 1.58, 0)
+              body.add_child(arm_l)
+              var sleeve_m: StandardMaterial3D = m_cloth if not anim else m_skin
+              _seg(arm_l, Vector3.ZERO, Vector3(0, -0.3, 0), 0.085, sleeve_m)
+              var elbow_l := Node3D.new()
+              elbow_l.position = Vector3(0, -0.3, 0)
+              arm_l.add_child(elbow_l)
+              _seg(elbow_l, Vector3.ZERO, Vector3(0, -0.26, 0), 0.075, m_skin)
+              _box(elbow_l, Vector3(0.12, 0.1, 0.12), Vector3(0, -0.32, 0), m_glove if not anim else m_skin)
+
+              # Brazo derecho (sostiene el arma)
+              var arm_r := Node3D.new()
+              arm_r.position = Vector3(0.31, 1.58, 0)
+              arm_r.rotation.x = -1.35
+              body.add_child(arm_r)
+              _seg(arm_r, Vector3.ZERO, Vector3(0, -0.3, 0), 0.085, sleeve_m)
+              var elbow_r := Node3D.new()
+              elbow_r.position = Vector3(0, -0.3, 0)
+              arm_r.add_child(elbow_r)
+              _seg(elbow_r, Vector3.ZERO, Vector3(0, -0.26, 0), 0.075, m_skin)
+              _box(elbow_r, Vector3(0.12, 0.1, 0.12), Vector3(0, -0.32, 0), m_glove if not anim else m_skin)
+              var hold := Node3D.new()
+              hold.position = Vector3(0, -0.34, 0)
+              elbow_r.add_child(hold)
+
+              # Cabeza
+              var head := Node3D.new()
+              head.position = Vector3(0, 1.86, 0)
+              body.add_child(head)
+              if anim:
+                  _sph(head, 0.16, Vector3.ZERO, m_skin, Vector3(1.05, 1.0, 0.95))
+                  _sph(head, 0.09, Vector3(0, -0.06, 0.14), _m(skin_c.darkened(0.2), 0.5, 0.0, false), Vector3(1.3, 0.8, 0.8))
+                  for i in 5:
+                      _box(head, Vector3(0.05, 0.06, 0.03), Vector3(-0.1 + i * 0.05, -0.12, 0.155), m_white)
+                  for ex in [-0.07, 0.07]:
+                      _sph(head, 0.04, Vector3(ex, 0.04, 0.14), _glow(s["eye"], 2.5))
+                      _box(head, Vector3(0.1, 0.012, 0.012), Vector3(ex, 0.075, 0.165), m_dark)
+                      _box(head, Vector3(0.1, 0.012, 0.012), Vector3(ex, 0.005, 0.165), m_dark)
+                  _box(head, Vector3(0.06, 0.3, 0.03), Vector3(-0.11, 0.27, 0), m_skin, Vector3(0, 0, 10))
+                  _box(head, Vector3(0.06, 0.3, 0.03), Vector3(0.11, 0.27, 0), m_skin, Vector3(0, 0, -10))
+              else:
+                  _sph(head, 0.15, Vector3.ZERO, m_skin, Vector3(0.92, 1.08, 0.95))
+                  _sph(head, 0.165, Vector3(0, 0.005, 0), m_mask, Vector3(0.98, 1.12, 0.98))
+                  if s.get("glow", false):
+                      var lb := Label3D.new()
+                      lb.text = "V"
+                      lb.font_size = 96
+                      lb.pixel_size = 0.0021
+                      lb.modulate = Color(0.7, 0.97, 1.0)
+                      lb.shaded = false
+                      lb.outline_size = 0
+                      lb.position = Vector3(0, 0.03, 0.175)
+                      head.add_child(lb)
+
+              # Arma en la mano
+              var gun := _make_gun(weapon)
+              gun.rotation_degrees = Vector3(90, 0, 0)
+              hold.add_child(gun)
+
+              var st := {
+                  "hp": 100.0, "alive": true, "bot": is_bot, "weapon": weapon,
+                  "cd": randf_range(0.5, 1.5), "yaw": 0.0, "recoil": 0.0, "phase": 0.0,
+                  "flash_t": 0.0, "vy": 0.0, "last": Vector3.ZERO,
+                  "wander": Vector2.ZERO, "wander_t": 0.0,
+                  "strafe": 1.0 if randf() < 0.5 else -1.0,
+                  "body": body, "legs": legs, "arm_l": arm_l, "arm_r": arm_r,
+                  "hold": hold, "gun": gun, "flash": gun.get_node("Flash")
+              }
+              root.set_meta("st", st)
+              return root
+
+          func _make_gun(kind: String) -> Node3D:
+              var g := Node3D.new()
+              var metal := _m(Color(0.16, 0.17, 0.19), 0.4, 0.7, false)
+              var steel := _m(Color(0.5, 0.54, 0.58), 0.3, 0.9, false)
+              var wood := _m(Color(0.4, 0.25, 0.12), 0.6, 0.0, true)
+              var fz := 0.32
+              if kind == "escopeta":
+                  _box(g, Vector3(0.1, 0.1, 0.85), Vector3(0, 0, 0.1), metal)
+                  _box(g, Vector3(0.07, 0.07, 0.6), Vector3(0, 0.02, 0.5), steel)
+                  _box(g, Vector3(0.09, 0.09, 0.25), Vector3(0, -0.02, 0.25), wood)
+                  _box(g, Vector3(0.1, 0.14, 0.4), Vector3(0, -0.02, -0.45), wood)
+                  fz = 0.95
+              elif kind == "rifle":
+                  _box(g, Vector3(0.1, 0.13, 0.5), Vector3(0, 0, 0.1), metal)
+                  _box(g, Vector3(0.05, 0.05, 0.5), Vector3(0, 0.02, 0.7), steel)
+                  _box(g, Vector3(0.07, 0.2, 0.12), Vector3(0, -0.14, 0.15), metal)
+                  _box(g, Vector3(0.09, 0.14, 0.45), Vector3(0, -0.01, -0.4), wood)
+                  fz = 0.97
+              else:
+                  _box(g, Vector3(0.07, 0.1, 0.32), Vector3(0, 0, 0.1), metal)
+                  _box(g, Vector3(0.06, 0.16, 0.09), Vector3(0, -0.12, -0.04), metal)
+              var fl := MeshInstance3D.new()
+              var fs := SphereMesh.new()
+              fs.radius = 0.14
+              fs.height = 0.28
+              fl.mesh = fs
+              fl.material_override = _glow(Color(1.0, 0.8, 0.3), 4.0)
+              fl.position = Vector3(0, 0, fz)
+              fl.visible = false
+              fl.name = "Flash"
+              g.add_child(fl)
+              return g
+
+          func _equip(c: CharacterBody3D, kind: String) -> void:
+              var st: Dictionary = c.get_meta("st")
+              var old = st["gun"]
+              if is_instance_valid(old):
+                  old.queue_free()
+              var g := _make_gun(kind)
+              g.rotation_degrees = Vector3(90, 0, 0)
+              st["hold"].add_child(g)
+              st["gun"] = g
+              st["flash"] = g.get_node("Flash")
+              st["weapon"] = kind
+
+          func _animate(st: Dictionary, delta: float, spd: float) -> void:
+              var sw: float = clampf(spd / 4.0, 0.0, 1.0)
+              st["phase"] = float(st["phase"]) + spd * delta * 1.7
+              var ph: float = st["phase"]
+              var k: float = minf(1.0, delta * 16.0)
+              var legs: Array = st["legs"]
+              legs[0].rotation.x = lerpf(legs[0].rotation.x, sin(ph) * 0.7 * sw, k)
+              legs[1].rotation.x = lerpf(legs[1].rotation.x, -sin(ph) * 0.7 * sw, k)
+              var al: Node3D = st["arm_l"]
+              al.rotation.x = lerpf(al.rotation.x, -sin(ph) * 0.5 * sw, k)
+              var ar: Node3D = st["arm_r"]
+              ar.rotation.x = lerpf(ar.rotation.x, -1.35 + float(st["recoil"]) * 0.22 + sin(ph) * 0.03 * sw, minf(1.0, delta * 20.0))
+              var body: Node3D = st["body"]
+              body.position.y = lerpf(body.position.y, absf(sin(ph)) * 0.05 * sw, minf(1.0, delta * 14.0))
+              st["recoil"] = maxf(0.0, float(st["recoil"]) - delta * 9.0)
+              st["flash_t"] = maxf(0.0, float(st["flash_t"]) - delta)
+              var fl = st["flash"]
+              if is_instance_valid(fl):
+                  fl.visible = float(st["flash_t"]) > 0.0
+
+          func _animate_all(delta: float) -> void:
+              for c in _all_chars():
+                  var st: Dictionary = c.get_meta("st")
+                  if not st["alive"]:
+                      continue
+                  var p: Vector3 = c.position
+                  var lastv: Vector3 = st["last"]
+                  var spd: float = Vector2(p.x - lastv.x, p.z - lastv.z).length() / maxf(delta, 0.0001)
+                  st["last"] = p
+                  _animate(st, delta, spd)
+
+          func _all_chars() -> Array:
+              var arr: Array = [player]
+              arr.append_array(bots)
+              return arr
 
           # ================= LOBBY =================
+          func _setup_env() -> void:
+              if env_node:
+                  env_node.queue_free()
+              env_node = WorldEnvironment.new()
+              var e := Environment.new()
+              e.background_mode = Environment.BG_SKY
+              var s := Sky.new()
+              s.sky_material = ProceduralSkyMaterial.new()
+              e.sky = s
+              e.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+              e.ambient_light_energy = 0.8
+              e.tonemap_mode = Environment.TONE_MAPPER_ACES
+              e.glow_enabled = true
+              e.glow_intensity = 0.5
+              e.glow_bloom = 0.05
+              e.adjustment_enabled = true
+              e.adjustment_contrast = 1.08
+              e.adjustment_saturation = 1.08
+              e.fog_enabled = true
+              e.fog_density = 0.0025
+              e.fog_light_color = Color(0.75, 0.84, 0.92)
+              env_node.environment = e
+              add_child(env_node)
+
           func _build_lobby() -> void:
-              _setup_env(false)
+              _setup_env()
               lobby_root = Node3D.new()
               add_child(lobby_root)
               var sun := DirectionalLight3D.new()
-              sun.rotation_degrees = Vector3(-45, 30, 0)
+              sun.rotation_degrees = Vector3(-40, 35, 0)
+              sun.shadow_enabled = true
               lobby_root.add_child(sun)
-              var lcam := Camera3D.new()
-              lcam.position = Vector3(0, 2.2, 5.5)
-              lobby_root.add_child(lcam)
-              lcam.current = true
-              lcam.look_at(Vector3(0, 1.2, 0), Vector3.UP)
-              lobby_char = build_character(SKINS[skin_index], "pistola", false)
+              _box(lobby_root, Vector3(6, 0.2, 6), Vector3(0, -0.1, 0), _m(Color(0.3, 0.33, 0.32), 0.7, 0.0, true))
+              var lc := Camera3D.new()
+              lc.fov = 42.0
+              lc.position = Vector3(0, 1.5, 5.2)
+              lobby_root.add_child(lc)
+              lc.current = true
+              lc.look_at(Vector3(0, 1.15, 0), Vector3.UP)
+              lobby_char = _build_char(SKINS[skin_index], "pistola", false)
               lobby_root.add_child(lobby_char)
+              _build_lobby_ui()
 
+          func _sbox(bg: Color, r: int, border: Color = Color(0, 0, 0, 0), bw: int = 0) -> StyleBoxFlat:
+              var sb := StyleBoxFlat.new()
+              sb.bg_color = bg
+              sb.set_corner_radius_all(r)
+              if bw > 0:
+                  sb.set_border_width_all(bw)
+                  sb.border_color = border
+              return sb
+
+          func _rarity_color(r: String) -> Color:
+              if r == "Raro":
+                  return Color(0.3, 0.6, 1.0)
+              if r == "Épico":
+                  return Color(0.7, 0.35, 1.0)
+              if r == "Legendario":
+                  return Color(1.0, 0.75, 0.2)
+              return Color(0.7, 0.7, 0.7)
+
+          func _build_lobby_ui() -> void:
               lobby_ui = CanvasLayer.new()
               add_child(lobby_ui)
-              var vb := VBoxContainer.new()
-              vb.position = Vector2(40, 40)
-              vb.add_theme_constant_override("separation", 12)
-              lobby_ui.add_child(vb)
+              var root := Control.new()
+              root.set_anchors_preset(Control.PRESET_FULL_RECT)
+              root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+              lobby_ui.add_child(root)
+
               var title := Label.new()
               title.text = "BATTLE ROYALE"
-              title.add_theme_font_size_override("font_size", 44)
-              vb.add_child(title)
-              skin_label = Label.new()
-              skin_label.add_theme_font_size_override("font_size", 24)
-              vb.add_child(skin_label)
+              title.position = Vector2(40, 26)
+              title.add_theme_font_size_override("font_size", 52)
+              title.add_theme_color_override("font_outline_color", Color.BLACK)
+              title.add_theme_constant_override("outline_size", 8)
+              root.add_child(title)
+              var sub := Label.new()
+              sub.text = "Lobby · Isla Libre · 20 jugadores"
+              sub.position = Vector2(44, 96)
+              sub.add_theme_font_size_override("font_size", 18)
+              sub.add_theme_color_override("font_color", Color(0.8, 0.9, 0.85))
+              root.add_child(sub)
+
+              var pn := PanelContainer.new()
+              pn.anchor_left = 0.6
+              pn.anchor_right = 1.0
+              pn.anchor_top = 0.0
+              pn.anchor_bottom = 1.0
+              pn.add_theme_stylebox_override("panel", _sbox(Color(0.02, 0.04, 0.03, 0.72), 0))
+              root.add_child(pn)
+              var mc := MarginContainer.new()
+              for side in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
+                  mc.add_theme_constant_override(side, 24)
+              pn.add_child(mc)
+              var vb := VBoxContainer.new()
+              vb.add_theme_constant_override("separation", 10)
+              mc.add_child(vb)
+
+              var hd := Label.new()
+              hd.text = "SKINS"
+              hd.add_theme_font_size_override("font_size", 18)
+              hd.add_theme_color_override("font_color", Color(0.8, 0.95, 0.85))
+              vb.add_child(hd)
+
+              lobby_btns.clear()
               for i in SKINS.size():
                   var b := Button.new()
-                  b.text = SKINS[i]["name"] + "  ·  " + SKINS[i]["rarity"]
-                  b.custom_minimum_size = Vector2(340, 56)
+                  b.text = SKINS[i]["name"] + "   ·   " + SKINS[i]["rarity"]
+                  b.custom_minimum_size = Vector2(0, 58)
+                  b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+                  b.add_theme_font_size_override("font_size", 20)
                   b.pressed.connect(_select_skin.bind(i))
                   vb.add_child(b)
+                  lobby_btns.append(b)
+
+              var info := Label.new()
+              info.text = "Móvil: joystick a la izquierda, arrastra a la derecha para mirar y usa FUEGO. PC: WASD, ratón y botón izquierdo."
+              info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+              info.add_theme_font_size_override("font_size", 14)
+              info.add_theme_color_override("font_color", Color(0.75, 0.8, 0.78))
+              vb.add_child(info)
+
+              var spacer := Control.new()
+              spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+              vb.add_child(spacer)
+
               var play := Button.new()
               play.text = "JUGAR"
-              play.custom_minimum_size = Vector2(340, 80)
-              play.add_theme_font_size_override("font_size", 32)
+              play.custom_minimum_size = Vector2(0, 84)
+              play.add_theme_font_size_override("font_size", 30)
+              var orange := _sbox(Color(1.0, 0.6, 0.1), 16)
+              var orange_h := _sbox(Color(1.0, 0.68, 0.2), 16)
+              play.add_theme_stylebox_override("normal", orange)
+              play.add_theme_stylebox_override("hover", orange_h)
+              play.add_theme_stylebox_override("pressed", _sbox(Color(0.85, 0.45, 0.05), 16))
+              play.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+              play.add_theme_color_override("font_color", Color.BLACK)
               play.pressed.connect(_start_match)
               vb.add_child(play)
-              _refresh_skin_label()
+              _refresh_lobby_btns()
 
-          func _refresh_skin_label() -> void:
-              skin_label.text = "Skin: " + SKINS[skin_index]["name"] + " (" + SKINS[skin_index]["rarity"] + ")"
+          func _refresh_lobby_btns() -> void:
+              for i in lobby_btns.size():
+                  var b: Button = lobby_btns[i]
+                  var sel: bool = i == skin_index
+                  var col: Color = _rarity_color(SKINS[i]["rarity"])
+                  var bg := Color(0.22, 0.16, 0.02, 0.95) if sel else Color(0.07, 0.12, 0.09, 0.9)
+                  var border := col if sel else Color(1, 1, 1, 0.12)
+                  var bw := 3 if sel else 1
+                  b.add_theme_stylebox_override("normal", _sbox(bg, 12, border, bw))
+                  b.add_theme_stylebox_override("hover", _sbox(bg.lightened(0.1), 12, border, bw))
+                  b.add_theme_stylebox_override("pressed", _sbox(bg.darkened(0.1), 12, border, bw))
+                  b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+                  b.add_theme_color_override("font_color", Color.WHITE)
 
           func _select_skin(i: int) -> void:
               skin_index = i
               if lobby_char:
                   lobby_char.queue_free()
-              lobby_char = build_character(SKINS[i], "pistola", false)
+              lobby_char = _build_char(SKINS[i], "pistola", false)
               lobby_root.add_child(lobby_char)
-              _refresh_skin_label()
+              _refresh_lobby_btns()
 
           func _update_lobby(delta: float) -> void:
               if lobby_char:
                   lobby_char.rotation.y += delta * 0.5
                   _animate(lobby_char.get_meta("st"), delta, 0.0)
 
+          func _back_to_lobby() -> void:
+              in_match = false
+              ended = false
+              if hud:
+                  hud.queue_free()
+                  hud = null
+                  overlay = null
+              if world:
+                  world.queue_free()
+                  world = null
+              player = null
+              cam = null
+              bots.clear()
+              _build_lobby()
+
+          # ================= PARTIDA =================
           func _start_match() -> void:
               if lobby_ui:
                   lobby_ui.queue_free()
@@ -340,7 +948,10 @@ jobs:
                   world.queue_free()
               world = Node3D.new()
               add_child(world)
-              _setup_env(true)
+              _setup_env()
+              zone_radius = 130.0
+              zone_target = 130.0
+              zone_phase = 0
               _build_map()
               _spawn_player()
               _spawn_bots()
@@ -352,105 +963,92 @@ jobs:
               last_count = -1
               match_time = 0.0
               kills = 0
-              zone_radius = 130.0
-              zone_target = 130.0
-              zone_phase = 0
               reloading = 0.0
               firing = false
-              joy_id = -1
-              look_id = -1
+              fire_edge = false
               fire_id = -1
+              look_id = -1
+              joy_id = -1
               joy_vec = Vector2.ZERO
               weapon_idx = 0
+              feed_items.clear()
+              msg_text = ""
               ammo = {}
               for k in WEAPON_ORDER:
                   ammo[k] = [WEAPONS[k]["mag"], WEAPONS[k]["reserve"]]
 
-          func _back_to_lobby() -> void:
-              in_match = false
-              ended = false
-              if hud:
-                  hud.queue_free()
-                  hud = null
-              if world:
-                  world.queue_free()
-                  world = null
-              player = null
-              bots.clear()
-              _build_lobby()
-
-          func _setup_env(sky: bool) -> void:
-              if env_node:
-                  env_node.queue_free()
-              env_node = WorldEnvironment.new()
-              var e := Environment.new()
-              if sky:
-                  e.background_mode = Environment.BG_SKY
-                  var s := Sky.new()
-                  s.sky_material = ProceduralSkyMaterial.new()
-                  e.sky = s
-                  e.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-                  e.fog_enabled = true
-                  e.fog_density = 0.004
-              else:
-                  e.background_mode = Environment.BG_COLOR
-                  e.background_color = Color(0.1, 0.25, 0.18)
-                  e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-                  e.ambient_light_color = Color(0.7, 0.75, 0.7)
-              env_node.environment = e
-              add_child(env_node)
-
-          # ================= MAPA =================
           func _build_map() -> void:
               obstacles.clear()
               var sun := DirectionalLight3D.new()
               sun.rotation_degrees = Vector3(-55, 30, 0)
+              sun.shadow_enabled = true
+              sun.directional_shadow_max_distance = 150.0
+              sun.light_energy = 1.1
               world.add_child(sun)
-              _box(world, Vector3(260, 0.2, 260), Vector3(0, -0.1, 0), _mat(Color(0.42, 0.72, 0.35)))
-              _box(world, Vector3(900, 0.2, 900), Vector3(0, -0.9, 0), _mat(Color(0.23, 0.65, 0.91)))
+              _box(world, Vector3(260, 0.2, 260), Vector3(0, -0.1, 0), _grass_mat())
+              _box(world, Vector3(900, 0.2, 900), Vector3(0, -0.9, 0), _water_mat())
 
-              var walls := [Color(0.95, 0.88, 0.75), Color(0.96, 0.7, 0.42), Color(0.66, 0.85, 0.86), Color(0.85, 0.7, 0.56)]
-              var roofs := [Color(0.55, 0.24, 0.17), Color(0.24, 0.25, 0.36), Color(0.43, 0.3, 0.26)]
-              var glass := _mat(Color(0.17, 0.29, 0.37))
+              var walls := [Color(0.93, 0.87, 0.76), Color(0.9, 0.62, 0.4), Color(0.6, 0.8, 0.82), Color(0.82, 0.66, 0.52)]
+              var roofs := [Color(0.5, 0.22, 0.16), Color(0.22, 0.23, 0.33), Color(0.4, 0.28, 0.24)]
+              var glass := _m(Color(0.12, 0.18, 0.24), 0.1, 0.5, false)
+              var door := _m(Color(0.35, 0.22, 0.12), 0.7, 0.0, true)
               for i in 16:
                   var p := _random_free(24.0, 105.0)
                   var w := randf_range(6.0, 11.0)
                   var d := randf_range(6.0, 11.0)
                   var h := randf_range(4.0, 7.0)
-                  _box(world, Vector3(w, h, d), Vector3(p.x, h * 0.5, p.y), _mat(walls.pick_random()))
-                  _box(world, Vector3(w + 0.8, 0.6, d + 0.8), Vector3(p.x, h + 0.3, p.y), _mat(roofs.pick_random()))
-                  _box(world, Vector3(1.2, 1.0, 0.12), Vector3(p.x, h * 0.5, p.y + d * 0.5 + 0.02), glass)
+                  var wall_m := _m(walls.pick_random(), 0.85, 0.0, true)
+                  _box(world, Vector3(w, h, d), Vector3(p.x, h * 0.5, p.y), wall_m)
+                  _box(world, Vector3(w + 0.8, 0.6, d + 0.8), Vector3(p.x, h + 0.3, p.y), _m(roofs.pick_random(), 0.7, 0.0, true))
+                  for sz in [-1.0, 1.0]:
+                      for sx in [-0.28, 0.28]:
+                          _box(world, Vector3(1.2, 1.1, 0.08), Vector3(p.x + sx * w, h * 0.55, p.y + sz * (d * 0.5 + 0.03)), glass)
+                  _box(world, Vector3(1.1, 2.0, 0.1), Vector3(p.x, 1.0, p.y + d * 0.5 + 0.04), door)
                   _collider(Vector3(w, h, d), Vector3(p.x, h * 0.5, p.y))
                   obstacles.append(Rect2(p.x - w * 0.5 - 0.4, p.y - d * 0.5 - 0.4, w + 0.8, d + 0.8))
 
-              var leaf_cols := [Color(0.18, 0.55, 0.22), Color(0.24, 0.61, 0.29), Color(0.15, 0.48, 0.21)]
-              var trunk_m := _mat(Color(0.42, 0.27, 0.14))
+              var leaf_cols := [Color(0.16, 0.45, 0.2), Color(0.2, 0.52, 0.25), Color(0.13, 0.38, 0.18)]
+              var trunk := _m(Color(0.36, 0.24, 0.14), 0.95, 0.0, true)
               for i in 90:
                   var p := _random_free(10.0, 118.0)
-                  if not _is_free(p, 1.0):
+                  if not _is_free(p, 1.2):
                       continue
-                  _box(world, Vector3(0.5, 2.4, 0.5), Vector3(p.x, 1.2, p.y), trunk_m)
+                  var cyl := MeshInstance3D.new()
+                  var cm := CylinderMesh.new()
+                  cm.top_radius = 0.16
+                  cm.bottom_radius = 0.22
+                  cm.height = 2.4
+                  cyl.mesh = cm
+                  cyl.material_override = trunk
+                  cyl.position = Vector3(p.x, 1.2, p.y)
+                  world.add_child(cyl)
+                  _sph(world, 1.6, Vector3(p.x, 3.4, p.y), _m(leaf_cols.pick_random(), 0.9, 0.0, true))
+                  _sph(world, 1.1, Vector3(p.x + 0.5, 4.1, p.y - 0.3), _m(leaf_cols.pick_random(), 0.9, 0.0, true))
                   _collider(Vector3(0.5, 2.4, 0.5), Vector3(p.x, 1.2, p.y))
-                  _sphere(world, randf_range(1.4, 2.0), Vector3(p.x, 3.4, p.y), _mat(leaf_cols.pick_random()))
-                  obstacles.append(Rect2(p.x - 0.45, p.y - 0.45, 0.9, 0.9))
+                  obstacles.append(Rect2(p.x - 0.5, p.y - 0.5, 1.0, 1.0))
 
+              var rock_m := _m(Color(0.5, 0.53, 0.56), 0.9, 0.0, true)
               for i in 40:
                   var p := _random_free(10.0, 112.0)
                   if not _is_free(p, 1.0):
                       continue
                   var r := randf_range(0.9, 1.5)
-                  var rock := _sphere(world, r, Vector3(p.x, r * 0.6, p.y), _mat(Color(0.5, 0.53, 0.56)))
-                  rock.scale = Vector3(1.0, 0.7, 1.0)
-                  _collider(Vector3(r * 1.8, r * 1.2, r * 1.8), Vector3(p.x, r * 0.6, p.y))
+                  _sph(world, r, Vector3(p.x, r * 0.5, p.y), rock_m, Vector3(1.0, 0.7, 1.0))
+                  _collider(Vector3(r * 1.8, r * 1.0, r * 1.8), Vector3(p.x, r * 0.5, p.y))
                   obstacles.append(Rect2(p.x - r * 0.9, p.y - r * 0.9, r * 1.8, r * 1.8))
 
+              var bush_m := _m(Color(0.22, 0.5, 0.2), 0.95, 0.0, true)
+              for i in 40:
+                  var p := _random_free(8.0, 110.0)
+                  _sph(world, randf_range(0.5, 0.8), Vector3(p.x, 0.4, p.y), bush_m, Vector3(1.0, 0.7, 1.0))
+
               zone_mesh = MeshInstance3D.new()
-              var cyl := CylinderMesh.new()
-              cyl.top_radius = 1.0
-              cyl.bottom_radius = 1.0
-              cyl.height = 14.0
-              zone_mesh.mesh = cyl
-              zone_mesh.material_override = _mat_alpha(Color(1, 0.17, 0.23, 0.35))
+              var zc := CylinderMesh.new()
+              zc.top_radius = 1.0
+              zc.bottom_radius = 1.0
+              zc.height = 14.0
+              zone_mesh.mesh = zc
+              zone_mesh.material_override = _alpha_mat(Color(1.0, 0.2, 0.25, 0.28))
               zone_mesh.position.y = 7.0
               zone_mesh.scale = Vector3(zone_radius, 1.0, zone_radius)
               world.add_child(zone_mesh)
@@ -464,47 +1062,6 @@ jobs:
               body.add_child(cs)
               body.position = pos
               world.add_child(body)
-
-          func _box(parent: Node, size: Vector3, pos: Vector3, m: Material) -> MeshInstance3D:
-              var mi := MeshInstance3D.new()
-              var bm := BoxMesh.new()
-              bm.size = size
-              mi.mesh = bm
-              mi.material_override = m
-              mi.position = pos
-              parent.add_child(mi)
-              return mi
-
-          func _sphere(parent: Node, r: float, pos: Vector3, m: Material) -> MeshInstance3D:
-              var mi := MeshInstance3D.new()
-              var sm := SphereMesh.new()
-              sm.radius = r
-              sm.height = r * 2.0
-              mi.mesh = sm
-              mi.material_override = m
-              mi.position = pos
-              parent.add_child(mi)
-              return mi
-
-          func _mat(c: Color) -> StandardMaterial3D:
-              var k := c.to_html()
-              if not _mats.has(k):
-                  var m := StandardMaterial3D.new()
-                  m.albedo_color = c
-                  m.roughness = 0.85
-                  _mats[k] = m
-              return _mats[k]
-
-          func _unlit(c: Color) -> StandardMaterial3D:
-              var m := StandardMaterial3D.new()
-              m.albedo_color = c
-              m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-              return m
-
-          func _mat_alpha(c: Color) -> StandardMaterial3D:
-              var m := _unlit(c)
-              m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-              return m
 
           func _is_free(p: Vector2, r: float) -> bool:
               if p.length() > MAP_LIMIT - r:
@@ -537,16 +1094,17 @@ jobs:
                   p.z = tz.y
               n.position = p
 
-          # ================= PERSONAJES =================
           func _spawn_player() -> void:
               var p := _random_free(30.0, 80.0)
-              player = build_character(SKINS[skin_index], "pistola", false)
+              player = _build_char(SKINS[skin_index], "pistola", false)
               player.position = Vector3(p.x, 0, p.y)
               world.add_child(player)
-              player.get_meta("st").last = player.position
+              var st: Dictionary = player.get_meta("st")
+              st["last"] = player.position
               yaw = randf() * TAU
               pitch = 0.0
               cam = Camera3D.new()
+              cam.fov = 68.0
               world.add_child(cam)
               cam.current = true
               cam_first = true
@@ -555,207 +1113,28 @@ jobs:
           func _spawn_bots() -> void:
               bots.clear()
               for i in NUM_BOTS:
-                  var b := build_character(SKINS[randi() % SKINS.size()], "rifle", true)
+                  var s: Dictionary = SKINS[randi() % SKINS.size()]
+                  var b := _build_char(s, WEAPON_ORDER[randi() % WEAPON_ORDER.size()], true)
                   var p := _random_free(20.0, 105.0)
                   b.position = Vector3(p.x, 0, p.y)
                   world.add_child(b)
-                  var st = b.get_meta("st")
-                  st.last = b.position
-                  st.wander = _random_free(10.0, 95.0)
-                  st.strafe = 1.0 if randf() < 0.5 else -1.0
+                  var st: Dictionary = b.get_meta("st")
+                  st["last"] = b.position
+                  st["wander"] = _random_free(10.0, 95.0)
+                  st["wander_t"] = randf_range(4.0, 9.0)
                   bots.append(b)
 
-          func build_character(s: Dictionary, weapon: String, is_bot: bool) -> CharacterBody3D:
-              var root := CharacterBody3D.new()
-              var anim: bool = s["type"] == "animatronic"
-              var skin_c := Color(0.94, 0.72, 0.55)
-              var vest_c := Color(0.56, 0.58, 0.61)
-              var pants_c := Color(0.23, 0.24, 0.27)
-              var boot_c := Color(0.35, 0.23, 0.12)
-              var glove_c := Color(0.22, 0.17, 0.12)
-              var dark_c := Color(0.1, 0.1, 0.1)
-              var eye_c := Color.GREEN
-              var sleeve_c := Color(0.72, 0.74, 0.76)
-              if anim:
-                  skin_c = s["color"]
-                  vest_c = s["color"].darkened(0.25)
-                  pants_c = Color(0.16, 0.16, 0.16)
-                  glove_c = Color(0.2, 0.2, 0.2)
-                  eye_c = s["eye"]
-                  sleeve_c = skin_c
-
-              var cs := CollisionShape3D.new()
-              var cap := CapsuleShape3D.new()
-              cap.radius = 0.45
-              cap.height = 2.3
-              cs.shape = cap
-              cs.position = Vector3(0, 1.15, 0)
-              root.add_child(cs)
-
-              var body := Node3D.new()
-              body.name = "Body"
-              root.add_child(body)
-
-              var legs: Array = []
-              for x in [-0.2, 0.2]:
-                  var hip := Node3D.new()
-                  hip.position = Vector3(x, 0.96, 0)
-                  body.add_child(hip)
-                  _box(hip, Vector3(0.3, 0.95, 0.32), Vector3(0, -0.475, 0), _mat(pants_c))
-                  _box(hip, Vector3(0.36, 0.22, 0.46), Vector3(0, -0.85, 0.05), _mat(boot_c))
-                  legs.append(hip)
-
-              _box(body, Vector3(0.9, 0.14, 0.52), Vector3(0, 0.98, 0), _mat(Color(0.12, 0.12, 0.12)))
-              _box(body, Vector3(0.84, 0.95, 0.46), Vector3(0, 1.45, 0), _mat(sleeve_c))
-
-              if not anim:
-                  _box(body, Vector3(0.92, 0.62, 0.54), Vector3(0, 1.42, 0.02), _mat(vest_c))
-                  _box(body, Vector3(0.5, 0.46, 0.06), Vector3(0, 1.47, 0.31), _mat(Color(0.43, 0.45, 0.48)))
-                  _box(body, Vector3(0.26, 0.3, 0.22), Vector3(-0.5, 1.0, 0.15), _mat(Color(0.97, 0.8, 0.05)))
-                  _box(body, Vector3(0.62, 0.78, 0.26), Vector3(0, 1.42, -0.38), _mat(Color(0.18, 0.2, 0.23)))
-                  _box(body, Vector3(0.2, 0.7, 0.04), Vector3(0.33, 1.42, -0.38), _mat(Color(1, 0.8, 0)))
-                  _box(body, Vector3(0.12, 0.16, 1.0), Vector3(0.2, 1.9, -0.55), _mat(dark_c))
-                  _box(body, Vector3(0.06, 0.28, 0.1), Vector3(0.5, 0.98, 0.22), _mat(Color(0.13, 0.13, 0.13)))
-                  _box(body, Vector3(0.03, 0.32, 0.06), Vector3(0.5, 0.7, 0.22), _mat(Color(0.85, 0.87, 0.9)))
-              else:
-                  _box(body, Vector3(0.64, 0.7, 0.06), Vector3(0, 1.42, 0.27), _mat(skin_c.darkened(0.2)))
-                  var bow := _mat(s["bow"] if s.has("bow") else Color(0.42, 0.17, 0.57))
-                  _box(body, Vector3(0.16, 0.12, 0.1), Vector3(-0.11, 1.75, 0.3), bow)
-                  _box(body, Vector3(0.16, 0.12, 0.1), Vector3(0.11, 1.75, 0.3), bow)
-                  _box(body, Vector3(0.07, 0.08, 0.11), Vector3(0, 1.75, 0.31), bow)
-
-              var arm_l := Node3D.new()
-              arm_l.position = Vector3(-0.63, 1.8, 0)
-              body.add_child(arm_l)
-              _box(arm_l, Vector3(0.3, 0.7, 0.3), Vector3(0, -0.35, 0), _mat(sleeve_c))
-              _box(arm_l, Vector3(0.26, 0.55, 0.26), Vector3(0, -0.97, 0), _mat(skin_c))
-              _box(arm_l, Vector3(0.28, 0.2, 0.28), Vector3(0, -1.2, 0), _mat(glove_c))
-
-              var arm_r := Node3D.new()
-              arm_r.position = Vector3(0.63, 1.8, 0)
-              arm_r.rotation.x = -1.35
-              body.add_child(arm_r)
-              _box(arm_r, Vector3(0.3, 0.6, 0.3), Vector3(0, -0.3, 0), _mat(sleeve_c))
-              _box(arm_r, Vector3(0.26, 0.5, 0.26), Vector3(0, -0.85, 0), _mat(skin_c))
-              _box(arm_r, Vector3(0.28, 0.24, 0.28), Vector3(0, -1.1, 0), _mat(glove_c))
-              var hold := Node3D.new()
-              hold.position = Vector3(0, -1.1, 0.05)
-              arm_r.add_child(hold)
-
-              var head := Node3D.new()
-              head.position = Vector3(0, 2.0, 0)
-              body.add_child(head)
-              if anim:
-                  _box(head, Vector3(0.7, 0.62, 0.56), Vector3.ZERO, _mat(skin_c))
-                  _box(head, Vector3(0.3, 0.3, 0.1), Vector3(0, -0.1, 0.32), _mat(skin_c.darkened(0.2)))
-                  _box(head, Vector3(0.14, 0.1, 0.1), Vector3(0, 0.0, 0.36), _mat(dark_c))
-                  _box(head, Vector3(0.5, 0.12, 0.3), Vector3(0, -0.22, 0.3), _mat(dark_c))
-                  for i in 5:
-                      _box(head, Vector3(0.08, 0.1, 0.04), Vector3(-0.2 + i * 0.1, -0.2, 0.33), _mat(Color(0.95, 0.95, 0.95)))
-                  for ex in [-0.15, 0.15]:
-                      _box(head, Vector3(0.1, 0.1, 0.06), Vector3(ex, 0.12, 0.33), _unlit(eye_c))
-                      _frame(head, ex, 0.12, 0.34)
-                  var ear_l := _box(head, Vector3(0.2, 0.9, 0.12), Vector3(-0.2, 0.7, 0), _mat(skin_c))
-                  ear_l.rotation.z = 0.12
-                  var ear_r := _box(head, Vector3(0.2, 0.9, 0.12), Vector3(0.2, 0.7, 0), _mat(skin_c))
-                  ear_r.rotation.z = -0.12
-              else:
-                  _box(head, Vector3(0.5, 0.5, 0.5), Vector3.ZERO, _mat(skin_c))
-                  _box(head, Vector3(0.52, 0.28, 0.52), Vector3(0, -0.16, 0), _mat(Color(0.07, 0.07, 0.07)))
-                  _box(head, Vector3(0.54, 0.12, 0.54), Vector3(0, 0.27, 0), _mat(Color(0.16, 0.11, 0.08)))
-                  for ex in [-0.12, 0.12]:
-                      _box(head, Vector3(0.11, 0.05, 0.02), Vector3(ex, 0.05, 0.26), _mat(Color(0.95, 0.95, 0.95)))
-
-              var gun := _make_gun(weapon)
-              hold.add_child(gun)
-
-              var st := {
-                  "hp": 100.0, "alive": true, "bot": is_bot, "weapon": weapon,
-                  "cd": randf_range(0.5, 1.5), "yaw": 0.0, "recoil": 0.0, "phase": 0.0,
-                  "flash_t": 0.0, "vy": 0.0, "speed": 0.0, "last": Vector3.ZERO,
-                  "wander": Vector2.ZERO, "wander_t": 0.0, "strafe": 1.0,
-                  "body": body, "legs": legs, "arm_l": arm_l, "arm_r": arm_r,
-                  "hold": hold, "gun": gun, "flash_node": gun.get_node("Flash")
-              }
-              root.set_meta("st", st)
-              return root
-
-          func _frame(p: Node, x: float, y: float, z: float) -> void:
-              var c := _mat(Color(0.07, 0.07, 0.07))
-              _box(p, Vector3(0.2, 0.035, 0.04), Vector3(x, y + 0.08, z), c)
-              _box(p, Vector3(0.2, 0.035, 0.04), Vector3(x, y - 0.08, z), c)
-              _box(p, Vector3(0.035, 0.16, 0.04), Vector3(x - 0.1, y, z), c)
-              _box(p, Vector3(0.035, 0.16, 0.04), Vector3(x + 0.1, y, z), c)
-
-          func _make_gun(kind: String) -> Node3D:
-              var g := Node3D.new()
-              var dk := _mat(Color(0.16, 0.17, 0.2))
-              var steel := _mat(Color(0.6, 0.64, 0.68))
-              var wood := _mat(Color(0.48, 0.29, 0.13))
-              if kind == "escopeta":
-                  _box(g, Vector3(0.13, 0.13, 0.9), Vector3(0, 0, 0.05), wood)
-                  _box(g, Vector3(0.1, 0.08, 0.6), Vector3(0, 0.04, 0.45), steel)
-                  _box(g, Vector3(0.12, 0.15, 0.4), Vector3(0, -0.02, -0.5), wood)
-              elif kind == "rifle":
-                  _box(g, Vector3(0.1, 0.15, 0.9), Vector3(0, 0, 0.05), dk)
-                  _box(g, Vector3(0.04, 0.05, 0.4), Vector3(0, 0.02, 0.6), steel)
-                  _box(g, Vector3(0.09, 0.2, 0.12), Vector3(0, -0.17, 0.1), dk)
-                  _box(g, Vector3(0.09, 0.14, 0.42), Vector3(0, 0, -0.45), wood)
-              else:
-                  _box(g, Vector3(0.1, 0.14, 0.36), Vector3.ZERO, dk)
-                  _box(g, Vector3(0.04, 0.04, 0.12), Vector3(0, 0.02, 0.22), steel)
-                  _box(g, Vector3(0.08, 0.22, 0.1), Vector3(0, -0.16, -0.1), dk)
-              var flash := MeshInstance3D.new()
-              var sph := SphereMesh.new()
-              sph.radius = 0.16
-              sph.height = 0.32
-              flash.mesh = sph
-              flash.material_override = _unlit(Color(1, 0.87, 0.33))
-              flash.position = Vector3(0, 0.05, 0.8)
-              flash.visible = false
-              flash.name = "Flash"
-              g.add_child(flash)
-              return g
-
-          func _equip(c: CharacterBody3D, kind: String) -> void:
-              var st = c.get_meta("st")
-              st.weapon = kind
-              if is_instance_valid(st.gun):
-                  st.gun.queue_free()
-              var g := _make_gun(kind)
-              st.hold.add_child(g)
-              st.gun = g
-              st.flash_node = g.get_node("Flash")
-
-          func _animate(st: Dictionary, delta: float, spd: float) -> void:
-              var sw: float = clampf(spd / 4.0, 0.0, 1.0)
-              st.phase += spd * delta * 1.7
-              var ph: float = st.phase
-              var k: float = min(1.0, delta * 16.0)
-              var legs: Array = st.legs
-              legs[0].rotation.x = lerpf(legs[0].rotation.x, sin(ph) * 0.8 * sw, k)
-              legs[1].rotation.x = lerpf(legs[1].rotation.x, -sin(ph) * 0.8 * sw, k)
-              st.arm_l.rotation.x = lerpf(st.arm_l.rotation.x, -sin(ph) * 0.55 * sw, k)
-              st.arm_r.rotation.x = lerpf(st.arm_r.rotation.x, -1.35 + st.recoil * 0.22, min(1.0, delta * 20.0))
-              st.body.position.y = lerpf(st.body.position.y, absf(sin(ph)) * 0.06 * sw, min(1.0, delta * 14.0))
-              st.recoil = max(0.0, st.recoil - delta * 9.0)
-              st.flash_t = max(0.0, st.flash_t - delta)
-              if is_instance_valid(st.flash_node):
-                  st.flash_node.visible = st.flash_t > 0.0
-
-          func _animate_all(delta: float) -> void:
-              for c in _all_chars():
-                  var st = c.get_meta("st")
-                  var p: Vector3 = c.position
-                  var spd := Vector2(p.x - st.last.x, p.z - st.last.z).length() / maxf(delta, 0.0001)
-                  st.last = p
-                  if st.alive:
-                      _animate(st, delta, spd)
+          func _alive_bots() -> int:
+              var n := 0
+              for b in bots:
+                  if b.get_meta("st")["alive"]:
+                      n += 1
+              return n
 
           # ================= JUGADOR =================
           func _update_player(delta: float) -> void:
-              var st = player.get_meta("st")
-              if not st.alive:
+              var st: Dictionary = player.get_meta("st")
+              if not st["alive"]:
                   return
               var mv := joy_vec
               if Input.is_key_pressed(KEY_D):
@@ -771,47 +1150,50 @@ jobs:
               if Input.is_key_pressed(KEY_RIGHT):
                   yaw -= 2.5 * delta
               mv = mv.limit_length(1.0)
-              var fwd := Vector3(sin(yaw), 0, cos(yaw))
-              var right := Vector3(-cos(yaw), 0, sin(yaw))
+              var fwd := Vector3(sin(yaw), 0.0, cos(yaw))
+              var right := Vector3(-cos(yaw), 0.0, sin(yaw))
               var dir := right * mv.x + fwd * mv.y
               if dir.length() > 0.01:
-                  _move(player, dir * 6.0 * delta)
+                  _move(player, dir * 5.5 * delta)
 
-              st.vy -= 22.0 * delta
-              var py: float = player.position.y + st.vy * delta
+              var vy: float = float(st["vy"]) - 22.0 * delta
+              var py: float = player.position.y + vy * delta
               if py <= 0.0:
                   py = 0.0
-                  st.vy = 0.0
+                  vy = 0.0
+              st["vy"] = vy
               player.position.y = py
               player.rotation.y = yaw
 
-              st.cd = max(0.0, st.cd - delta)
+              st["cd"] = maxf(0.0, float(st["cd"]) - delta)
               if reloading > 0.0:
                   reloading -= delta
                   if reloading <= 0.0:
                       _finish_reload()
-              var wants := firing or Input.is_key_pressed(KEY_F)
-              if wants and st.cd <= 0.0 and reloading <= 0.0:
-                  var k: String = st.weapon
-                  var a = ammo[k]
+              var wk: String = st["weapon"]
+              var w: Dictionary = WEAPONS[wk]
+              var wants: bool = (firing or Input.is_key_pressed(KEY_F)) and (bool(w["auto"]) or fire_edge)
+              if wants and float(st["cd"]) <= 0.0 and reloading <= 0.0:
+                  var a: Array = ammo[wk]
                   if a[0] > 0:
                       a[0] -= 1
-                      st.cd = WEAPONS[k]["rate"]
-                      st.recoil = 1.0
-                      st.flash_t = 0.05
+                      st["cd"] = w["rate"]
+                      st["recoil"] = 1.0
+                      st["flash_t"] = 0.05
                       _fire(player, cam.global_position, _aim_dir(), 1.0, 1.0)
                   else:
                       _start_reload()
+              fire_edge = false
 
           func _jump() -> void:
-              if not started or not player.get_meta("st").alive:
+              if not started or not player.get_meta("st")["alive"]:
                   return
-              var st = player.get_meta("st")
+              var st: Dictionary = player.get_meta("st")
               if player.position.y <= 0.01:
-                  st.vy = 8.5
+                  st["vy"] = 8.5
 
           func _switch_weapon(i: int) -> void:
-              if not started or not player.get_meta("st").alive:
+              if not started or not player.get_meta("st")["alive"]:
                   return
               weapon_idx = i
               reloading = 0.0
@@ -820,58 +1202,47 @@ jobs:
           func _start_reload() -> void:
               if reloading > 0.0 or not started:
                   return
-              var k: String = player.get_meta("st").weapon
-              var a = ammo[k]
-              if a[0] >= WEAPONS[k]["mag"] or a[1] <= 0:
+              var st: Dictionary = player.get_meta("st")
+              var wk: String = st["weapon"]
+              var a: Array = ammo[wk]
+              if a[0] >= WEAPONS[wk]["mag"] or a[1] <= 0:
                   return
-              reloading = WEAPONS[k]["reload"]
+              reloading = float(WEAPONS[wk]["reload"])
 
           func _finish_reload() -> void:
               reloading = 0.0
-              var k: String = player.get_meta("st").weapon
-              var a = ammo[k]
-              var take: int = min(WEAPONS[k]["mag"] - a[0], a[1])
+              var st: Dictionary = player.get_meta("st")
+              var wk: String = st["weapon"]
+              var a: Array = ammo[wk]
+              var take: int = min(int(WEAPONS[wk]["mag"]) - int(a[0]), int(a[1]))
               a[0] += take
               a[1] -= take
 
-          func _aim_dir() -> Vector3:
-              return Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch))
-
-          func _look(rel: Vector2) -> void:
-              yaw -= rel.x * 0.006
-              pitch = clampf(pitch - rel.y * 0.004, -0.5, 0.5)
-
-          func _fire_pos() -> Vector2:
-              var vs := get_viewport().get_visible_rect().size
-              return Vector2(vs.x - 110.0, vs.y - 110.0)
-
-          func _jump_pos() -> Vector2:
-              var vs := get_viewport().get_visible_rect().size
-              return Vector2(vs.x - 240.0, vs.y - 100.0)
-
-          func _weap_pos() -> Vector2:
-              var vs := get_viewport().get_visible_rect().size
-              return Vector2(vs.x - 110.0, vs.y - 240.0)
-
           # ================= DISPARO =================
-          func _fire(shooter: Node3D, origin: Vector3, dir: Vector3, spread_mul: float, dmg_mul: float) -> void:
-              var st = shooter.get_meta("st")
-              var w = WEAPONS[st.weapon]
+          func _fire(shooter: CharacterBody3D, origin: Vector3, dir: Vector3, spread_mul: float, dmg_mul: float) -> void:
+              var st: Dictionary = shooter.get_meta("st")
+              var w: Dictionary = WEAPONS[st["weapon"]]
               var space := get_world_3d().direct_space_state
-              for i in w["pellets"]:
-                  var sp: float = w["spread"] * spread_mul
+              var sp: float = float(w["spread"]) * spread_mul
+              st["flash_t"] = 0.05
+              st["recoil"] = 1.0
+              if st.has("flash") and is_instance_valid(st["flash"]):
+                  st["flash"].visible = true
+              for i in int(w["pellets"]):
                   var d: Vector3 = (dir + Vector3(randf_range(-sp, sp), randf_range(-sp, sp), randf_range(-sp, sp))).normalized()
-                  var end: Vector3 = origin + d * float(w["dist"])
-                  var q := PhysicsRayQueryParameters3D.create(origin, end)
+                  var endp: Vector3 = origin + d * float(w["dist"])
+                  var q := PhysicsRayQueryParameters3D.create(origin, endp)
                   q.exclude = [shooter.get_rid()]
-                  var hit := space.intersect_ray(q)
+                  var hit: Dictionary = space.intersect_ray(q)
                   if not hit.is_empty():
-                      end = hit.position
-                      var col: Node3D = hit.collider
-                      if col != shooter and col.has_meta("st"):
-                          if col.get_meta("st").alive:
+                      endp = hit["position"]
+                      var col = hit["collider"]
+                      if col is CharacterBody3D and col != shooter and col.has_meta("st"):
+                          if col.get_meta("st")["alive"]:
                               _damage(col, float(w["dmg"]) * dmg_mul, shooter)
-                  _tracer(origin, end, not st.bot)
+                              if shooter == player:
+                                  hit_t = 0.18
+                  _tracer(origin, endp, shooter == player)
 
           func _tracer(a: Vector3, b: Vector3, mine: bool) -> void:
               var mi := MeshInstance3D.new()
@@ -881,24 +1252,22 @@ jobs:
               im.surface_add_vertex(b)
               im.surface_end()
               mi.mesh = im
-              mi.material_override = _unlit(Color(1, 0.9, 0.4) if mine else Color(1, 0.4, 0.4))
+              mi.material_override = _unlit(Color(1.0, 0.9, 0.45) if mine else Color(1.0, 0.45, 0.4))
               world.add_child(mi)
-              get_tree().create_timer(0.07).timeout.connect(func():
-                  if is_instance_valid(mi):
-                      mi.queue_free())
+              get_tree().create_timer(0.06).timeout.connect(mi.queue_free)
 
-          func _damage(c: Node3D, amt: float, by: Node3D) -> void:
-              var st = c.get_meta("st")
-              if not st.alive:
+          func _damage(c: CharacterBody3D, amt: float, by) -> void:
+              var st: Dictionary = c.get_meta("st")
+              if not st["alive"]:
                   return
-              st.hp -= amt
+              st["hp"] = float(st["hp"]) - amt
               if c == player:
-                  hurt_rect.color = Color(1, 0, 0, 0.35)
-                  shake = min(0.5, shake + 0.2)
-              if st.hp > 0.0:
+                  hud_hurt.color = Color(0.9, 0.05, 0.05, 0.4)
+                  shake = minf(0.4, shake + 0.15)
+              if float(st["hp"]) > 0.0:
                   return
-              st.hp = 0.0
-              st.alive = false
+              st["hp"] = 0.0
+              st["alive"] = false
               var t := create_tween()
               t.tween_property(c, "rotation:x", -PI / 2.0, 0.35).set_trans(Tween.TRANS_QUAD)
               if c == player:
@@ -911,54 +1280,45 @@ jobs:
           # ================= BOTS =================
           func _update_bots(delta: float) -> void:
               var pp: Vector3 = player.position
-              var pl_alive: bool = player.get_meta("st").alive
+              var pl_alive: bool = player.get_meta("st")["alive"]
               for b in bots:
-                  var st = b.get_meta("st")
-                  if not st.alive:
+                  var st: Dictionary = b.get_meta("st")
+                  if not st["alive"]:
                       continue
                   var p: Vector3 = b.position
                   var to := Vector2(pp.x - p.x, pp.z - p.z)
                   var d := to.length()
-                  var dirv := to.normalized()
-                  st.cd -= delta
+                  var dirv := to / maxf(d, 0.001)
+                  st["cd"] = float(st["cd"]) - delta
                   if pl_alive and d < 42.0:
-                      st.yaw = atan2(dirv.x, dirv.y)
-                      var step := 3.2 * delta
+                      st["yaw"] = atan2(dirv.x, dirv.y)
+                      var step := 3.0 * delta
+                      var mv := Vector2.ZERO
                       if d > 18.0:
-                          _move(b, Vector3(dirv.x, 0, dirv.y) * step)
+                          mv = dirv * step
                       elif d < 9.0:
-                          _move(b, -Vector3(dirv.x, 0, dirv.y) * step)
+                          mv = -dirv * step
                       else:
-                          var perp: Vector2 = Vector2(-dirv.y, dirv.x) * st.strafe
-                          _move(b, Vector3(perp.x, 0, perp.y) * step)
-                      if st.cd <= 0.0:
-                          var origin: Vector3 = p + Vector3(0, 2.0, 0) + Vector3(sin(st.yaw), 0, cos(st.yaw)) * 0.6
-                          var target: Vector3 = pp + Vector3(0, 1.3, 0)
+                          mv = Vector2(-dirv.y, dirv.x) * float(st["strafe"]) * step
+                      _move(b, Vector3(mv.x, 0.0, mv.y))
+                      if float(st["cd"]) <= 0.0:
+                          var bf := Vector3(sin(st["yaw"]), 0.0, cos(st["yaw"]))
+                          var origin := p + Vector3(0, 2.0, 0) + bf * 0.6
+                          var target := pp + Vector3(0, 1.3, 0)
                           _fire(b, origin, (target - origin).normalized(), 2.2, 0.6)
-                          st.cd = randf_range(0.7, 1.4)
+                          st["cd"] = randf_range(0.7, 1.4)
                   else:
-                      st.wander_t -= delta
-                      var wp: Vector2 = st.wander
-                      if st.wander_t <= 0.0 or Vector2(p.x, p.z).distance_to(wp) < 1.0:
-                          st.wander = _random_free(10.0, 95.0)
-                          st.wander_t = randf_range(4.0, 9.0)
-                          wp = st.wander
-                      var tw: Vector2 = (wp - Vector2(p.x, p.z)).normalized()
-                      _move(b, Vector3(tw.x, 0, tw.y) * 2.2 * delta)
-                      st.yaw = atan2(tw.x, tw.y)
-                  b.rotation.y = lerp_angle(b.rotation.y, st.yaw, min(1.0, delta * 8.0))
-
-          func _alive_bots() -> int:
-              var n := 0
-              for b in bots:
-                  if b.get_meta("st").alive:
-                      n += 1
-              return n
-
-          func _all_chars() -> Array:
-              var arr: Array = [player]
-              arr.append_array(bots)
-              return arr
+                      st["wander_t"] = float(st["wander_t"]) - delta
+                      var wp: Vector2 = st["wander"]
+                      if float(st["wander_t"]) <= 0.0 or Vector2(p.x, p.z).distance_to(wp) < 1.0:
+                          st["wander"] = _random_free(10.0, 95.0)
+                          st["wander_t"] = randf_range(4.0, 9.0)
+                          wp = st["wander"]
+                      var tw := wp - Vector2(p.x, p.z)
+                      var tn := tw / maxf(tw.length(), 0.001)
+                      _move(b, Vector3(tn.x, 0.0, tn.y) * 2.0 * delta)
+                      st["yaw"] = atan2(tn.x, tn.y)
+                  b.rotation.y = lerp_angle(b.rotation.y, float(st["yaw"]), minf(1.0, delta * 8.0))
 
           # ================= ZONA =================
           func _update_zone(delta: float) -> void:
@@ -966,69 +1326,73 @@ jobs:
                   zone_target = ZONE_PHASES[zone_phase][1]
                   zone_phase += 1
                   _feed("La zona se reduce")
-              zone_radius = lerpf(zone_radius, zone_target, min(1.0, delta * 0.35))
+              zone_radius = lerpf(zone_radius, zone_target, minf(1.0, delta * 0.35))
               zone_mesh.scale = Vector3(zone_radius, 1.0, zone_radius)
               for c in _all_chars():
                   var p: Vector3 = c.position
                   if Vector2(p.x, p.z).length() > zone_radius:
                       _damage(c, (3.0 if c == player else 4.0) * delta, null)
 
+          func _show_end(win: bool) -> void:
+              if ended:
+                  return
+              ended = true
+              firing = false
+              end_title.text = "VICTORIA" if win else "ELIMINADO"
+              var s := int(match_time)
+              end_sub.text = "Eliminaciones: %d    Tiempo: %d:%02d" % [kills, s / 60, s % 60]
+              end_panel.visible = true
+
           # ================= CÁMARA =================
           func _update_camera(delta: float) -> void:
-              if not player or not cam:
+              if player == null or cam == null:
                   return
               var pp: Vector3 = player.position
-              var pivot := pp + Vector3(0, 2.4, 0)
-              var flat := Vector3(sin(yaw), 0, cos(yaw))
-              var desired := pivot - flat * 6.5 + Vector3.UP * (1.2 + pitch * 3.0)
+              var pivot := pp + Vector3(0, 1.6, 0)
+              var flat := Vector3(sin(yaw), 0.0, cos(yaw))
+              var right := Vector3(-cos(yaw), 0.0, sin(yaw))
+              var desired := pivot - flat * 4.2 + right * 0.6 + Vector3.UP * (0.7 + pitch * 2.0)
               var q := PhysicsRayQueryParameters3D.create(pivot, desired)
               q.exclude = [player.get_rid()]
-              var hit := get_world_3d().direct_space_state.intersect_ray(q)
+              var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(q)
               if not hit.is_empty():
-                  var hp: Vector3 = hit.position
-                  desired = hp + (pivot - hp).normalized() * 0.3
+                  var hp: Vector3 = hit["position"]
+                  desired = hp + (pivot - hp).normalized() * 0.25
               if cam_first:
                   cam.global_position = desired
                   cam_first = false
               else:
                   cam.global_position = cam.global_position.lerp(desired, minf(1.0, delta * 14.0))
               if shake > 0.0:
-                  cam.global_position += Vector3(randf_range(-1, 1), randf_range(-1, 1), 0) * shake * 0.2
-                  shake = max(0.0, shake - delta * 2.2)
+                  cam.global_position += Vector3(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0), 0.0) * shake * 0.15
+                  shake = maxf(0.0, shake - delta * 2.2)
               cam.look_at(pivot + _aim_dir() * 10.0, Vector3.UP)
 
           # ================= HUD =================
           func _build_hud() -> void:
-              var vs := get_viewport().get_visible_rect().size
+              var v := _vs()
+              sb_panel = _sbox(Color(0.02, 0.05, 0.04, 0.55), 14, Color(1, 1, 1, 0.08), 1)
+              sb_slot = _sbox(Color(0.02, 0.04, 0.03, 0.6), 10, Color(1, 1, 1, 0.25), 2)
+              sb_on = _sbox(Color(0.1, 0.08, 0.02, 0.7), 10, Color(1.0, 0.7, 0.1), 3)
+              sb_red = _sbox(Color(0.8, 0.15, 0.15, 0.85), 16)
+
               hud = CanvasLayer.new()
               add_child(hud)
+
+              hud_hurt = ColorRect.new()
+              hud_hurt.set_anchors_preset(Control.PRESET_FULL_RECT)
+              hud_hurt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+              hud_hurt.color = Color(0.9, 0.05, 0.05, 0.0)
+              hud.add_child(hud_hurt)
 
               overlay = Control.new()
               overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
               overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
               hud.add_child(overlay)
-              overlay.draw.connect(_draw_overlay)
-
-              hurt_rect = ColorRect.new()
-              hurt_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
-              hurt_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-              hurt_rect.color = Color(1, 0, 0, 0)
-              hud.add_child(hurt_rect)
-
-              hud_hp = ProgressBar.new()
-              hud_hp.position = Vector2(20, 20)
-              hud_hp.size = Vector2(260, 22)
-              hud_hp.max_value = 100.0
-              hud_hp.show_percentage = false
-              hud.add_child(hud_hp)
-
-              hud_top = _label(hud, Vector2(20, 50), 20, HORIZONTAL_ALIGNMENT_LEFT, Vector2(500, 30))
-              hud_ammo = _label(hud, Vector2(vs.x - 380, vs.y - 90), 26, HORIZONTAL_ALIGNMENT_RIGHT, Vector2(360, 40))
-              feed_label = _label(hud, Vector2(vs.x - 420, 20), 18, HORIZONTAL_ALIGNMENT_RIGHT, Vector2(400, 30))
-              hud_msg = _label(hud, Vector2(vs.x * 0.5 - 300, vs.y * 0.3), 96, HORIZONTAL_ALIGNMENT_CENTER, Vector2(600, 140))
+              overlay.draw.connect(_draw_hud)
 
               end_panel = VBoxContainer.new()
-              end_panel.position = Vector2(vs.x * 0.5 - 200, vs.y * 0.22)
+              end_panel.position = Vector2(v.x * 0.5 - 200.0, v.y * 0.22)
               end_panel.custom_minimum_size = Vector2(400, 0)
               end_panel.add_theme_constant_override("separation", 14)
               end_panel.visible = false
@@ -1045,73 +1409,150 @@ jobs:
               back.text = "VOLVER AL LOBBY"
               back.custom_minimum_size = Vector2(340, 70)
               back.add_theme_font_size_override("font_size", 24)
+              back.add_theme_stylebox_override("normal", _sbox(Color(1.0, 0.6, 0.1), 16))
+              back.add_theme_color_override("font_color", Color.BLACK)
               back.pressed.connect(_back_to_lobby)
               end_panel.add_child(back)
 
-          func _label(parent: Node, pos: Vector2, fsize: int, align: HorizontalAlignment, sz: Vector2) -> Label:
-              var l := Label.new()
-              l.position = pos
-              l.size = sz
-              l.horizontal_alignment = align
-              l.add_theme_font_size_override("font_size", fsize)
-              l.add_theme_color_override("font_outline_color", Color.BLACK)
-              l.add_theme_constant_override("outline_size", 6)
-              parent.add_child(l)
-              return l
+          func _txt(pos: Vector2, s: String, fs: int, col: Color, align: HorizontalAlignment = HORIZONTAL_ALIGNMENT_LEFT, w: float = -1.0) -> void:
+              var f := ThemeDB.fallback_font
+              overlay.draw_string(f, pos + Vector2(1.5, 1.5), s, align, w, fs, Color(0, 0, 0, 0.7))
+              overlay.draw_string(f, pos, s, align, w, fs, col)
+
+          func _btn(c: Vector2, r: float, label: String, fs: int, col: Color) -> void:
+              overlay.draw_circle(c, r, col)
+              overlay.draw_arc(c, r, 0.0, TAU, 40, Color(1, 1, 1, 0.75), 2.5)
+              _txt(Vector2(c.x - r, c.y + fs * 0.35), label, fs, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, r * 2.0)
 
           func _update_hud(delta: float) -> void:
               if msg_t > 0.0:
                   msg_t -= delta
                   if msg_t <= 0.0:
-                      hud_msg.text = ""
-              if feed_t > 0.0:
-                  feed_t -= delta
-                  if feed_t <= 0.0:
-                      feed_label.text = ""
-              var st = player.get_meta("st")
-              hud_hp.value = st.hp
-              var alive: int = _alive_bots() + (1 if st.alive else 0)
-              hud_top.text = "Vivos: %d     Eliminaciones: %d     Zona: %d m" % [alive, kills, int(zone_radius)]
-              var k: String = st.weapon
-              var a = ammo[k]
-              var rec := "  RECARGANDO" if reloading > 0.0 else ""
-              hud_ammo.text = "%s   %d / %d%s" % [WEAPONS[k]["name"], a[0], a[1], rec]
-              hurt_rect.color = Color(1, 0, 0, max(0.0, hurt_rect.color.a - delta * 1.5))
+                      msg_text = ""
+              if hit_t > 0.0:
+                  hit_t -= delta
+              var hc: Color = hud_hurt.color
+              hc.a = maxf(0.0, hc.a - delta * 1.4)
+              hud_hurt.color = hc
+              for i in range(feed_items.size() - 1, -1, -1):
+                  feed_items[i]["life"] -= delta
+                  if feed_items[i]["life"] <= 0.0:
+                      feed_items.remove_at(i)
 
           func _msg(t: String, dur: float) -> void:
-              hud_msg.text = t
+              msg_text = t
               msg_t = dur
 
           func _feed(t: String) -> void:
-              feed_label.text = t
-              feed_t = 3.0
+              feed_items.push_front({"t": t, "life": 3.5})
+              while feed_items.size() > 4:
+                  feed_items.pop_back()
 
-          func _show_end(win: bool) -> void:
-              if ended:
+          func _draw_hud() -> void:
+              if not in_match or player == null or overlay == null:
                   return
-              ended = true
-              end_title.text = "VICTORIA" if win else "ELIMINADO"
-              var s := int(match_time)
-              end_sub.text = "Eliminaciones: %d    Tiempo: %d:%02d" % [kills, s / 60, s % 60]
-              end_panel.visible = true
+              var v := _vs()
+              var st: Dictionary = player.get_meta("st")
+              var hpf: float = clampf(float(st["hp"]) / 100.0, 0.0, 1.0)
 
-          func _draw_overlay() -> void:
-              var vs := get_viewport().get_visible_rect().size
-              var c := vs * 0.5
-              overlay.draw_circle(c, 2.5, Color(1, 1, 1, 0.9))
-              overlay.draw_arc(c, 10.0, 0.0, TAU, 24, Color(1, 1, 1, 0.5), 1.5)
+              # Panel de vida
+              overlay.draw_style_box(sb_panel, Rect2(16, 16, 330, 84))
+              var sk: Dictionary = SKINS[skin_index]
+              overlay.draw_circle(Vector2(60, 58), 28.0, _skin_col(sk))
+              overlay.draw_arc(Vector2(60, 58), 28.0, 0.0, TAU, 32, Color.WHITE, 3.0)
+              _txt(Vector2(100, 40), "VIDA", 14, Color(0.8, 0.95, 0.85))
+              overlay.draw_rect(Rect2(100, 46, 236, 16), Color(0, 0, 0, 0.6))
+              var hc := Color(0.35, 1.0, 0.35).lerp(Color(1.0, 0.25, 0.2), 1.0 - hpf)
+              overlay.draw_rect(Rect2(100, 46, 236.0 * hpf, 16), hc)
+              _txt(Vector2(100, 88), str(ceili(float(st["hp"]))), 20, Color.WHITE)
+
+              # Vivos y zona
+              var alive: int = _alive_bots() + (1 if st["alive"] else 0)
+              overlay.draw_style_box(sb_panel, Rect2(v.x * 0.5 - 110.0, 14, 220, 40))
+              _txt(Vector2(v.x * 0.5 - 110.0, 41), "VIVOS  %d" % alive, 20, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 220.0)
+              overlay.draw_style_box(sb_red, Rect2(v.x * 0.5 - 110.0, 60, 220, 32))
+              var zt := "ZONA FINAL"
+              if zone_phase < ZONE_PHASES.size():
+                  zt = "ZONA  %ds" % maxi(0, ceili(float(ZONE_PHASES[zone_phase][0]) - match_time))
+              _txt(Vector2(v.x * 0.5 - 110.0, 82), zt, 17, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 220.0)
+
+              # Minimapa
+              _draw_minimap(Vector2(v.x - 92.0, 96.0), 74.0)
+
+              # Feed
+              var fy := 204.0
+              for item in feed_items:
+                  var a: float = clampf(float(item["life"]), 0.0, 1.0)
+                  _txt(Vector2(v.x - 326.0, fy), item["t"], 16, Color(1, 1, 1, a), HORIZONTAL_ALIGNMENT_RIGHT, 300.0)
+                  fy += 24.0
+
+              # Mira
+              var c := v * 0.5
+              var gap := 6.0 + (8.0 if (firing and WEAPONS[st["weapon"]]["auto"]) else 0.0)
+              var wc := Color(1, 1, 1, 0.9)
+              overlay.draw_line(c + Vector2(-gap - 9, 0), c + Vector2(-gap, 0), wc, 2.0)
+              overlay.draw_line(c + Vector2(gap, 0), c + Vector2(gap + 9, 0), wc, 2.0)
+              overlay.draw_line(c + Vector2(0, -gap - 9), c + Vector2(0, -gap), wc, 2.0)
+              overlay.draw_line(c + Vector2(0, gap), c + Vector2(0, gap + 9), wc, 2.0)
+              if hit_t > 0.0:
+                  var hcol := Color(1, 0.25, 0.25, 0.95)
+                  overlay.draw_line(c + Vector2(-7, -7), c + Vector2(7, 7), hcol, 2.5)
+                  overlay.draw_line(c + Vector2(7, -7), c + Vector2(-7, 7), hcol, 2.5)
+
+              # Joystick flotante
               if joy_id != -1:
-                  overlay.draw_circle(joy_origin, 60.0, Color(1, 1, 1, 0.12))
-                  overlay.draw_arc(joy_origin, 60.0, 0.0, TAU, 40, Color(1, 1, 1, 0.4), 2.0)
-                  overlay.draw_circle(joy_origin + Vector2(joy_vec.x, -joy_vec.y) * 60.0, 24.0, Color(1, 1, 1, 0.6))
-              _draw_btn(_fire_pos(), 60.0, "FUEGO", Color(0.85, 0.25, 0.12, 0.85))
-              _draw_btn(_jump_pos(), 44.0, "SALTAR", Color(0, 0, 0, 0.5))
-              _draw_btn(_weap_pos(), 34.0, "ARMA", Color(0, 0, 0, 0.5))
+                  overlay.draw_circle(joy_origin, JOY_R, Color(1, 1, 1, 0.1))
+                  overlay.draw_arc(joy_origin, JOY_R, 0.0, TAU, 40, Color(1, 1, 1, 0.45), 2.0)
+                  overlay.draw_circle(joy_origin + Vector2(joy_vec.x, -joy_vec.y) * JOY_R, 26.0, Color(1, 1, 1, 0.6))
 
-          func _draw_btn(p: Vector2, r: float, txt: String, col: Color) -> void:
-              overlay.draw_circle(p, r, col)
-              overlay.draw_arc(p, r, 0.0, TAU, 32, Color(1, 1, 1, 0.7), 3.0)
-              overlay.draw_string(ThemeDB.fallback_font, p + Vector2(-r, 6.0), txt, HORIZONTAL_ALIGNMENT_CENTER, r * 2.0, 16, Color.WHITE)
+              # Botones
+              _btn(_fire_c(), FIRE_R, "FUEGO", 20, Color(0.92, 0.3, 0.1, 0.9))
+              _btn(_jump_c(), JUMP_R, "SALTAR", 12, Color(0.08, 0.1, 0.1, 0.75))
+              _btn(_reload_c(), RELOAD_R, "RECARGAR", 10, Color(0.08, 0.1, 0.1, 0.75))
+              _btn(_arma_c(), ARMA_R, "ARMA", 11, Color(0.08, 0.1, 0.1, 0.75))
+
+              # Panel de munición
+              var ar := _ammo_rect()
+              overlay.draw_style_box(sb_panel, ar)
+              var wk: String = st["weapon"]
+              var a: Array = ammo[wk]
+              _txt(Vector2(ar.position.x + 14, ar.position.y + 20), WEAPONS[wk]["name"], 14, Color(1, 0.85, 0.4))
+              _txt(Vector2(ar.position.x + 14, ar.position.y + 46), "%d / %d" % [a[0], a[1]], 26, Color.WHITE)
+              if reloading > 0.0:
+                  _txt(Vector2(ar.position.x + 150, ar.position.y + 20), "RECARGANDO", 12, Color(1, 0.6, 0.3))
+
+              # Ranuras de arma
+              var short := ["PIST", "RIFLE", "ESC"]
+              for i in 3:
+                  var sr := _slot_rect(i)
+                  var sb: StyleBoxFlat = sb_on if i == weapon_idx else sb_slot
+                  overlay.draw_style_box(sb, sr)
+                  _txt(Vector2(sr.position.x + 8, sr.position.y + 17), str(i + 1) + " " + short[i], 12, Color.WHITE)
+                  var wa: Array = ammo[WEAPON_ORDER[i]]
+                  _txt(Vector2(sr.position.x + 8, sr.position.y + 36), str(wa[0]), 14, Color(1, 0.9, 0.5))
+
+              # Mensaje central
+              if msg_t > 0.0 and msg_text != "":
+                  _txt(Vector2(v.x * 0.5 - 300.0, v.y * 0.36), msg_text, 96, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 600.0)
+
+          func _draw_minimap(c: Vector2, R: float) -> void:
+              var k := R / 125.0
+              overlay.draw_circle(c, R + 3.0, Color(1, 1, 1, 0.85))
+              overlay.draw_circle(c, R, Color(0.12, 0.3, 0.45, 0.95))
+              overlay.draw_circle(c, MAP_LIMIT * k, Color(0.45, 0.7, 0.35, 0.95))
+              overlay.draw_arc(c, zone_radius * k, 0.0, TAU, 60, Color(1, 0.25, 0.25), 2.5)
+              for b in bots:
+                  if b.get_meta("st")["alive"]:
+                      var bp: Vector3 = b.position
+                      overlay.draw_circle(c + Vector2(bp.x, bp.z) * k, 2.5, Color(1, 0.3, 0.3))
+              var pf := Vector2(sin(yaw), cos(yaw))
+              var pp2 := Vector2(-pf.y, pf.x)
+              var pp: Vector3 = player.position
+              var pc := c + Vector2(pp.x, pp.z) * k
+              overlay.draw_colored_polygon(PackedVector2Array([pc + pf * 9.0, pc - pf * 6.0 + pp2 * 6.0, pc - pf * 6.0 - pp2 * 6.0]), Color(1, 0.9, 0.3))
+
+          func _fire_pos_unused() -> void:
+              pass
           EOF
 
       - name: Exportar APK con Godot

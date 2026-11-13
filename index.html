@@ -337,7 +337,6 @@ let diff = 'normal', state = 'menu';
 let keys = [], keyMeshes = [], keyGroup = null;
 let keysGot = 0, battery = 100, stamina = 100, flashOn = true, elapsed = 0;
 let heartT = 0, voiceT = 12, curRoom = -1, caughtTime = 0;
-let animSpecialTime = 0, animSpecial = '', recoverAnimTime = 0, wasStunned = false, idleCueTime = 4, idleAnimLeft = 0, idleAnimName = '';
 const input = {};
 const player = { x: START[0] * CELL, z: START[1] * CELL, yaw: -Math.PI / 2, pitch: 0 };
 const EXIT = { x: 74, z: 35 };
@@ -347,22 +346,10 @@ const keyIcons = [...document.querySelectorAll('#keysRow .kico')];
 function lock() { if (!IS_TOUCH) $('c').requestPointerLock(); }
 function setTC(on) { $('tc').style.display = (IS_TOUCH && on) ? 'block' : 'none'; if (!on) resetTouchState(); }
 
-// ---------- Animaciones de Bonnie ----------
-let mixer = null, curAnim = null;
-const clips = {};
-const bonnieRig = { root: null, bones: {}, list: [], legs: [] };
+// ---------- Movimiento procedural e IK de Bonnie ----------
+const bonnieRig = { root: null, bones: {}, list: [], legs: [], arms: [] };
 let proceduralClock = 0;
 const springDisplay = { group: null, root: null, bones: {}, list: [], jaw: null, head: null, baseY: 0.63, time: 0 };
-function playAnim(name) {
-  if (!mixer || curAnim === name || !clips[name]) return;
-  const next = mixer.clipAction(clips[name]);
-  next.reset();
-  if (name === 'Jumpscare') { next.setLoop(THREE.LoopOnce, 1); next.clampWhenFinished = true; }
-  else next.setLoop(THREE.LoopRepeat, Infinity);
-  if (curAnim) mixer.clipAction(clips[curAnim]).fadeOut(0.25);
-  next.fadeIn(0.25).play();
-  curAnim = name;
-}
 function restoreProceduralPose() {
   for (const bone of bonnieRig.list) if (bone.userData.btRestQuat) bone.quaternion.copy(bone.userData.btRestQuat);
 }
@@ -388,12 +375,14 @@ function solveTwoBoneIK(upper, lower, end, targetWorld, weight) {
 }
 function applyProceduralRobot(dt) {
   if (!bonnieRig.root || !bonnieRig.list.length) return;
-  const active = state === 'playing' && bonnie.active;
-  const weight = active ? (bonnie.stun > 0 ? 0.22 : 0.76) : (state === 'playing' ? 0.15 : 0);
+  restoreProceduralPose();
+  const active = bonnie.active && (state === 'playing' || state === 'caught' || state === 'gameover');
+  const isGameplay = state === 'playing' || state === 'caught' || state === 'gameover';
+  const weight = active ? (bonnie.stun > 0 ? 0.22 : 0.76) : (isGameplay ? 0.15 : 0);
   if (weight <= 0) return;
   proceduralClock += dt;
   const t = proceduralClock, freq = active ? 7.4 : 1.8;
-  // Servo-like head, torso and arm offsets layered on top of the authored GLB clips.
+  // Servo-like head, torso and arm offsets are generated procedurally; no authored clips are played.
   const offsets = [
     ['Spine_Bn_09', 0.025 * Math.sin(t * freq), 0.018 * Math.sin(t * freq * 0.61), 0],
     ['Neck_Bn_021', 0.035 * Math.sin(t * freq * 0.71 + 1), 0.055 * Math.sin(t * 0.8), 0],
@@ -419,6 +408,18 @@ function applyProceduralRobot(dt) {
       leg.targetLocal.y += Math.max(0, Math.cos(p)) * 0.09;
       leg.targetWorld.copy(leg.targetLocal).applyMatrix4(bonnieRig.root.matrixWorld);
       solveTwoBoneIK(leg.upper, leg.lower, leg.end, leg.targetWorld, weight);
+    }
+    // Real upper/lower arm chains use the same IK solver for restrained servo-like gestures.
+    for (let i = 0; i < bonnieRig.arms.length; i++) {
+      const arm = bonnieRig.arms[i];
+      if (!arm.upper || !arm.lower || !arm.end) continue;
+      arm.end.getWorldPosition(arm.originWorld);
+      arm.targetLocal.copy(arm.originWorld).applyMatrix4(bonnieRig.inverseRoot);
+      const phase = t * 1.25 + (i ? Math.PI : 0);
+      arm.targetLocal.z += Math.sin(phase) * 0.045;
+      arm.targetLocal.y += (0.035 + Math.cos(phase) * 0.025) * (bonnie.stun > 0 ? 0.25 : 1);
+      arm.targetWorld.copy(arm.targetLocal).applyMatrix4(bonnieRig.root.matrixWorld);
+      solveTwoBoneIK(arm.upper, arm.lower, arm.end, arm.targetWorld, weight * 0.68);
     }
   }
 }
@@ -703,30 +704,7 @@ function buildWorld() {
     springDisplay.time = Math.random() * 6;
   }, undefined, err => { console.warn('Spring Bonnie de AMYR no cargó:', err); });
 
-  // Marcas LED sin placa: YouTube + @AMYR ANIMATIONS y Discord + @VOLUMI3D.
-  // La textura es transparente y el plano mira hacia el interior del pasillo.
-  const ledCanvas = mkCanvas(1800, 260), led = ledCanvas.getContext('2d');
-  function ledText(text, x, y, color, font) {
-    led.save(); led.font = font; led.textBaseline = 'middle'; led.textAlign = 'left';
-    led.shadowColor = color; led.shadowBlur = 24; led.fillStyle = color; led.fillText(text, x, y);
-    led.shadowBlur = 0; led.fillStyle = '#fff8ef'; led.fillText(text, x, y); led.restore();
-  }
-  // YouTube LED glyph (rounded screen + play triangle).
-  led.save(); led.shadowColor = '#ff0033'; led.shadowBlur = 24; led.fillStyle = '#ff0033';
-  led.beginPath(); led.moveTo(88,62); led.lineTo(184,62); led.quadraticCurveTo(211,62,211,89); led.lineTo(211,171); led.quadraticCurveTo(211,198,184,198); led.lineTo(88,198); led.quadraticCurveTo(61,198,61,171); led.lineTo(61,89); led.quadraticCurveTo(61,62,88,62); led.fill();
-  led.shadowBlur = 0; led.fillStyle = '#fff'; led.beginPath(); led.moveTo(119,91); led.lineTo(119,169); led.lineTo(174,130); led.closePath(); led.fill(); led.restore();
-  ledText('@AMYR ANIMATIONS', 245, 132, '#ff344f', 'bold 58px Arial');
-  // Thin glow separator, not a backing panel.
-  led.save(); led.fillStyle = '#a9b4ff'; led.shadowColor = '#5865f2'; led.shadowBlur = 18; led.fillRect(870,60,3,140); led.restore();
-  // Discord controller mark, drawn as a clean vector-like path.
-  led.save(); led.shadowColor = '#5865f2'; led.shadowBlur = 22; led.fillStyle = '#5865f2';
-  led.beginPath(); led.moveTo(1039,79); led.quadraticCurveTo(1091,48,1145,78); led.quadraticCurveTo(1175,124,1183,174); led.quadraticCurveTo(1153,199,1124,203); led.lineTo(1109,183); led.quadraticCurveTo(1083,191,1056,183); led.lineTo(1040,203); led.quadraticCurveTo(1004,194,987,174); led.quadraticCurveTo(995,119,1039,79); led.fill();
-  led.shadowBlur = 0; led.fillStyle = '#fff'; led.beginPath(); led.ellipse(1051,137,10,14,0,0,Math.PI*2); led.ellipse(1119,137,10,14,0,0,Math.PI*2); led.fill(); led.restore();
-  ledText('@VOLUMI3D', 1210, 132, '#9aa8ff', 'bold 58px Arial');
-  const ledTex = new THREE.CanvasTexture(ledCanvas); ledTex.colorSpace = THREE.SRGBColorSpace;
-  const ledMaterial = new THREE.MeshBasicMaterial({ map: ledTex, transparent: true, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
-  const ledNames = new THREE.Mesh(new THREE.PlaneGeometry(14.0, 2.02), ledMaterial);
-  ledNames.position.set(41, 2.22, 37.04); ledNames.rotation.y = Math.PI; ledNames.scale.x = -1; worldGroup.add(ledNames);
+  // Sin letreros ni marcas de YouTube/Discord en esta pared.
 
   // puerta de salida
   const door = new THREE.Mesh(new THREE.BoxGeometry(0.3, 2.8, 3.2), new THREE.MeshStandardMaterial({ color: 0x0b6a40, emissive: 0x0a8f55, emissiveIntensity: 0.6 }));
@@ -830,7 +808,6 @@ function newGame() {
   keys = KEY_SPOTS.slice().sort(() => Math.random() - 0.5).slice(0, 3);
   keysGot = 0; battery = 100; stamina = 100; elapsed = 0; flashOn = true; curRoom = -1; voiceT = 12; caughtTime = 0;
   $('jumpscareFX').className = ''; $('flash').style.opacity = 0; camera.fov = 72; camera.updateProjectionMatrix();
-  animSpecialTime = 0; animSpecial = ''; recoverAnimTime = 0; wasStunned = false; idleCueTime = 3 + Math.random() * 3; idleAnimLeft = 0; idleAnimName = '';
   keyIcons.forEach(k => k.classList.remove('on')); $('keysTxt').textContent = '0/3';
 
   // Elegir sala al azar y una casilla abierta con espacio para moverse.
@@ -1398,19 +1375,20 @@ new GLTFLoader().load(
     const m = gltf.scene;
     m.traverse(o => { if (o.isMesh) { o.frustumCulled = false; } });
     fitModel(m);
-    bonnieRig.root = m; bonnieRig.bones = {}; bonnieRig.list = []; bonnieRig.legs = [];
+    bonnieRig.root = m; bonnieRig.bones = {}; bonnieRig.list = []; bonnieRig.legs = []; bonnieRig.arms = [];
     m.traverse(o => { if (o.isBone) { bonnieRig.bones[o.name] = o; bonnieRig.list.push(o); o.userData.btRestQuat = o.quaternion.clone(); } });
     bonnieRig.legs = [
       { upper: bonnieRig.bones.L_Leg_01_Bn_03, lower: bonnieRig.bones.L_Leg_02_Bn_04, end: bonnieRig.bones.L_Leg_03_Bn_05 },
       { upper: bonnieRig.bones.R_Leg_01_Bn_06, lower: bonnieRig.bones.R_Leg_02_Bn_07, end: bonnieRig.bones.R_Leg_03_Bn_08 }
     ].map(x => Object.assign(x, { originWorld: new THREE.Vector3(), targetLocal: new THREE.Vector3(), targetWorld: new THREE.Vector3() }));
+    bonnieRig.arms = [
+      { upper: bonnieRig.bones.L_Arm_01_Bn_011, lower: bonnieRig.bones.L_Arm_02_Bn_012, end: bonnieRig.bones.L_Arm_03_Bn_013 },
+      { upper: bonnieRig.bones.R_Arm_01_Bn_040, lower: bonnieRig.bones.R_Arm_02_Bn_041, end: bonnieRig.bones.R_Arm_03_Bn_042 }
+    ].map(x => Object.assign(x, { originWorld: new THREE.Vector3(), targetLocal: new THREE.Vector3(), targetWorld: new THREE.Vector3() }));
     m.updateMatrixWorld(true);
     // Sustituir respaldo por el modelo real sin tocar el estado de la partida.
     if (fallbackBonnie) { bonnie.group.remove(fallbackBonnie); fallbackBonnie = null; }
     bonnie.group.add(m);
-    mixer = new THREE.AnimationMixer(m);
-    gltf.animations.forEach(a => { clips[a.name.replace(/^.*--/, '')] = a; });
-    curAnim = null; playAnim('Idle');
     bonnieReady('LISTO');
   },
   event => {
@@ -1464,41 +1442,7 @@ function update(dt) {
 
   if (state === 'menu') player.yaw += dt * 0.08;
 
-  if (mixer) {
-    restoreProceduralPose();
-    let want = 'Idle';
-    if (state === 'caught' || state === 'gameover') want = clips.Jumpscare ? 'Jumpscare' : 'JumpscareFinalPose';
-    else if (state === 'playing' && bonnie.active) {
-      const near = Math.hypot(player.x - bonnie.x, player.z - bonnie.z);
-      if (bonnie.stun > 0) { want = 'Shocked'; wasStunned = true; }
-      else {
-        if (wasStunned) { wasStunned = false; recoverAnimTime = 1.0; }
-        if (recoverAnimTime > 0) { recoverAnimTime -= dt; want = 'CPU_Revive'; }
-        else {
-          animSpecialTime -= dt;
-          if (near < 5.5 && animSpecialTime <= 0) {
-            animSpecial = ['Haywire', 'CPU_Lurch', 'ChargePose'][Math.floor(Math.random() * 3)];
-            animSpecialTime = 1.1 + Math.random() * 0.5;
-          }
-          want = animSpecialTime > 0 ? animSpecial : 'Charge';
-        }
-      }
-    } else if (state === 'playing') {
-      if (idleAnimLeft > 0) {
-        idleAnimLeft -= dt; want = idleAnimName;
-      } else {
-        idleCueTime -= dt;
-        if (idleCueTime <= 0) {
-          idleAnimName = Math.random() < 0.55 ? 'Glimpse' : 'Decloaked';
-          want = idleAnimName;
-          idleAnimLeft = Math.max(0.7, Math.min(2.0, (clips[idleAnimName] && clips[idleAnimName].duration) || 1.3));
-          idleCueTime = 5 + Math.random() * 6;
-        }
-      }
-    }
-    if (!clips[want]) want = clips.Charge && bonnie.active ? 'Charge' : 'Idle';
-    playAnim(want);
-    mixer.update(dt);
+  if (bonnieRig.root) {
     bonnieRig.root.updateMatrixWorld(true);
     bonnieRig.inverseRoot = bonnieRig.root.matrixWorld.clone().invert();
     applyProceduralRobot(dt);

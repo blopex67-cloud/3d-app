@@ -32,6 +32,12 @@
   h2{font-family:var(--mono);letter-spacing:6px;color:var(--ink);margin:0 0 18px;text-transform:uppercase}
   .sub{opacity:.65;margin-bottom:26px;letter-spacing:4px;font-size:13px;text-transform:uppercase}
   .sub b{color:var(--red);animation:blink 1.1s steps(2) infinite}
+  .credits{display:flex;align-items:center;justify-content:center;gap:clamp(20px,7vw,90px);width:min(560px,94vw);margin:20px auto 4px;padding:10px 14px;border:1px solid rgba(255,255,255,.16);background:linear-gradient(90deg,rgba(10,10,12,.82),rgba(25,25,29,.7),rgba(10,10,12,.82));box-shadow:0 0 22px rgba(0,0,0,.7)}
+  .credit{display:flex;align-items:center;gap:10px;min-width:0;text-align:left}
+  .credit img{width:58px;height:58px;object-fit:cover;border:1px solid #ffffff55;box-shadow:0 0 12px rgba(0,0,0,.8)}
+  .credit:last-child{flex-direction:row-reverse;text-align:right}
+  .credit-name{font-size:clamp(10px,2.5vw,14px);font-weight:900;letter-spacing:1.4px;line-height:1.5;text-transform:uppercase;text-shadow:0 0 9px currentColor}
+  .credit-name.amyr{color:#ff454d}.credit-name.volumi{color:#55c9ff}
   .stats{margin:8px 0 26px;font-size:18px;opacity:.85;letter-spacing:2px}
   .help{max-width:640px;line-height:1.7;font-size:15px;opacity:.9;margin-bottom:22px;text-align:left}
   .help b{color:var(--amber)}
@@ -80,7 +86,7 @@
   #danger{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 35%,rgba(255,0,40,.55));opacity:0;z-index:4}
   #flash{position:fixed;inset:0;pointer-events:none;background:#ff1030;opacity:0;z-index:9;transition:opacity 1.2s}
   body.touch .kb{display:none}
-  @media (max-width:700px){#msg{white-space:normal;width:80%;text-align:center}}
+  @media (max-width:700px){#msg{white-space:normal;width:80%;text-align:center}.credits{gap:14px;padding:8px;margin-top:14px}.credit{gap:6px}.credit img{width:46px;height:46px}.credit-name{letter-spacing:.7px}}
 
   /* ---------- Controles táctiles ---------- */
   #tc{position:fixed;inset:0;z-index:7;display:none;touch-action:none}
@@ -162,6 +168,10 @@
   <button class="btn" id="playBtn" disabled>JUGAR</button>
   <button class="btn sec" id="helpBtn">CÓMO JUGAR</button>
   <div id="loadTxt" style="margin-top:12px;font-size:12px;letter-spacing:2px;opacity:.6">CARGANDO MODELO...</div>
+  <div class="credits" aria-label="Créditos">
+    <div class="credit"><img src="assets/amyr-animations.jpg" alt="Referencia de AMYR ANIMATIONS"><div class="credit-name amyr">AMYR<br>ANIMATIONS</div></div>
+    <div class="credit"><img src="assets/volumi3d.jpg" alt="Logo de Volumi3D"><div class="credit-name volumi">CREADOR<br>VOLUMI3D</div></div>
+  </div>
 </div>
 
 <div id="help" class="screen hidden">
@@ -516,6 +526,26 @@ function buildWorld() {
       const s = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 1.3, 4), lamb(0xdddddd)); s.position.set(bx, 1.55, bz); worldGroup.add(s);
     }
   });
+
+  // Carteles de créditos y referencias, montados en el muro sur del pasillo.
+  const creditsLoader = new THREE.TextureLoader();
+  function addCreditPoster(file, x, title, color) {
+    const backing = new THREE.Mesh(new THREE.BoxGeometry(3.35, 3.02, 0.10), new THREE.MeshStandardMaterial({ color: 0x111318, roughness: 0.92, metalness: 0.15 }));
+    backing.position.set(x, 1.72, 36.94); worldGroup.add(backing);
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(3.18, 2.84, 0.05), new THREE.MeshBasicMaterial({ color }));
+    frame.position.set(x, 1.72, 36.87); worldGroup.add(frame);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+    const poster = new THREE.Mesh(new THREE.PlaneGeometry(3.06, 2.72), mat);
+    poster.position.set(x, 1.72, 36.835); worldGroup.add(poster);
+    creditsLoader.load('assets/' + file, tex => {
+      tex.colorSpace = THREE.SRGBColorSpace;
+      mat.map = tex; mat.needsUpdate = true;
+    });
+    const plaque = new THREE.Mesh(new THREE.PlaneGeometry(3.15, 0.34), new THREE.MeshBasicMaterial({ map: signTex(title, 640, 80, color, '#090a0c', 'bold 38px Arial') }));
+    plaque.position.set(x, 0.16, 36.82); worldGroup.add(plaque);
+  }
+  addCreditPoster('amyr-animations.jpg', 22, 'AMYR ANIMATIONS', '#ff414b');
+  addCreditPoster('volumi3d.jpg', 50, 'CREADOR · VOLUMI3D', '#42c5ff');
 
   // puerta de salida
   const door = new THREE.Mesh(new THREE.BoxGeometry(0.3, 2.8, 3.2), new THREE.MeshStandardMaterial({ color: 0x0b6a40, emissive: 0x0a8f55, emissiveIntensity: 0.6 }));

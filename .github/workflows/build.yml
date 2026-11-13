@@ -1,313 +1,384 @@
-name: Build APK
+name: Build APK 3D
 
 on:
   push:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      GODOT_VERSION: "4.3-stable"
     steps:
-      - name: Instalar Java
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: '17'
 
-      - name: Instalar Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
-      - name: Instalar componentes del SDK
+      - name: Crear juego 3D
         run: |
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager "platforms;android-34" "build-tools;34.0.0" "cmdline-tools;latest"
+          mkdir -p www
+          cat > www/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="es">
+          <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+          <title>Battle Royale 3D</title>
+          <style>
+          html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none;user-select:none;font-family:sans-serif}
+          canvas{display:block}
+          #hud{position:fixed;top:10px;left:10px;color:#fff;font-weight:bold;font-size:18px;text-shadow:0 0 4px #000;pointer-events:none}
+          #hint{position:fixed;top:10px;right:10px;color:#fff;font-size:12px;opacity:.7;text-shadow:0 0 4px #000;pointer-events:none}
+          #joy{position:fixed;width:110px;height:110px;border-radius:50%;background:rgba(255,255,255,.2);border:2px solid rgba(255,255,255,.5);display:none;pointer-events:none}
+          #knob{position:absolute;left:35px;top:35px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.7)}
+          #fire{position:fixed;right:25px;bottom:25px;width:90px;height:90px;border-radius:50%;background:rgba(255,80,60,.8);color:#fff;font-weight:bold;font-size:14px;display:flex;align-items:center;justify-content:center;border:3px solid #fff}
+          #over{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.7);color:#fff;font-size:28px;text-align:center;z-index:10}
+          button{padding:14px 28px;font-size:20px;margin-top:20px;border:0;border-radius:10px;background:#f5a623;font-weight:bold}
+          </style>
+          </head>
+          <body>
+          <canvas id="c"></canvas>
+          <div id="hud"></div>
+          <div id="hint">Izq: mover · Der: mirar · PC: WASD / flechas / Espacio</div>
+          <div id="joy"><div id="knob"></div></div>
+          <div id="fire">DISPARAR</div>
+          <div id="over"><div id="msg"></div><button onclick="location.reload()">Jugar de nuevo</button></div>
+          <script src="three.min.js"></script>
+          <script>
+          const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('c'), antialias: true });
+          renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+          renderer.setSize(innerWidth, innerHeight);
 
-      - name: Descargar Godot y templates
-        run: |
-          mkdir -p $HOME/godot && cd $HOME/godot
-          wget -q https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip
-          unzip -q Godot_v${GODOT_VERSION}_linux.x86_64.zip
-          mv Godot_v${GODOT_VERSION}_linux.x86_64 godot
-          chmod +x godot
-          wget -q https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_export_templates.tpz
-          unzip -q Godot_v${GODOT_VERSION}_export_templates.tpz
-          mkdir -p $HOME/.local/share/godot/export_templates/4.3.stable
-          mv templates/* $HOME/.local/share/godot/export_templates/4.3.stable/
+          const scene = new THREE.Scene();
+          scene.background = new THREE.Color(0x9fd8ff);
+          scene.fog = new THREE.Fog(0x9fd8ff, 60, 170);
+          const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 400);
+          addEventListener('resize', () => {
+            renderer.setSize(innerWidth, innerHeight);
+            camera.aspect = innerWidth / innerHeight;
+            camera.updateProjectionMatrix();
+          });
 
-      - name: Configurar Godot y keystore de debug
-        run: |
-          mkdir -p $HOME/.config/godot $HOME/.android
-          keytool -genkey -v -keystore $HOME/.android/debug.keystore -storepass android \
-            -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
-            -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-          cat > $HOME/.config/godot/editor_settings-4.3.tres <<EOF
-          [gd_resource type="EditorSettings" format=3]
+          scene.add(new THREE.HemisphereLight(0xffffff, 0x446633, 1.1));
+          const sun = new THREE.DirectionalLight(0xffffff, 0.7);
+          sun.position.set(30, 60, 20);
+          scene.add(sun);
 
-          [resource]
-          export/android/android_sdk_path = "$ANDROID_HOME"
-          export/android/java_sdk_path = "$JAVA_HOME"
-          export/android/debug_keystore = "$HOME/.android/debug.keystore"
-          export/android/debug_keystore_user = "androiddebugkey"
-          export/android/debug_keystore_pass = "android"
-          EOF
+          const MAP = 90;
+          const rnd = (a, b) => a + Math.random() * (b - a);
+          const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+          const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
 
-      - name: Crear proyecto
-        run: |
-          mkdir -p juego/build && cd juego
-          cat > project.godot <<'EOF'
-          config_version=5
+          const ground = new THREE.Mesh(
+            new THREE.PlaneGeometry(MAP * 2, MAP * 2),
+            new THREE.MeshLambertMaterial({ color: 0x6cba5a })
+          );
+          ground.rotation.x = -Math.PI / 2;
+          scene.add(ground);
 
-          [application]
-
-          config/name="VideoEditor"
-          run/main_scene="res://main.tscn"
-          config/features=PackedStringArray("4.3", "Mobile")
-          EOF
-          cat > main.tscn <<'EOF'
-          [gd_scene load_steps=2 format=3]
-
-          [ext_resource type="Script" path="res://editor.gd" id="1"]
-
-          [node name="Main" type="Control"]
-          script = ExtResource("1")
-          EOF
-          cat > export_presets.cfg <<'EOF'
-          [preset.0]
-
-          name="Android"
-          platform="Android"
-          runnable=true
-          export_filter="all_resources"
-          include_filter=""
-          exclude_filter=""
-          export_path="build/app-debug.apk"
-          encrypt_pck=false
-          encrypt_directory=false
-
-          [preset.0.options]
-
-          custom_template/debug=""
-          custom_template/release=""
-          gradle_build/use_gradle_build=false
-          package/unique_name="com.carlos.videoeditor"
-          package/name="VideoEditor"
-          package/signed=true
-          permissions/read_media_images=true
-          permissions/read_external_storage=true
-          permissions/write_external_storage=true
-          EOF
-          cat > editor.gd <<'EOF'
-          extends Control
-
-          const SHADER_CODE := """
-          shader_type canvas_item;
-          uniform float brillo = 1.0;
-          uniform float contraste = 1.0;
-          void fragment() {
-              vec4 c = texture(TEXTURE, UV);
-              c.rgb = (c.rgb - 0.5) * contraste + 0.5;
-              c.rgb *= brillo;
-              COLOR = c;
+          // Obstáculos (cajas)
+          const obs = [];
+          const crateMat = new THREE.MeshLambertMaterial({ color: 0x8b5a2b });
+          for (let i = 0; i < 45; i++) {
+            const w = rnd(2, 5), d = rnd(2, 5), h = rnd(2, 6);
+            const x = rnd(-MAP + 6, MAP - 6), z = rnd(-MAP + 6, MAP - 6);
+            if (Math.hypot(x, z) < 12) continue;
+            const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), crateMat);
+            m.position.set(x, h / 2, z);
+            scene.add(m);
+            obs.push({ x, z, hw: w / 2, hd: d / 2 });
           }
-          """
+          const blocked = (x, z, r) => obs.some(o =>
+            x + r > o.x - o.hw && x - r < o.x + o.hw && z + r > o.z - o.hd && z - r < o.z + o.hd);
 
-          var clips: Array = []
-          var idx := -1
-          var preview: TextureRect
-          var overlay: Label
-          var mat: ShaderMaterial
-          var lista: ItemList
-          var ini: SpinBox
-          var fin: SpinBox
-          var texto: LineEdit
-          var brillo: HSlider
-          var contraste: HSlider
-          var timer: Timer
-          var dlg: FileDialog
-          var estado: Label
+          // Zona que se encoge
+          const zone = { r: MAP * 1.5 };
+          const zoneMesh = new THREE.Mesh(
+            new THREE.CylinderGeometry(1, 1, 40, 64, 1, true),
+            new THREE.MeshBasicMaterial({ color: 0xff3344, transparent: true, opacity: 0.22, side: THREE.DoubleSide })
+          );
+          zoneMesh.position.y = 20;
+          scene.add(zoneMesh);
 
-          func _ready() -> void:
-              set_anchors_preset(Control.PRESET_FULL_RECT)
-              var raiz := VBoxContainer.new()
-              raiz.set_anchors_preset(Control.PRESET_FULL_RECT)
-              add_child(raiz)
+          // Personajes
+          function makeFighter(color, x, z) {
+            const g = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.3, 0.7), new THREE.MeshLambertMaterial({ color }));
+            body.position.y = 0.95;
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.38, 16, 12), new THREE.MeshLambertMaterial({ color: 0xffd7a8 }));
+            head.position.y = 2.0;
+            const gun = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.22, 0.8), new THREE.MeshLambertMaterial({ color: 0x222222 }));
+            gun.position.set(0.3, 1.2, -0.6);
+            g.add(body, head, gun);
+            g.position.set(x, 0, z);
+            scene.add(g);
+            return g;
+          }
 
-              preview = TextureRect.new()
-              preview.size_flags_vertical = Control.SIZE_EXPAND_FILL
-              preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-              preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-              var sh := Shader.new()
-              sh.code = SHADER_CODE
-              mat = ShaderMaterial.new()
-              mat.shader = sh
-              preview.material = mat
-              raiz.add_child(preview)
+          const player = { mesh: makeFighter(0x2ecc71, 0, 0), hp: 100, alive: true, cd: 0, isPlayer: true };
+          const COLORS = [0xe74c3c, 0x3498db, 0xf1c40f, 0x9b59b6, 0xe67e22];
+          const bots = [];
+          for (let i = 0; i < 14; i++) {
+            let x, z;
+            do { x = rnd(-MAP + 6, MAP - 6); z = rnd(-MAP + 6, MAP - 6); }
+            while (Math.hypot(x, z) < 15 || blocked(x, z, 1));
+            bots.push({
+              mesh: makeFighter(COLORS[i % COLORS.length], x, z),
+              hp: 60, alive: true, cd: 0, yaw: 0, tx: x, tz: z, t: 0
+            });
+          }
 
-              overlay = Label.new()
-              overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-              overlay.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-              overlay.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-              overlay.add_theme_font_size_override("font_size", 40)
-              preview.add_child(overlay)
+          // Balas
+          const bullets = [];
+          const bulletGeo = new THREE.SphereGeometry(0.12, 6, 6);
+          const matP = new THREE.MeshBasicMaterial({ color: 0xffee55 });
+          const matB = new THREE.MeshBasicMaterial({ color: 0xff7755 });
+          function shoot(owner, x, z, yaw, spread) {
+            const a = yaw + spread;
+            const m = new THREE.Mesh(bulletGeo, owner.isPlayer ? matP : matB);
+            m.position.set(x - Math.sin(yaw) * 0.8, 1.6, z - Math.cos(yaw) * 0.8);
+            scene.add(m);
+            bullets.push({ mesh: m, vx: -Math.sin(a) * 1.8, vz: -Math.cos(a) * 1.8, life: 80, owner });
+          }
 
-              lista = ItemList.new()
-              lista.custom_minimum_size = Vector2(0, 120)
-              lista.item_selected.connect(_seleccionar)
-              raiz.add_child(lista)
+          let kills = 0, state = 'play';
+          function damage(ent, amt, by) {
+            if (!ent.alive) return;
+            ent.hp -= amt;
+            if (ent.hp <= 0) {
+              ent.hp = 0;
+              ent.alive = false;
+              ent.mesh.rotation.x = -Math.PI / 2;
+              if (by === player) kills++;
+            }
+          }
+          function move(ent, dx, dz) {
+            const p = ent.mesh.position, R = 0.5;
+            const nx = clamp(p.x + dx, -MAP + 1, MAP - 1);
+            if (!blocked(nx, p.z, R)) p.x = nx;
+            const nz = clamp(p.z + dz, -MAP + 1, MAP - 1);
+            if (!blocked(p.x, nz, R)) p.z = nz;
+          }
 
-              var fila := HBoxContainer.new()
-              raiz.add_child(fila)
-              fila.add_child(_boton("+ Imagen", func(): dlg.popup_centered_ratio(0.8)))
-              fila.add_child(_boton("▶ Reproducir", _reproducir))
-              fila.add_child(_boton("■ Parar", func(): timer.stop()))
-              fila.add_child(_boton("Quitar", _quitar))
+          // Controles
+          const keys = {};
+          addEventListener('keydown', e => keys[e.code] = true);
+          addEventListener('keyup', e => keys[e.code] = false);
 
-              var fila2 := HBoxContainer.new()
-              raiz.add_child(fila2)
-              ini = SpinBox.new()
-              ini.prefix = "Inicio "
-              ini.max_value = 600
-              ini.step = 0.1
-              ini.value_changed.connect(func(v): _set_campo("start", v))
-              fin = SpinBox.new()
-              fin.prefix = "Fin "
-              fin.max_value = 600
-              fin.step = 0.1
-              fin.value = 3
-              fin.value_changed.connect(func(v): _set_campo("end", v))
-              fila2.add_child(ini)
-              fila2.add_child(fin)
+          const joyEl = document.getElementById('joy');
+          const knobEl = document.getElementById('knob');
+          const fireEl = document.getElementById('fire');
+          const JR = 55;
+          let joyId = null, lookId = null, fireId = null;
+          let jOX = 0, jOY = 0, lastLX = 0, jx = 0, jy = 0, firing = false;
+          let camYaw = 0;
 
-              texto = LineEdit.new()
-              texto.placeholder_text = "Texto sobre el clip"
-              texto.text_changed.connect(func(t): _set_campo("text", t))
-              raiz.add_child(texto)
+          addEventListener('touchstart', e => {
+            e.preventDefault();
+            for (const t of e.changedTouches) {
+              if (fireEl.contains(t.target)) {
+                firing = true; fireId = t.identifier;
+              } else if (t.clientX < innerWidth / 2 && joyId === null) {
+                joyId = t.identifier; jOX = t.clientX; jOY = t.clientY;
+                Object.assign(joyEl.style, { display: 'block', left: (jOX - JR) + 'px', top: (jOY - JR) + 'px' });
+              } else if (lookId === null) {
+                lookId = t.identifier; lastLX = t.clientX;
+              }
+            }
+          }, { passive: false });
 
-              brillo = _slider(0.0, 2.0, 1.0, "brillo")
-              raiz.add_child(brillo)
-              contraste = _slider(0.0, 2.0, 1.0, "contraste")
-              raiz.add_child(contraste)
+          addEventListener('touchmove', e => {
+            e.preventDefault();
+            for (const t of e.changedTouches) {
+              if (t.identifier === joyId) {
+                let dx = t.clientX - jOX, dy = t.clientY - jOY;
+                const d = Math.hypot(dx, dy);
+                if (d > JR) { dx *= JR / d; dy *= JR / d; }
+                jx = dx / JR; jy = dy / JR;
+                knobEl.style.transform = `translate(${dx}px,${dy}px)`;
+              } else if (t.identifier === lookId) {
+                camYaw -= (t.clientX - lastLX) * 0.008;
+                lastLX = t.clientX;
+              }
+            }
+          }, { passive: false });
 
-              estado = Label.new()
-              raiz.add_child(estado)
-              raiz.add_child(_boton("Exportar proyecto", _exportar))
+          function endTouch(e) {
+            e.preventDefault();
+            for (const t of e.changedTouches) {
+              if (t.identifier === joyId) {
+                joyId = null; jx = jy = 0;
+                joyEl.style.display = 'none';
+                knobEl.style.transform = '';
+              }
+              if (t.identifier === lookId) lookId = null;
+              if (t.identifier === fireId) { fireId = null; firing = false; }
+            }
+          }
+          addEventListener('touchend', endTouch, { passive: false });
+          addEventListener('touchcancel', endTouch, { passive: false });
 
-              timer = Timer.new()
-              timer.one_shot = true
-              timer.timeout.connect(_siguiente)
-              add_child(timer)
+          // Lógica principal
+          const hud = document.getElementById('hud');
+          const over = document.getElementById('over');
+          const msg = document.getElementById('msg');
 
-              dlg = FileDialog.new()
-              dlg.file_mode = FileDialog.FILE_MODE_OPEN_FILE
-              dlg.access = FileDialog.ACCESS_FILESYSTEM
-              dlg.filters = PackedStringArray(["*.png, *.jpg, *.jpeg, *.webp ; Imágenes"])
-              dlg.file_selected.connect(_agregar)
-              add_child(dlg)
+          function endGame(win) {
+            state = 'end';
+            msg.innerHTML = (win ? '🏆 ¡VICTORIA!' : '💀 Eliminado') + '<br><small>Eliminaciones: ' + kills + '</small>';
+            over.style.display = 'flex';
+          }
 
-          func _boton(t: String, cb: Callable) -> Button:
-              var b := Button.new()
-              b.text = t
-              b.pressed.connect(cb)
-              return b
+          function update() {
+            if (keys.ArrowLeft) camYaw += 0.04;
+            if (keys.ArrowRight) camYaw -= 0.04;
+            const ix = clamp(jx + (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0), -1, 1);
+            const iy = clamp(jy + (keys.KeyS ? 1 : 0) - (keys.KeyW ? 1 : 0), -1, 1);
+            const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw);
+            const rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
+            const mag = Math.min(1, Math.hypot(ix, iy));
+            const pp = player.mesh.position;
 
-          func _slider(mn: float, mx: float, v: float, campo: String) -> HSlider:
-              var s := HSlider.new()
-              s.min_value = mn
-              s.max_value = mx
-              s.step = 0.01
-              s.value = v
-              s.custom_minimum_size.x = 200
-              s.value_changed.connect(func(x): _set_campo(campo, x))
-              return s
+            // Movimiento del jugador relativo a la cámara
+            if (player.alive && mag > 0) {
+              const mx = rx * ix - fx * iy, mz = rz * ix - fz * iy;
+              const l = Math.hypot(mx, mz);
+              move(player, (mx / l) * 0.22 * mag, (mz / l) * 0.22 * mag);
+            }
 
-          func _agregar(path: String) -> void:
-              var img := Image.load_from_file(path)
-              if img == null:
-                  estado.text = "No se pudo abrir la imagen"
-                  return
-              clips.append({
-                  "path": path, "start": 0.0, "end": 3.0, "text": "",
-                  "brillo": 1.0, "contraste": 1.0,
-                  "tex": ImageTexture.create_from_image(img)
-              })
-              lista.add_item(path.get_file())
-              _seleccionar(clips.size() - 1)
+            // Asistencia de puntería: enemigo cercano dentro del cono de visión
+            let aim = camYaw, best = 45;
+            for (const b of bots) {
+              if (!b.alive) continue;
+              const dx = b.mesh.position.x - pp.x, dz = b.mesh.position.z - pp.z;
+              const d = Math.hypot(dx, dz);
+              if (d < best) {
+                const a = Math.atan2(-dx, -dz);
+                if (Math.abs(wrap(a - camYaw)) < 0.35) { best = d; aim = a; }
+              }
+            }
+            player.mesh.rotation.y = aim;
 
-          func _seleccionar(i: int) -> void:
-              idx = i
-              var c: Dictionary = clips[i]
-              ini.set_value_no_signal(c.start)
-              fin.set_value_no_signal(c.end)
-              texto.text = c.text
-              brillo.set_value_no_signal(c.brillo)
-              contraste.set_value_no_signal(c.contraste)
-              mat.set_shader_parameter("brillo", c.brillo)
-              mat.set_shader_parameter("contraste", c.contraste)
-              preview.texture = c.tex
-              overlay.text = c.text
+            // Disparo del jugador
+            player.cd = Math.max(0, player.cd - 1);
+            if (player.alive && (firing || keys.Space) && player.cd === 0) {
+              shoot(player, pp.x, pp.z, aim, rnd(-0.03, 0.03));
+              player.cd = 10;
+            }
 
-          func _set_campo(campo: String, v) -> void:
-              if idx < 0:
-                  return
-              clips[idx][campo] = v
-              match campo:
-                  "brillo", "contraste":
-                      mat.set_shader_parameter(campo, v)
-                  "text":
-                      overlay.text = v
+            // IA de los bots
+            for (const b of bots) {
+              if (!b.alive) continue;
+              const p = b.mesh.position;
+              b.cd = Math.max(0, b.cd - 1);
+              const dx = pp.x - p.x, dz = pp.z - p.z, dp = Math.hypot(dx, dz) || 1;
+              if (player.alive && dp < 38) {
+                b.yaw = Math.atan2(-dx, -dz);
+                const s = dp > 16 ? 0.1 : dp < 10 ? -0.08 : 0;
+                move(b, dx / dp * s, dz / dp * s);
+                if (b.cd === 0) {
+                  shoot(b, p.x, p.z, b.yaw, rnd(-0.12, 0.12));
+                  b.cd = Math.floor(rnd(45, 90));
+                }
+              } else {
+                const wd = Math.hypot(b.tx - p.x, b.tz - p.z);
+                if (--b.t <= 0 || wd < 1) {
+                  b.tx = rnd(-MAP + 6, MAP - 6);
+                  b.tz = rnd(-MAP + 6, MAP - 6);
+                  b.t = 240;
+                }
+                const dx2 = b.tx - p.x, dz2 = b.tz - p.z, d2 = Math.hypot(dx2, dz2) || 1;
+                move(b, dx2 / d2 * 0.07, dz2 / d2 * 0.07);
+                b.yaw = Math.atan2(-dx2, -dz2);
+              }
+              b.mesh.rotation.y = b.yaw;
+            }
 
-          func _reproducir() -> void:
-              if clips.is_empty():
-                  return
-              _mostrar(0)
+            // Zona: se encoge y daña fuera de ella
+            zone.r = Math.max(3, zone.r - 0.03);
+            zoneMesh.scale.set(zone.r, 1, zone.r);
+            if (player.alive && Math.hypot(pp.x, pp.z) > zone.r) damage(player, 0.08, null);
+            for (const b of bots) {
+              if (b.alive && Math.hypot(b.mesh.position.x, b.mesh.position.z) > zone.r) damage(b, 0.05, null);
+            }
 
-          func _mostrar(i: int) -> void:
-              _seleccionar(i)
-              lista.select(i)
-              var c: Dictionary = clips[i]
-              timer.start(max(c.end - c.start, 0.1))
+            // Balas
+            for (let i = bullets.length - 1; i >= 0; i--) {
+              const bl = bullets[i];
+              const bp = bl.mesh.position;
+              bp.x += bl.vx; bp.z += bl.vz; bl.life--;
+              let hit = bl.life <= 0 || blocked(bp.x, bp.z, 0.05) || Math.abs(bp.x) > MAP || Math.abs(bp.z) > MAP;
+              if (!hit) {
+                for (const t of [player, ...bots]) {
+                  if (!t.alive || t === bl.owner) continue;
+                  const tp = t.mesh.position;
+                  if (Math.hypot(tp.x - bp.x, tp.z - bp.z) < 0.9) {
+                    damage(t, 20, bl.owner);
+                    hit = true;
+                    break;
+                  }
+                }
+              }
+              if (hit) {
+                scene.remove(bl.mesh);
+                bullets.splice(i, 1);
+              }
+            }
 
-          func _siguiente() -> void:
-              var n := idx + 1
-              if n >= clips.size():
-                  estado.text = "Fin de la reproducción"
-                  return
-              _mostrar(n)
+            // HUD y fin de partida
+            const aliveBots = bots.filter(b => b.alive).length;
+            hud.textContent = `❤ ${Math.ceil(player.hp)}   👥 ${aliveBots + (player.alive ? 1 : 0)}   💀 ${kills}`;
+            if (!player.alive) endGame(false);
+            else if (aliveBots === 0) endGame(true);
+          }
 
-          func _quitar() -> void:
-              if idx < 0:
-                  return
-              clips.remove_at(idx)
-              lista.remove_item(idx)
-              idx = -1
-              preview.texture = null
-              overlay.text = ""
+          // Cámara en tercera persona detrás del jugador
+          function updateCamera() {
+            const pp = player.mesh.position;
+            const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw);
+            camera.position.lerp(new THREE.Vector3(pp.x - fx * 9, 4.5, pp.z - fz * 9), 0.2);
+            camera.lookAt(pp.x + fx * 2, 1.8, pp.z + fz * 2);
+          }
 
-          func _exportar() -> void:
-              var datos: Array = []
-              for c in clips:
-                  datos.append({
-                      "path": c.path, "start": c.start, "end": c.end,
-                      "text": c.text, "brillo": c.brillo, "contraste": c.contraste
-                  })
-              var f := FileAccess.open("user://proyecto.json", FileAccess.WRITE)
-              f.store_string(JSON.stringify(datos, "\t"))
-              f.close()
-              estado.text = "Proyecto guardado en user://proyecto.json"
+          function loop() {
+            if (state === 'play') update();
+            zoneMesh.scale.set(zone.r, 1, zone.r);
+            updateCamera();
+            renderer.render(scene, camera);
+            requestAnimationFrame(loop);
+          }
+          loop();
+          </script>
+          </body>
+          </html>
           EOF
+          curl -fsSL -o www/three.min.js https://unpkg.com/three@0.128.0/build/three.min.js
 
-      - name: Importar proyecto
-        working-directory: juego
-        run: $HOME/godot/godot --headless --import || true
+      - name: Instalar Capacitor
+        run: |
+          npm init -y
+          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
+          npx cap init BattleRoyale com.ejemplo.battleroyale --web-dir=www
+          npx cap add android
+          npx cap sync android
 
-      - name: Exportar APK
-        working-directory: juego
-        run: $HOME/godot/godot --headless --export-debug "Android" build/app-debug.apk
+      - name: Compilar APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
 
       - name: Subir APK
         uses: actions/upload-artifact@v4
         with:
-          name: apk
-          path: juego/build/*.apk
+          name: battle-royale-3d-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk

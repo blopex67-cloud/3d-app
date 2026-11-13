@@ -92,6 +92,38 @@ jobs:
           S=android/app/src/main/res/values/styles.xml
           sed -i 's#<style name="AppTheme.NoActionBar"[^>]*>#&\n        <item name="android:windowFullscreen">true</item>\n        <item name="android:windowBackground">@android:color/black</item>\n        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>#' "$S"
 
+      - name: Generar iconos Android desde assets/icon.jpg
+        run: |
+          npm install --no-save sharp
+          node <<'NODE'
+          const sharp = require('sharp');
+          const fs = require('fs');
+          const path = require('path');
+          const src = 'assets/icon.jpg';
+          const res = 'android/app/src/main/res';
+          const sizes = { mdpi: 48, hdpi: 72, xhdpi: 96, xxhdpi: 144, xxxhdpi: 192 };
+          (async () => {
+            for (const [density, size] of Object.entries(sizes)) {
+              const dir = path.join(res, 'mipmap-' + density);
+              fs.mkdirSync(dir, { recursive: true });
+              await sharp(src).resize(size, size, { fit: 'cover' }).png().toFile(path.join(dir, 'ic_launcher.png'));
+              await sharp(src).resize(size, size, { fit: 'cover' }).png().toFile(path.join(dir, 'ic_launcher_round.png'));
+            }
+            const adaptive = path.join(res, 'mipmap-anydpi-v26');
+            fs.mkdirSync(adaptive, { recursive: true });
+            const fg = await sharp(src).resize(320, 320, { fit: 'cover' }).png().toBuffer();
+            await sharp({ create: { width: 432, height: 432, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+              .composite([{ input: fg, left: 56, top: 56 }]).png().toFile(path.join(res, 'mipmap-xxxhdpi', 'ic_launcher_foreground.png'));
+            const adaptiveXml = '<?xml version="1.0" encoding="utf-8"?>\n<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android"><background android:drawable="@color/icon_background"/><foreground android:drawable="@mipmap/ic_launcher_foreground"/></adaptive-icon>';
+            fs.writeFileSync(path.join(adaptive, 'ic_launcher.xml'), adaptiveXml);
+            fs.writeFileSync(path.join(adaptive, 'ic_launcher_round.xml'), adaptiveXml);
+            const values = path.join(res, 'values');
+            fs.mkdirSync(values, { recursive: true });
+            fs.writeFileSync(path.join(values, 'icon_background.xml'),
+              '<?xml version="1.0" encoding="utf-8"?><resources><color name="icon_background">#08090c</color></resources>');
+          })().catch(e => { console.error(e); process.exit(1); });
+          NODE
+
       - name: Compilar APK
         run: |
           cd android

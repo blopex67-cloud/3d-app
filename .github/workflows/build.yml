@@ -1,1350 +1,421 @@
-name: Build APK Battle Royale
+name: Build Unity APK Battle Royale
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
+env:
+  UNITY_VERSION: 2022.3.20f1
+  PROJECT_PATH: unity-game
+
 jobs:
   build:
+    name: Construir APK
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: '17'
+          lfs: true
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Crear juego
+      - name: Crear proyecto Unity (scripts y escena)
         run: |
-          mkdir -p www
-          cat > www/index.html << 'EOF'
-          <!DOCTYPE html>
-          <html lang="es">
-          <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-          <title>Battle Royale</title>
-          <style>
-          [hidden]{display:none!important}
-          *{box-sizing:border-box}
-          html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:Arial,Helvetica,sans-serif;color:#fff;user-select:none;-webkit-user-select:none;touch-action:none}
-          #game{position:fixed;inset:0;width:100%;height:100%;display:block}
+          mkdir -p ${PROJECT_PATH}/Assets/Scripts ${PROJECT_PATH}/Assets/Editor ${PROJECT_PATH}/ProjectSettings
 
-          #lobby{position:fixed;inset:0;display:flex;flex-direction:column;background:radial-gradient(circle at 30% 10%,#3f8f5e,#17402e 55%,#06150f);animation:fadeIn .45s ease-out}
-          #lobby header{display:flex;justify-content:space-between;align-items:center;padding:10px 18px;padding-left:max(18px,env(safe-area-inset-left));padding-right:max(18px,env(safe-area-inset-right));background:rgba(0,0,0,.35);font-weight:bold;animation:slideDown .5s cubic-bezier(.2,.8,.2,1)}
-          .hr{display:flex;gap:8px;align-items:center}
-          .logo{font-size:22px;letter-spacing:2px;text-shadow:0 2px 0 #000}
-          .logo span{color:#ffb300;display:inline-block;animation:shine 3s ease-in-out infinite}
-          .cur{font-size:14px;background:rgba(255,255,255,.12);padding:6px 12px;border-radius:14px}
-          #lobby main{flex:1;display:flex;flex-direction:column;min-height:0}
-          #stage{flex:1;position:relative;min-height:200px}
-          #prev{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;animation:fadeIn .8s ease-out}
-          #sInfo{position:absolute;left:14px;top:10px;pointer-events:none;animation:fadeUp .6s .15s both}
-          #sName{font-size:26px;font-weight:bold;text-shadow:0 2px 6px #000}
-          #sRar{font-size:13px;color:#ffd166;font-weight:bold}
-          aside{padding:12px;overflow:auto;background:rgba(0,0,0,.3);animation:slideLeft .55s cubic-bezier(.2,.8,.2,1)}
-          aside h3{margin:0 0 8px;font-size:14px;letter-spacing:1px;color:#cfe8d6}
-          #skins{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-          .sk{background:rgba(255,255,255,.08);border:2px solid transparent;border-radius:12px;padding:6px;color:#fff;font-size:12px;font-weight:bold;text-align:center;cursor:pointer;transition:transform .15s,border-color .2s,box-shadow .2s,background .2s;animation:fadeUp .45s both;animation-delay:calc(var(--i) * 60ms)}
-          .sk:hover{background:rgba(255,255,255,.14);transform:translateY(-2px)}
-          .sk:active{transform:scale(.94)}
-          .sk small{display:block;color:#aaa;font-weight:normal;font-size:10px}
-          .sk.on{border-color:#ffb300;box-shadow:0 0 14px rgba(255,179,0,.55);animation:pop .35s ease-out}
-          .sw{height:46px;border-radius:8px;margin-bottom:6px;border:1px solid rgba(0,0,0,.4);transition:transform .2s}
-          .sk:hover .sw{transform:scale(1.05)}
-          .info{margin-top:10px;font-size:13px;background:rgba(255,255,255,.07);padding:8px 10px;border-radius:10px}
-          .info b{color:#ffd166;margin-right:6px}
-          #lobby footer{display:flex;align-items:center;gap:10px;padding:12px;padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right));background:rgba(0,0,0,.45);animation:slideUp .5s cubic-bezier(.2,.8,.2,1)}
-          nav{display:flex;gap:6px;flex:1;flex-wrap:wrap}
-          .nv{background:rgba(255,255,255,.1);color:#fff;border:0;border-radius:10px;padding:10px 12px;font-size:12px;font-weight:bold;transition:transform .15s,background .2s,color .2s}
-          .nv:hover{background:rgba(255,255,255,.2)}
-          .nv:active{transform:scale(.93)}
-          .nv.on{background:#ffb300;color:#000}
-          #play{background:linear-gradient(#ffc83d,#ff8a00);color:#000;border:0;border-radius:28px;padding:14px 46px;font-size:22px;font-weight:900;letter-spacing:2px;box-shadow:0 5px 0 #a04b00;transition:transform .12s,box-shadow .12s;animation:glow 1.8s ease-in-out infinite}
-          #play:hover{transform:translateY(-2px)}
-          #play:active{transform:translateY(4px);box-shadow:0 1px 0 #a04b00}
-          @media(min-width:700px){#lobby main{flex-direction:row}aside{width:360px;max-height:none}}
-          #toast{position:fixed;left:50%;top:14%;transform:translateX(-50%);background:rgba(0,0,0,.8);padding:8px 16px;border-radius:12px;font-size:14px;z-index:30;pointer-events:none;animation:toastIn .3s ease-out}
-
-          #hud{position:fixed;inset:0;pointer-events:none;text-shadow:0 1px 3px #000;animation:fadeIn .4s ease-out}
-          #hud button{pointer-events:auto}
-          #tl{position:absolute;left:max(12px,env(safe-area-inset-left));top:12px;display:flex;gap:8px;align-items:center;animation:slideRight .5s cubic-bezier(.2,.8,.2,1)}
-          #av{width:46px;height:46px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 6px #000}
-          .bar{width:170px;height:14px;background:rgba(0,0,0,.55);border-radius:8px;overflow:hidden;margin-bottom:4px;border:1px solid rgba(255,255,255,.2)}
-          .bar i{display:block;height:100%;width:100%;transition:width .25s cubic-bezier(.2,.8,.2,1)}
-          .hp i{background:linear-gradient(#9dff7f,#2fbf2f)}
-          .ar i{background:linear-gradient(#9fe3ff,#2a7fd6)}
-          #hpt{font-size:12px;font-weight:bold}
-          #tc{position:absolute;top:12px;left:50%;transform:translateX(-50%);text-align:center;font-weight:bold;animation:slideDown .5s cubic-bezier(.2,.8,.2,1)}
-          #alive{background:rgba(0,0,0,.5);padding:4px 14px;border-radius:14px;font-size:15px}
-          #zone{margin-top:5px;background:rgba(200,30,40,.75);padding:3px 12px;border-radius:12px;font-size:12px}
-          #zone.warn{animation:zoneWarn .8s infinite}
-          #mini{position:absolute;right:max(12px,env(safe-area-inset-right));top:12px;width:120px;height:120px;border-radius:50%;border:2px solid rgba(255,255,255,.8);background:rgba(0,0,0,.3);animation:slideLeft .5s cubic-bezier(.2,.8,.2,1)}
-          #feed{position:absolute;right:max(12px,env(safe-area-inset-right));top:142px;text-align:right;font-size:13px;width:220px}
-          #feed div{background:rgba(0,0,0,.45);margin-top:4px;padding:3px 8px;border-radius:6px;display:inline-block;animation:feedIn .35s cubic-bezier(.2,.8,.2,1);transition:opacity .4s,transform .4s}
-          #feed div.out{opacity:0;transform:translateX(20px)}
-          #cross{position:absolute;left:50%;top:50%;width:0;height:0}
-          #cross i{position:absolute;background:#fff;box-shadow:0 0 3px #000;transition:transform .12s}
-          #cross i:nth-child(1){top:-18px;left:-1px;width:2px;height:10px}
-          #cross i:nth-child(2){top:8px;left:-1px;width:2px;height:10px}
-          #cross i:nth-child(3){left:-18px;top:-1px;width:10px;height:2px}
-          #cross i:nth-child(4){left:8px;top:-1px;width:10px;height:2px}
-          #cross.spread i:nth-child(1){transform:translateY(-4px)}
-          #cross.spread i:nth-child(2){transform:translateY(4px)}
-          #cross.spread i:nth-child(3){transform:translateX(-4px)}
-          #cross.spread i:nth-child(4){transform:translateX(4px)}
-          #hitm{position:absolute;left:50%;top:50%;width:18px;height:18px;transform:translate(-50%,-50%);opacity:0}
-          #hitm.on{opacity:1;animation:hitPop .2s ease-out}
-          #hitm::before,#hitm::after{content:'';position:absolute;left:8px;top:-4px;width:2px;height:26px;background:#ff3b3b;transform:rotate(45deg)}
-          #hitm::after{transform:rotate(-45deg)}
-          #dmg{position:absolute;inset:0;background:radial-gradient(transparent 55%,rgba(255,0,0,.65));opacity:0;transition:opacity .3s}
-          #slots{position:absolute;right:max(16px,env(safe-area-inset-right));bottom:222px;display:flex;gap:8px;animation:slideUp .5s cubic-bezier(.2,.8,.2,1)}
-          .slot{width:92px;height:54px;background:rgba(0,0,0,.6);border:2px solid rgba(255,255,255,.3);border-radius:10px;padding:4px 6px;display:flex;flex-direction:column;justify-content:center;pointer-events:auto;transition:transform .2s,border-color .2s,box-shadow .2s}
-          .slot:active{transform:scale(.92)}
-          .slot.on{border-color:#ffb300;box-shadow:0 0 12px rgba(255,179,0,.7);transform:translateY(-4px)}
-          .slot b{font-size:11px;color:#ddd}
-          .slot span{font-size:15px;font-weight:bold}
-          #fire{position:absolute;right:max(20px,env(safe-area-inset-right));bottom:20px;width:108px;height:108px;border-radius:50%;border:3px solid #fff;background:radial-gradient(circle at 35% 30%,#ff9a6b,#c93a14);color:#fff;font-weight:900;font-size:15px;box-shadow:0 5px 0 #6b1c08;touch-action:none;transition:transform .08s,box-shadow .08s}
-          #fire:active{transform:translateY(4px) scale(.95);box-shadow:0 1px 0 #6b1c08}
-          .rb{position:absolute;width:70px;height:70px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;border:2px solid rgba(255,255,255,.6);font-size:11px;font-weight:bold;touch-action:none;transition:transform .1s,background .15s}
-          .rb:active{transform:scale(.9);background:rgba(255,255,255,.25)}
-          #jump{right:146px;bottom:44px}
-          #reload{right:36px;bottom:140px}
-          #joyBase{position:absolute;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.4);display:none;transform:translate(-50%,-50%);animation:pop .2s ease-out}
-          #joyKnob{position:absolute;left:35px;top:35px;width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.7)}
-
-          #cd{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%);font-size:96px;font-weight:900;color:#fff;text-shadow:0 6px 0 #000,0 0 30px rgba(255,255,255,.4);pointer-events:none;z-index:15;opacity:0}
-          #cd.pop{animation:cdPop .9s cubic-bezier(.2,.8,.2,1)}
-          #end{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.75);text-align:center;z-index:20;animation:fadeIn .5s ease-out}
-          #endT{font-size:34px;font-weight:900;margin:0;animation:endIn .6s cubic-bezier(.2,.9,.3,1.3)}
-          #endS{font-size:16px;color:#ddd;margin:14px 0 20px;animation:fadeUp .6s .2s both}
-          #backLobby{background:linear-gradient(#ffc83d,#ff8a00);color:#000;border:0;border-radius:24px;padding:12px 40px;font-size:18px;font-weight:bold;animation:fadeUp .6s .4s both;transition:transform .12s}
-          #backLobby:active{transform:scale(.95)}
-
-          @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-          @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
-          @keyframes slideDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:none}}
-          @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
-          @keyframes slideLeft{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:none}}
-          @keyframes slideRight{from{opacity:0;transform:translateX(-30px)}to{opacity:1;transform:none}}
-          @keyframes feedIn{from{opacity:0;transform:translateX(30px) scale(.9)}to{opacity:1;transform:none}}
-          @keyframes pop{0%{transform:scale(.7);opacity:0}70%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
-          @keyframes hitPop{from{transform:translate(-50%,-50%) scale(1.9)}to{transform:translate(-50%,-50%) scale(1)}}
-          @keyframes cdPop{0%{transform:translate(-50%,-50%) scale(2.2);opacity:0}25%{opacity:1}70%{transform:translate(-50%,-50%) scale(1);opacity:1}100%{transform:translate(-50%,-50%) scale(.9);opacity:0}}
-          @keyframes endIn{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
-          @keyframes glow{0%,100%{box-shadow:0 5px 0 #a04b00,0 0 0 rgba(255,179,0,0)}50%{box-shadow:0 5px 0 #a04b00,0 0 22px rgba(255,179,0,.7)}}
-          @keyframes shine{0%,100%{text-shadow:0 0 0 #ffb300}50%{text-shadow:0 0 12px #ffe08a}}
-          @keyframes zoneWarn{0%,100%{opacity:1}50%{opacity:.45}}
-          @keyframes toastIn{from{opacity:0;transform:translate(-50%,-10px)}to{opacity:1;transform:translate(-50%,0)}}
-          </style>
-          </head>
-          <body>
-
-          <canvas id="game"></canvas>
-
-          <div id="lobby">
-            <header>
-              <div class="logo">BATTLE<span>ROYALE</span></div>
-              <div class="hr"><div class="cur">💎 1200 &nbsp; 🪙 500</div><button id="snd" class="nv">🔊 SONIDO</button></div>
-            </header>
-            <main>
-              <section id="stage">
-                <canvas id="prev"></canvas>
-                <div id="sInfo"><div id="sName"></div><div id="sRar"></div></div>
-              </section>
-              <aside>
-                <h3>SKINS</h3>
-                <div id="skins"></div>
-                <div class="info"><b>Modo</b>Battle Royale · 20 jugadores</div>
-                <div class="info"><b>Mapa</b>Isla Libre</div>
-              </aside>
-            </main>
-            <footer>
-              <nav>
-                <button class="nv on">👕 Personaje</button>
-                <button class="nv" onclick="toast('Próximamente')">🔫 Armas</button>
-                <button class="nv" onclick="toast('Próximamente')">🎁 Tienda</button>
-                <button class="nv" onclick="toast('Próximamente')">👥 Amigos</button>
-              </nav>
-              <button id="play">JUGAR</button>
-            </footer>
-          </div>
-
-          <div id="hud" hidden>
-            <div id="tl"><div id="av"></div><div><div class="bar hp"><i id="hp"></i></div><div class="bar ar"><i id="ar"></i></div><div id="hpt"></div></div></div>
-            <div id="tc"><div id="alive"></div><div id="zone"></div></div>
-            <canvas id="mini" width="260" height="260"></canvas>
-            <div id="feed"></div>
-            <div id="cross"><i></i><i></i><i></i><i></i></div>
-            <div id="hitm"></div>
-            <div id="dmg"></div>
-            <div id="slots">
-              <div class="slot" id="sl0"><b></b><span></span></div>
-              <div class="slot" id="sl1"><b></b><span></span></div>
-              <div class="slot" id="sl2"><b></b><span></span></div>
-            </div>
-            <div id="joyBase"><div id="joyKnob"></div></div>
-            <button class="rb" id="jump">SALTAR</button>
-            <button class="rb" id="reload">RECARGAR</button>
-            <button id="fire">FUEGO</button>
-          </div>
-
-          <div id="cd"></div>
-
-          <div id="end" hidden>
-            <h1 id="endT"></h1>
-            <p id="endS"></p>
-            <button id="backLobby">VOLVER AL LOBBY</button>
-          </div>
-
-          <script src="three.min.js"></script>
-          <script>
-          // ================= UTILIDADES =================
-          const $ = id => document.getElementById(id);
-          const V = THREE.Vector3;
-          const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
-          const rnd = (a, b) => a + Math.random() * (b - a);
-          const pick = a => a[(Math.random() * a.length) | 0];
-          const ease = (c, t, k, dt) => c + (t - c) * Math.min(1, dt * k);
-          const hex = c => '#' + c.toString(16).padStart(6, '0');
-          function toast(t) {
-            const d = document.createElement('div'); d.id = 'toast'; d.textContent = t;
-            document.body.appendChild(d); setTimeout(() => d.remove(), 1200);
-          }
-
-          // ================= SONIDO 8 BITS =================
-          let A = null, master = null, noiseBuf = null, sfxOn = true, inGame = false;
-          function audio() {
-            if (!A) {
-              A = new (window.AudioContext || window.webkitAudioContext)();
-              master = A.createGain(); master.gain.value = 0.45; master.connect(A.destination);
-              noiseBuf = A.createBuffer(1, A.sampleRate * 0.5, A.sampleRate);
-              const d = noiseBuf.getChannelData(0);
-              for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-            }
-            if (A.state === 'suspended') A.resume();
-            return A;
-          }
-          function tone(f, dur, type = 'square', vol = 0.2, slide = 0, delay = 0) {
-            if (!sfxOn || !A) return;
-            const t = A.currentTime + delay;
-            const o = A.createOscillator(), g = A.createGain();
-            o.type = type; o.frequency.setValueAtTime(f, t);
-            if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, f * slide), t + dur);
-            g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-            o.connect(g).connect(master); o.start(t); o.stop(t + dur + 0.02);
-          }
-          function noise(dur, vol = 0.3, cut = 2000, delay = 0) {
-            if (!sfxOn || !A) return;
-            const t = A.currentTime + delay;
-            const s = A.createBufferSource(); s.buffer = noiseBuf;
-            const f = A.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = cut;
-            const g = A.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-            s.connect(f).connect(g).connect(master); s.start(t, Math.random() * 0.3); s.stop(t + dur + 0.02);
-          }
-          const SFX = {
-            pistol() { noise(0.09, 0.35, 3000); tone(520, 0.08, 'square', 0.15, 0.3); },
-            rifle() { noise(0.06, 0.3, 2500); tone(300, 0.05, 'square', 0.12, 0.4); },
-            shotgun() { noise(0.22, 0.5, 1500); tone(160, 0.18, 'sawtooth', 0.2, 0.3); },
-            enemy() { noise(0.05, 0.1, 1200); },
-            hit() { tone(880, 0.1, 'square', 0.18, 0.5); },
-            head() { tone(1320, 0.12, 'square', 0.2, 0.6); tone(1760, 0.12, 'square', 0.15, 0.7, 0.05); },
-            hurt() { tone(160, 0.2, 'sawtooth', 0.25, 0.4); },
-            reload() { tone(400, 0.06, 'square', 0.15); tone(600, 0.06, 'square', 0.15, 1, 0.15); noise(0.04, 0.2, 4000, 0.3); },
-            pickup() { [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.12, 'square', 0.16, 1, i * 0.06)); },
-            jump() { tone(330, 0.15, 'square', 0.12, 2.2); },
-            count() { tone(660, 0.12, 'square', 0.2); },
-            go() { tone(1047, 0.25, 'square', 0.2); },
-            zone() { tone(220, 0.25, 'triangle', 0.25); tone(180, 0.25, 'triangle', 0.25, 1, 0.3); },
-            win() { [523, 659, 784, 1046, 784, 1046].forEach((f, i) => tone(f, 0.18, 'square', 0.18, 1, i * 0.13)); },
-            lose() { [392, 349, 330, 262].forEach((f, i) => tone(f, 0.25, 'triangle', 0.25, 1, i * 0.22)); },
-            click() { tone(900, 0.04, 'square', 0.1); }
-          };
-          const MEL = [262, 330, 392, 494, 440, 392, 330, 294];
-          let mStep = 0;
-          setInterval(() => {
-            if (!A || !sfxOn || inGame) return;
-            const f = MEL[mStep % 8];
-            tone(f / 2, 0.22, 'triangle', 0.09);
-            if (mStep % 4 === 0) tone(f / 4, 0.5, 'square', 0.05);
-            mStep++;
-          }, 260);
-          addEventListener('pointerdown', audio);
-          $('snd').onclick = () => { sfxOn = !sfxOn; $('snd').textContent = sfxOn ? '🔊 SONIDO' : '🔇 MUDO'; audio(); };
-
-          // ================= TEXTURAS PROCEDURALES =================
-          function ctex(w, h, draw, rx = 1, ry = 1) {
-            const c = document.createElement('canvas'); c.width = w; c.height = h;
-            const x = c.getContext('2d'); draw(x, w, h);
-            const t = new THREE.CanvasTexture(c);
-            t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry);
-            t.anisotropy = 2;
-            return t;
-          }
-          function speck(x, w, h, n, cols, minS, maxS, a) {
-            for (let i = 0; i < n; i++) {
-              x.globalAlpha = a * (0.4 + Math.random() * 0.6);
-              x.fillStyle = pick(cols);
-              const s = rnd(minS, maxS);
-              x.fillRect(Math.random() * w, Math.random() * h, s, s);
-            }
-            x.globalAlpha = 1;
-          }
-          function blobs(x, w, h, n, cols, rmin, rmax, a) {
-            for (let i = 0; i < n; i++) {
-              x.globalAlpha = a; x.fillStyle = pick(cols);
-              x.beginPath();
-              x.ellipse(Math.random() * w, Math.random() * h, rnd(rmin, rmax), rnd(rmin, rmax) * 0.6, Math.random() * 3, 0, 7);
-              x.fill();
-            }
-            x.globalAlpha = 1;
-          }
-          const TX = {
-            grass: ctex(256, 256, (x, w, h) => {
-              x.fillStyle = '#6fbf5a'; x.fillRect(0, 0, w, h);
-              speck(x, w, h, 2200, ['#5aa64a', '#63b04f', '#7ccb62', '#8fd66f', '#4f9a42'], 1, 3, 0.55);
-              x.strokeStyle = 'rgba(40,90,30,.25)'; x.lineWidth = 1;
-              for (let i = 0; i < 500; i++) {
-                const px = Math.random() * w, py = Math.random() * h;
-                x.beginPath(); x.moveTo(px, py); x.lineTo(px + rnd(-2, 2), py - rnd(3, 7)); x.stroke();
-              }
-            }, 30, 30),
-            camo: ctex(256, 256, (x, w, h) => {
-              x.fillStyle = '#56653a'; x.fillRect(0, 0, w, h);
-              blobs(x, w, h, 40, ['#3e4d2a', '#2d3520'], 12, 34, 0.85);
-              blobs(x, w, h, 30, ['#7a7048', '#6b6a3c'], 8, 24, 0.8);
-              speck(x, w, h, 800, ['#1f2416'], 1, 2, 0.4);
-            }),
-            fabric: ctex(128, 128, (x, w, h) => {
-              x.fillStyle = '#ffffff'; x.fillRect(0, 0, w, h);
-              speck(x, w, h, 2500, ['#000000', '#444444', '#dddddd'], 1, 2, 0.12);
-              x.strokeStyle = 'rgba(0,0,0,.07)';
-              for (let i = 0; i < w; i += 4) {
-                x.beginPath(); x.moveTo(i, 0); x.lineTo(i, h); x.stroke();
-                x.beginPath(); x.moveTo(0, i); x.lineTo(w, i); x.stroke();
-              }
-            }),
-            metal: ctex(128, 128, (x, w, h) => {
-              x.fillStyle = '#d5dbe0'; x.fillRect(0, 0, w, h);
-              for (let i = 0; i < 120; i++) {
-                x.globalAlpha = rnd(0.05, 0.2); x.fillStyle = pick(['#ffffff', '#7d8790']);
-                x.fillRect(rnd(0, w), 0, rnd(1, 3), h);
-              }
-              x.globalAlpha = 1;
-            }),
-            skin: ctex(64, 64, (x, w, h) => {
-              x.fillStyle = '#ffffff'; x.fillRect(0, 0, w, h);
-              speck(x, w, h, 300, ['#c08a60', '#e8c9a8'], 1, 2, 0.25);
-            }),
-            fur: ctex(128, 128, (x, w, h) => {
-              x.fillStyle = '#ffffff'; x.fillRect(0, 0, w, h);
-              for (let i = 0; i < 1400; i++) {
-                x.strokeStyle = pick(['rgba(0,0,0,.18)', 'rgba(255,255,255,.35)', 'rgba(120,90,0,.15)']);
-                x.lineWidth = 1;
-                const px = rnd(0, w), py = rnd(0, h);
-                x.beginPath(); x.moveTo(px, py); x.lineTo(px + rnd(-2, 2), py + rnd(2, 5)); x.stroke();
-              }
-            }),
-            hazard: ctex(64, 64, (x) => {
-              x.fillStyle = '#111'; x.fillRect(0, 0, 64, 64);
-              x.fillStyle = '#f5c400';
-              for (let i = -64; i < 128; i += 32) {
-                x.beginPath(); x.moveTo(i, 0); x.lineTo(i + 16, 0); x.lineTo(i + 80, 64); x.lineTo(i + 64, 64); x.closePath(); x.fill();
-              }
-            }),
-            bark: ctex(128, 256, (x, w, h) => {
-              x.fillStyle = '#ffffff'; x.fillRect(0, 0, w, h);
-              for (let i = 0; i < 30; i++) {
-                x.strokeStyle = pick(['rgba(0,0,0,.25)', 'rgba(255,255,255,.12)']);
-                x.lineWidth = rnd(1, 3);
-                x.beginPath(); x.moveTo(rnd(0, w), 0); x.lineTo(rnd(0, w), h); x.stroke();
-              }
-            }, 1, 2),
-            leaf: ctex(128, 128, (x, w, h) => {
-              x.fillStyle = '#ffffff'; x.fillRect(0, 0, w, h);
-              speck(x, w, h, 1400, ['#000000', '#ffffff', '#5a5a5a'], 2, 4, 0.18);
-            }),
-            brick: ctex(256, 256, (x, w, h) => {
-              x.fillStyle = '#d9cbb0'; x.fillRect(0, 0, w, h);
-              for (let r = 0; r < 16; r++) for (let c = 0; c < 8; c++) {
-                x.fillStyle = pick(['#b5542f', '#a64a2a', '#c46a3e']);
-                x.fillRect(c * 32 + (r % 2) * 16 + 1, r * 16 + 1, 30, 14);
-              }
-              speck(x, w, h, 600, ['#000'], 1, 2, 0.15);
-            }),
-            plaster: ctex(256, 256, (x, w, h) => {
-              x.fillStyle = '#ffffff'; x.fillRect(0, 0, w, h);
-              speck(x, w, h, 2000, ['#d8cfbf', '#f7f2e8', '#bfb49e'], 1, 3, 0.35);
-            }),
-            roof: ctex(128, 128, (x, w, h) => {
-              x.fillStyle = '#8b3a2b'; x.fillRect(0, 0, w, h);
-              x.strokeStyle = 'rgba(0,0,0,.35)'; x.lineWidth = 2;
-              for (let r = 0; r < 8; r++) {
-                x.beginPath(); x.moveTo(0, r * 16); x.lineTo(w, r * 16); x.stroke();
-                for (let c = 0; c < 4; c++) {
-                  x.beginPath(); x.moveTo(c * 32 + (r % 2) * 16, r * 16); x.lineTo(c * 32 + (r % 2) * 16, r * 16 + 16); x.stroke();
-                }
-              }
-            }),
-            rock: ctex(128, 128, (x, w, h) => {
-              x.fillStyle = '#ffffff'; x.fillRect(0, 0, w, h);
-              speck(x, w, h, 1800, ['#4b5157', '#9aa3ac', '#6c747c', '#c8cdd2'], 1, 4, 0.4);
-            }),
-            wood: ctex(128, 128, (x, w, h) => {
-              x.fillStyle = '#ffffff'; x.fillRect(0, 0, w, h);
-              for (let i = 0; i < 40; i++) {
-                x.strokeStyle = pick(['rgba(0,0,0,.18)', 'rgba(255,255,255,.15)']);
-                x.beginPath(); x.moveTo(0, rnd(0, h));
-                x.bezierCurveTo(w * .3, rnd(0, h), w * .6, rnd(0, h), w, rnd(0, h)); x.stroke();
-              }
-            }),
-            sand: ctex(128, 128, (x, w, h) => {
-              x.fillStyle = '#e8cf94'; x.fillRect(0, 0, w, h);
-              speck(x, w, h, 1500, ['#d4b77a', '#f5e3b5', '#c9a867'], 1, 2, 0.5);
-            }, 8, 8)
-          };
-          const GRASS = TX.grass;
-
-          // ================= MATERIALES Y GEOMETRÍAS (con caché) =================
-          const MC = new Map(), GC = new Map();
-          function mat(c, map = null, emissive = 0) {
-            const k = c + '|' + (map ? map.uuid : '-') + '|' + emissive;
-            let m = MC.get(k);
-            if (!m) {
-              m = new THREE.MeshLambertMaterial({ color: c, map });
-              if (emissive) m.emissive = new THREE.Color(emissive);
-              MC.set(k, m);
-            }
-            return m;
-          }
-          function basic(c) {
-            const k = 'basic' + c;
-            let m = MC.get(k);
-            if (!m) { m = new THREE.MeshBasicMaterial({ color: c }); MC.set(k, m); }
-            return m;
-          }
-          function geo(w, h, d) {
-            const k = w + ',' + h + ',' + d;
-            let g = GC.get(k);
-            if (!g) { g = new THREE.BoxGeometry(w, h, d); GC.set(k, g); }
-            return g;
-          }
-          function box(p, w, h, d, m, x, y, z) {
-            const mesh = new THREE.Mesh(geo(w, h, d), (m && m.isMaterial) ? m : mat(m));
-            mesh.position.set(x, y, z); p.add(mesh); return mesh;
-          }
-          const F = c => mat(c, TX.fabric);
-          const MTL = c => mat(c, TX.metal);
-          const SKN = c => mat(c, TX.skin);
-          const FUR = c => mat(c, TX.fur);
-
-          // ================= SKINS =================
-          const SKINS = [
-            { n: 'Operador', rar: 'Común', type: 'sol', skin: 0xefb98c, shirt: 0xb9bdc2, vest: 0x8e959c, pants: 0x3b3e44, mask: 0x121212, boots: 0x5b3a1e, bag: 0x2e333b, hair: 0x2a1d14, glove: 0x3a2a1e, belt: 0x1e1e1e },
-            { n: 'Camuflaje', rar: 'Raro', type: 'sol', camo: true, skin: 0xefb98c, shirt: 0xffffff, vest: 0x3f4d2a, pants: 0xffffff, mask: 0x2a2f1c, boots: 0x3c2c1a, bag: 0x6b5a2e, hair: 0x1a120a, glove: 0x2f2a1a, belt: 0x2a2f1c },
-            { n: 'Neón', rar: 'Épico', type: 'sol', skin: 0xf2c4a0, shirt: 0x1d1f3a, vest: 0x00e5ff, pants: 0x1a1a2e, mask: 0x0b0b15, boots: 0x222244, bag: 0xff2bd6, hair: 0x00e5ff, glove: 0x111122, belt: 0x111122 },
-            { n: 'Fuego', rar: 'Épico', type: 'sol', skin: 0xefb98c, shirt: 0xcfcfcf, vest: 0xb22222, pants: 0x2b2b2b, mask: 0x0d0d0d, boots: 0x3a1f1f, bag: 0x550000, hair: 0xff6a00, glove: 0x222222, belt: 0x222222 },
-            { n: 'Springtrap', rar: 'Legendario', type: 'anim', body: 0xd9cf2b, muzzle: 0xe8e06a, dark: 0x8a7d12, ear: 0xc9bf22, bow: 0x6a2c91, eye: 0x39ff6a, pants: 0x2a2a2a, boots: 0x1a1a1a, glove: 0x3a3a3a },
-            { n: 'Freddy', rar: 'Épico', type: 'anim', body: 0x7a4a2a, muzzle: 0x9a5f36, dark: 0x4a2c18, ear: 0x6a3e22, bow: 0xc1272d, eye: 0x4fc3ff, pants: 0x3a2416, boots: 0x1a1a1a, glove: 0x2a2a2a, hat: 0x111111 }
-          ];
-          let selIdx = Math.min(SKINS.length - 1, parseInt(localStorage.getItem('br_skin') || '0', 10) || 0);
-
-          // ================= ARMAS =================
-          const W = {
-            pistol:  { name: 'PISTOLA',  dmg: 18, rate: 0.22, mag: 12, reload: 1.0, spread: 0.012, auto: false, pell: 1, range: 120 },
-            rifle:   { name: 'RIFLE AK', dmg: 14, rate: 0.10, mag: 30, reload: 1.9, spread: 0.02,  auto: true,  pell: 1, range: 150 },
-            shotgun: { name: 'ESCOPETA', dmg: 11, rate: 0.75, mag: 6,  reload: 2.2, spread: 0.07,  auto: false, pell: 6, range: 45 }
-          };
-
-          // ================= RENDER =================
-          const renderer = new THREE.WebGLRenderer({ canvas: $('game'), antialias: true });
-          renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-          const scene = new THREE.Scene();
-          scene.background = new THREE.Color(0xbfe6ff);
-          scene.fog = new THREE.Fog(0xbfe6ff, 130, 280);
-          const camera = new THREE.PerspectiveCamera(65, 1, 0.1, 500);
-          scene.add(new THREE.HemisphereLight(0xffffff, 0x4a7a3a, 1.1));
-          const sun = new THREE.DirectionalLight(0xffffff, 0.8);
-          sun.position.set(40, 80, 30); scene.add(sun);
-          let world = new THREE.Group(); scene.add(world);
-          const ray = new THREE.Raycaster();
-          const camRay = new THREE.Raycaster();
-
-          const pr = new THREE.WebGLRenderer({ canvas: $('prev'), antialias: true, alpha: true });
-          pr.setPixelRatio(Math.min(devicePixelRatio, 2));
-          const pscene = new THREE.Scene();
-          const pcam = new THREE.PerspectiveCamera(34, 1, 0.1, 50);
-          pcam.position.set(0, 2.1, 9); pcam.lookAt(0, 1.9, 0);
-          pscene.add(new THREE.HemisphereLight(0xffffff, 0x445544, 1.2));
-          const psun = new THREE.DirectionalLight(0xffffff, 0.9); psun.position.set(3, 5, 5); pscene.add(psun);
-          let prevChar = null, prevEnt = null, prevRot = 0.4, prevDrag = false;
-
-          function resizePreview() {
-            const c = $('prev'), w = c.clientWidth, h = c.clientHeight;
-            if (!w || !h) return;
-            pr.setSize(w, h, false);
-            pcam.aspect = w / h; pcam.updateProjectionMatrix();
-          }
-          function resize() {
-            renderer.setSize(innerWidth, innerHeight, false);
-            camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
-            resizePreview();
-          }
-          addEventListener('resize', resize);
-
-          // ================= PERSONAJE DETALLADO =================
-          function buildChar(s) {
-            const anim = s.type === 'anim';
-            const g = new THREE.Group(), body = new THREE.Group();
-            body.scale.setScalar(1.5); g.add(body);
-            const B = (p, w, h, d, m, x, y, z) => box(p, w, h, d, m, x, y, z);
-
-            const pantsM = anim ? FUR(s.pants) : (s.camo ? mat(0xffffff, TX.camo) : F(s.pants));
-            const shirtM = anim ? FUR(s.body) : (s.camo ? mat(0xffffff, TX.camo) : F(s.shirt));
-            const vestM = anim ? FUR(s.dark) : F(s.vest);
-            const skinM = anim ? FUR(s.body) : SKN(0xefb98c);
-            const gloveM = F(anim ? 0x3a3a3a : s.glove);
-            const bootM = F(s.boots);
-            const bagM = F(s.bag || 0x2e333b);
-            const maskM = F(s.mask || 0x121212);
-            const hairM = mat(s.hair || 0x222222);
-            const beltM = F(s.belt || 0x1e1e1e);
-            const metalDk = MTL(0x3a4046);
-            const metalLt = MTL(0xcfd6dd);
-
-            // Piernas con botas y suela
-            const legs = [-0.2, 0.2].map(x => {
-              const p = new THREE.Group(); p.position.set(x, 0.96, 0); body.add(p);
-              B(p, 0.3, 0.95, 0.32, pantsM, 0, -0.475, 0);
-              B(p, 0.34, 0.07, 0.36, mat(0x1a1a1a), 0, -0.95, 0.05);
-              B(p, 0.36, 0.22, 0.46, bootM, 0, -0.85, 0.05);
-              return p;
-            });
-
-            // Cinturón, hebilla y pouches
-            B(body, 0.9, 0.14, 0.52, beltM, 0, 0.98, 0);
-            if (!anim) {
-              B(body, 0.1, 0.1, 0.03, MTL(0xd4af37), 0, 0.98, 0.27);
-              B(body, 0.16, 0.16, 0.14, F(0x2d3238), -0.36, 0.98, 0.1);
-              B(body, 0.16, 0.16, 0.14, F(0x2d3238), 0.38, 0.98, -0.05);
-            }
-
-            // Torso
-            if (anim) {
-              B(body, 0.9, 1.0, 0.5, shirtM, 0, 1.45, 0);
-              B(body, 0.64, 0.7, 0.06, FUR(s.muzzle), 0, 1.42, 0.27);
-              B(body, 0.16, 0.12, 0.1, F(s.bow), -0.11, 1.7, 0.3);
-              B(body, 0.16, 0.12, 0.1, F(s.bow), 0.11, 1.7, 0.3);
-              B(body, 0.07, 0.08, 0.11, F(s.bow), 0, 1.7, 0.31);
-            } else {
-              B(body, 0.84, 0.95, 0.46, shirtM, 0, 1.45, 0);
-              B(body, 0.92, 0.62, 0.54, vestM, 0, 1.42, 0.02);
-              B(body, 0.5, 0.46, 0.06, mat(0x6d747c, TX.metal), 0, 1.47, 0.31);
-              B(body, 0.1, 0.64, 0.56, F(0x1e2226), -0.3, 1.42, 0.02);
-              B(body, 0.1, 0.64, 0.56, F(0x1e2226), 0.3, 1.42, 0.02);
-              B(body, 0.2, 0.2, 0.12, F(0x2d3238), -0.28, 1.04, 0.32);
-              B(body, 0.2, 0.2, 0.12, F(0x2d3238), 0.28, 1.04, 0.32);
-              B(body, 0.26, 0.3, 0.22, mat(0xffffff, TX.hazard), -0.5, 1.0, 0.15);
-              B(body, 0.36, 0.14, 0.36, vestM, -0.6, 1.9, 0);
-              B(body, 0.36, 0.14, 0.36, vestM, 0.6, 1.9, 0);
-            }
-
-            // Brazo izquierdo
-            const armL = new THREE.Group(); armL.position.set(-0.63, 1.8, 0); body.add(armL);
-            B(armL, 0.3, 0.7, 0.3, shirtM, 0, -0.35, 0);
-            B(armL, 0.26, 0.55, 0.26, skinM, 0, -0.97, 0);
-            B(armL, 0.28, 0.2, 0.28, gloveM, 0, -1.2, 0);
-            B(armL, 0.28, 0.1, 0.22, gloveM, 0, -1.32, 0.04);
-
-            // Brazo derecho (sostiene el arma)
-            const armR = new THREE.Group(); armR.position.set(0.63, 1.8, 0); body.add(armR);
-            B(armR, 0.3, 0.6, 0.3, shirtM, 0, -0.3, 0);
-            B(armR, 0.26, 0.5, 0.26, skinM, 0, -0.85, 0);
-            B(armR, 0.28, 0.24, 0.28, gloveM, 0, -1.1, 0);
-            B(armR, 0.28, 0.1, 0.22, gloveM, 0, -1.22, 0.04);
-            const hold = new THREE.Group(); hold.position.set(0, -1.1, 0.05); armR.add(hold);
-            armR.rotation.x = -1.35;
-
-            // Cabeza
-            if (!anim) {
-              const head = B(body, 0.5, 0.5, 0.5, skinM, 0, 2.0, 0); head.userData.part = 'head';
-              B(body, 0.06, 0.12, 0.1, skinM, -0.27, 2.0, 0);
-              B(body, 0.06, 0.12, 0.1, skinM, 0.27, 2.0, 0);
-              B(body, 0.11, 0.05, 0.02, mat(0xf2f2f2), -0.12, 2.05, 0.26);
-              B(body, 0.11, 0.05, 0.02, mat(0xf2f2f2), 0.12, 2.05, 0.26);
-              B(body, 0.05, 0.05, 0.03, mat(0x111111), -0.12, 2.05, 0.27);
-              B(body, 0.05, 0.05, 0.03, mat(0x111111), 0.12, 2.05, 0.27);
-              B(body, 0.14, 0.03, 0.03, mat(0x2a1d14), -0.12, 2.12, 0.27);
-              B(body, 0.14, 0.03, 0.03, mat(0x2a1d14), 0.12, 2.12, 0.27);
-              B(body, 0.52, 0.28, 0.52, maskM, 0, 1.84, 0);
-              B(body, 0.54, 0.12, 0.54, hairM, 0, 2.27, 0);
-              B(body, 0.52, 0.08, 0.08, hairM, 0, 2.2, 0.24);
-              // Mochila, rifle a la espalda y cuchillo
-              B(body, 0.62, 0.78, 0.26, bagM, 0, 1.42, -0.38);
-              B(body, 0.2, 0.7, 0.04, mat(0xffffff, TX.hazard), 0.33, 1.42, -0.38);
-              B(body, 0.12, 0.16, 1.0, mat(0x1d1d1d), 0.2, 1.9, -0.55);
-              B(body, 0.06, 0.07, 0.16, mat(0x111111), 0.2, 2.0, -0.6);
-              B(body, 0.07, 0.07, 0.5, metalDk, 0.2, 1.98, -1.05);
-              B(body, 0.06, 0.28, 0.1, F(0x222222), 0.5, 0.98, 0.22);
-              B(body, 0.03, 0.32, 0.06, metalLt, 0.5, 0.7, 0.22);
-            } else {
-              const hd = B(body, 0.7, 0.62, 0.56, FUR(s.body), 0, 2.05, 0); hd.userData.part = 'head';
-              B(body, 0.42, 0.3, 0.3, FUR(s.muzzle), 0, 1.9, 0.36);
-              B(body, 0.14, 0.1, 0.1, mat(0x111111), 0, 1.98, 0.52);
-              B(body, 0.5, 0.12, 0.3, FUR(s.dark), 0, 1.72, 0.32);
-              for (let i = 0; i < 5; i++) B(body, 0.08, 0.1, 0.04, mat(0xf4f4f4), -0.2 + i * 0.1, 1.8, 0.36);
-              for (const x of [-0.15, 0.15]) {
-                const e = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), basic(s.eye));
-                e.position.set(x, 2.12, 0.33); body.add(e);
-                // marco de gafas
-                const c = 0x111111, t = 0.035, w = 0.2, h = 0.16, z = 0.34;
-                B(body, w, t, 0.04, mat(c), x, 2.12 + h / 2, z);
-                B(body, w, t, 0.04, mat(c), x, 2.12 - h / 2, z);
-                B(body, t, h, 0.04, mat(c), x - w / 2, 2.12, z);
-                B(body, t, h, 0.04, mat(c), x + w / 2, 2.12, z);
-              }
-              B(body, 0.14, 0.1, 0.04, mat(0x111111), 0, 2.12, 0.34);
-              if (s.hat) {
-                B(body, 0.5, 0.3, 0.5, mat(s.hat), 0, 2.5, 0);
-                B(body, 0.72, 0.05, 0.72, mat(s.hat), 0, 2.35, 0);
-                B(body, 0.52, 0.06, 0.52, F(s.bow), 0, 2.37, 0);
-              } else {
-                const e1 = B(body, 0.2, 0.9, 0.12, FUR(s.ear), -0.2, 2.7, 0); e1.rotation.z = 0.12;
-                const e2 = B(body, 0.2, 0.9, 0.12, FUR(s.ear), 0.2, 2.7, 0); e2.rotation.z = -0.12;
-              }
-              B(body, 0.3, 0.14, 0.22, FUR(s.dark), 0, 0.7, 0.1);
-            }
-
-            g.userData = { body, legs, armL, armR, hold, seed: rnd(0, 10), phase: 0 };
-            g.traverse(o => { o.frustumCulled = false; });
-            return g;
-          }
-
-          function makeGun(id) {
-            const g = new THREE.Group();
-            const dk = mat(0x2a2e33, TX.metal), st = MTL(0x9aa3ad), wd = mat(0x7a4a22, TX.wood);
-            if (id === 'pistol') {
-              box(g, 0.1, 0.14, 0.36, dk, 0, 0, 0);
-              box(g, 0.04, 0.04, 0.12, st, 0, 0.02, 0.22);
-              box(g, 0.08, 0.22, 0.1, dk, 0, -0.16, -0.1);
-            } else if (id === 'rifle') {
-              box(g, 0.1, 0.15, 0.9, dk, 0, 0, 0.05);
-              box(g, 0.04, 0.05, 0.4, st, 0, 0.02, 0.6);
-              box(g, 0.09, 0.2, 0.12, dk, 0, -0.17, 0.1);
-              box(g, 0.09, 0.14, 0.42, wd, 0, 0, -0.45);
-              box(g, 0.06, 0.06, 0.2, dk, 0, 0.12, 0.1);
-            } else {
-              box(g, 0.13, 0.13, 0.9, wd, 0, 0, 0.05);
-              box(g, 0.1, 0.08, 0.6, st, 0, 0.04, 0.45);
-              box(g, 0.12, 0.1, 0.2, dk, 0, -0.02, 0.2);
-              box(g, 0.12, 0.15, 0.4, wd, 0, -0.02, -0.5);
-            }
-            const flash = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 8), basic(0xffdd55));
-            flash.position.set(0, 0.05, 0.78); flash.visible = false; g.add(flash);
-            g.userData.flash = flash;
-            return g;
-          }
-          function makeEnt(name, skin, bot, wid) {
-            const g = buildChar(skin);
-            const e = {
-              name, g, bot, hp: 100, armor: 0, alive: true, cd: rnd(0.5, 1.5), yaw: 0, pitch: 0,
-              vy: 0, ground: true, wander: 0, tx: 0, tz: 0, strafe: Math.random() < 0.5 ? -1 : 1,
-              isP: false, gun: null, recoil: 0, flash: 0, deathT: 1, lx: 0, lz: 0, spd: 0
-            };
-            e.gun = makeGun(wid); g.userData.hold.add(e.gun);
-            g.traverse(c => { c.userData.ent = e; });
-            return e;
-          }
-          function setPreview() {
-            if (prevChar) pscene.remove(prevChar);
-            prevChar = buildChar(SKINS[selIdx]);
-            prevChar.position.y = 0;
-            prevEnt = { g: prevChar, alive: true, phase: 0, recoil: 0, flash: 0, gun: null, spd: 0 };
-            pscene.add(prevChar);
-          }
-          function buildSkinUI() {
-            const box2 = $('skins'); box2.innerHTML = '';
-            SKINS.forEach((s, i) => {
-              const b = document.createElement('button');
-              b.className = 'sk' + (i === selIdx ? ' on' : '');
-              b.style.setProperty('--i', i);
-              const c1 = s.type === 'anim' ? s.body : s.shirt, c2 = s.type === 'anim' ? s.bow : s.vest;
-              b.innerHTML = `<div class="sw" style="background:linear-gradient(135deg,${hex(c1)},${hex(c2)})"></div>${s.n}<small>${s.rar}</small>`;
-              b.onclick = () => { SFX.click(); selIdx = i; localStorage.setItem('br_skin', String(i)); buildSkinUI(); setPreview(); };
-              box2.appendChild(b);
-            });
-            $('sName').textContent = SKINS[selIdx].n;
-            $('sRar').textContent = SKINS[selIdx].rar;
-          }
-          $('prev').addEventListener('pointerdown', e => { prevDrag = true; e.target.setPointerCapture(e.pointerId); });
-          $('prev').addEventListener('pointermove', e => { if (prevDrag) prevRot += e.movementX * 0.01; });
-          $('prev').addEventListener('pointerup', () => prevDrag = false);
-
-          // ================= MAPA =================
-          let solids = [], cols = [], pickups = [], bots = [], P = null, slots = [], cur = 0;
-          let reloadT = 0, fireHeld = false, fireEdge = false, joyX = 0, joyY = 0;
-          let kills = 0, matchT = 0, zPh = 0, running = false, ready = false;
-          let time = 0, cdT = 0, slowT = 0, camShake = 0, camFov = 65, camSnap = false, endQueued = false;
-          const zone = { r: 130, target: 130 };
-          let zoneWall = null;
-          const tracers = [];
-          const ZPH = [{ t: 50, r: 85 }, { t: 110, r: 45 }, { t: 170, r: 20 }, { t: 230, r: 6 }];
-
-          function free(x, z, r) {
-            if (Math.hypot(x, z) > 112 - r) return false;
-            return cols.every(c => Math.abs(x - c.x) > c.hw + r || Math.abs(z - c.z) > c.hd + r);
-          }
-          function randomFree(minR, maxR) {
-            let x, z, t = 0;
-            do { const a = rnd(0, 6.283), r = rnd(minR, maxR); x = Math.cos(a) * r; z = Math.sin(a) * r; }
-            while (!free(x, z, 1) && ++t < 80);
-            return { x, z };
-          }
-          function makePickup(type) {
-            const g = new THREE.Group();
-            const col = { med: 0xffffff, vest: 0x2a7fd6, pistol: 0x9aa3ad, rifle: 0xffaa00, shotgun: 0xff5533 }[type];
-            box(g, 0.6, 0.5, 0.6, mat(col, TX.fabric), 0, 0, 0);
-            if (type === 'med') { box(g, 0.46, 0.12, 0.12, mat(0xe53935), 0, 0.32, 0); box(g, 0.12, 0.12, 0.46, mat(0xe53935), 0, 0.32, 0); }
-            const ring = new THREE.Mesh(new THREE.RingGeometry(0.6, 0.8, 24), new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide, transparent: true, opacity: 0.7 }));
-            ring.rotation.x = -Math.PI / 2; ring.position.y = -0.55; g.add(ring);
-            g.userData.ring = ring;
-            return g;
-          }
-          function buildWorld() {
-            scene.remove(world); world = new THREE.Group(); scene.add(world);
-            solids = []; cols = [];
-            const water = new THREE.Mesh(new THREE.CircleGeometry(900, 48), mat(0x3aa6e8));
-            water.rotation.x = -Math.PI / 2; water.position.y = -0.8; world.add(water);
-            const sand = new THREE.Mesh(new THREE.CircleGeometry(150, 64), mat(0xffffff, TX.sand));
-            sand.rotation.x = -Math.PI / 2; sand.position.y = -0.4; world.add(sand);
-            const grass = new THREE.Mesh(new THREE.CircleGeometry(132, 64), mat(0xffffff, GRASS));
-            grass.rotation.x = -Math.PI / 2; world.add(grass);
-
-            const wallMats = [mat(0xffffff, TX.plaster), mat(0xf6b26b, TX.plaster), mat(0xa8dadc, TX.plaster), mat(0xffffff, TX.brick), mat(0xd9b48f, TX.plaster)];
-            const roofMats = [mat(0xffffff, TX.roof), mat(0x3d405b, TX.roof), mat(0x6d4c41, TX.roof)];
-            const glass = mat(0x2b4a5e), frameM = mat(0xe8e2d4);
-            let n = 0;
-            for (let tries = 0; n < 16 && tries < 400; tries++) {
-              const w = rnd(6, 11), d = rnd(6, 11), h = rnd(4, 7), a = rnd(0, 6.283), r = rnd(24, 105);
-              const x = Math.cos(a) * r, z = Math.sin(a) * r;
-              if (!free(x, z, Math.max(w, d) * 0.7)) continue;
-              n++;
-              solids.push(box(world, w, h, d, pick(wallMats), x, h / 2, z));
-              solids.push(box(world, w + 0.8, 0.6, d + 0.8, pick(roofMats), x, h + 0.3, z));
-              for (const sx of [-0.25, 0.25]) for (const sz of [-1, 1]) {
-                box(world, 1.1, 1.0, 0.12, glass, x + sx * w, h * 0.5, z + sz * (d / 2 + 0.02));
-                box(world, 1.2, 0.08, 0.14, frameM, x + sx * w, h * 0.5 + 0.54, z + sz * (d / 2 + 0.02));
-              }
-              cols.push({ x, z, hw: w / 2 + 0.3, hd: d / 2 + 0.3 });
-            }
-            const trunkM = mat(0xffffff, TX.bark);
-            const leafC = [0x2e8b3e, 0x3c9d4a, 0x257a36, 0x46a052];
-            for (let i = 0; i < 90; i++) {
-              const a = rnd(0, 6.283), r = rnd(10, 118), x = Math.cos(a) * r, z = Math.sin(a) * r;
-              if (!free(x, z, 1.2)) continue;
-              solids.push(box(world, 0.5, 2.4, 0.5, trunkM, x, 1.2, z));
-              const f = new THREE.Mesh(new THREE.IcosahedronGeometry(rnd(1.4, 2), 0), mat(pick(leafC), TX.leaf));
-              f.position.set(x, 3.4, z); f.rotation.y = rnd(0, 3); world.add(f); solids.push(f);
-              cols.push({ x, z, hw: 0.45, hd: 0.45 });
-            }
-            const rockMat = mat(0xffffff, TX.rock);
-            for (let i = 0; i < 40; i++) {
-              const a = rnd(0, 6.283), r = rnd(10, 112), x = Math.cos(a) * r, z = Math.sin(a) * r;
-              if (!free(x, z, 1)) continue;
-              const rk = new THREE.Mesh(new THREE.DodecahedronGeometry(rnd(0.9, 1.5)), rockMat);
-              rk.position.set(x, 0.6, z); world.add(rk); solids.push(rk);
-              cols.push({ x, z, hw: 0.9, hd: 0.9 });
-            }
-            zoneWall = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 14, 128, 1, true),
-              new THREE.MeshBasicMaterial({ color: 0xff2b3a, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false }));
-            zoneWall.position.y = 7; world.add(zoneWall);
-
-            pickups = [];
-            const kinds = ['med', 'med', 'vest', 'pistol', 'rifle', 'rifle', 'shotgun', 'shotgun'];
-            for (let i = 0; i < 26; i++) {
-              const type = pick(kinds), p = randomFree(8, 108);
-              const m = makePickup(type); m.position.set(p.x, 0.6, p.z); world.add(m);
-              pickups.push({ type, m, x: p.x, z: p.z, appear: 0 });
-            }
-          }
-          function moveEnt(e, dx, dz) {
-            const p = e.g.position;
-            const nx = p.x + dx, nz = p.z + dz;
-            if (free(nx, p.z, 0.4)) p.x = nx;
-            if (free(p.x, nz, 0.4)) p.z = nz;
-          }
-
-          // ================= ANIMACIONES =================
-          function animEnt(e, dt, spd, air) {
-            if (!e.alive) return;
-            const u = e.g.userData, sw = Math.min(1, spd / 4);
-            e.phase += spd * dt * 1.7;
-            const ph = e.phase;
-            u.legs[0].rotation.x = ease(u.legs[0].rotation.x, air ? -0.55 : Math.sin(ph) * 0.8 * sw, 16, dt);
-            u.legs[1].rotation.x = ease(u.legs[1].rotation.x, air ? -0.3 : -Math.sin(ph) * 0.8 * sw, 16, dt);
-            u.armL.rotation.x = ease(u.armL.rotation.x, air ? -0.3 : -Math.sin(ph) * 0.55 * sw, 12, dt);
-            const aimT = -1.35 + Math.sin(ph) * 0.04 * sw + e.recoil * 0.22;
-            u.armR.rotation.x = ease(u.armR.rotation.x, aimT, 20, dt);
-            const bobT = Math.abs(Math.sin(ph)) * 0.06 * sw + Math.sin(time * 2 + u.seed) * 0.015 * (1 - sw);
-            u.body.position.y = ease(u.body.position.y, bobT, 14, dt);
-            u.body.rotation.x = ease(u.body.rotation.x, sw * 0.08, 8, dt);
-            e.recoil = Math.max(0, e.recoil - dt * 9);
-            if (e.gun) {
-              e.flash = Math.max(0, e.flash - dt);
-              e.gun.userData.flash.visible = e.flash > 0;
-              e.gun.userData.flash.rotation.z += dt * 30;
-            }
-          }
-          function updateDeaths(dt) {
-            for (const e of [P, ...bots]) {
-              if (!e || e.alive || e.deathT >= 1) continue;
-              e.deathT = Math.min(1, e.deathT + dt * 2.2);
-              const k = 1 - Math.pow(1 - e.deathT, 3);
-              e.g.rotation.x = -Math.PI / 2 * k;
-              e.g.position.y = 0.25 * k;
-            }
-          }
-          function animateAll(dt) {
-            for (const e of [P, ...bots]) {
-              if (!e || !e.alive) continue;
-              const p = e.g.position;
-              e.spd = Math.hypot(p.x - e.lx, p.z - e.lz) / Math.max(dt, 1e-4);
-              e.lx = p.x; e.lz = p.z;
-              animEnt(e, dt, e.spd, !e.ground);
-            }
-            updateDeaths(dt);
-          }
-
-          // ================= ARMAS =================
-          function fwdVec() {
-            return new V(Math.sin(P.yaw) * Math.cos(P.pitch), Math.sin(P.pitch), Math.cos(P.yaw) * Math.cos(P.pitch));
-          }
-          function tracer(a, b, mine) {
-            const geo2 = new THREE.BufferGeometry().setFromPoints([a, b]);
-            const m2 = new THREE.LineBasicMaterial({ color: mine ? 0xffe066 : 0xff6b6b, transparent: true, opacity: 1 });
-            const ln = new THREE.Line(geo2, m2);
-            world.add(ln);
-            tracers.push({ ln, geo: geo2, mat: m2, t: 0.12 });
-          }
-          function updateTracers(dt) {
-            for (let i = tracers.length - 1; i >= 0; i--) {
-              const tr = tracers[i];
-              tr.t -= dt;
-              tr.mat.opacity = Math.max(0, tr.t / 0.12);
-              if (tr.t <= 0) { world.remove(tr.ln); tr.geo.dispose(); tr.mat.dispose(); tracers.splice(i, 1); }
-            }
-          }
-          function fireShot(sh, wid, origin, dir, o) {
-            const w = W[wid], sp = o.spread ?? w.spread, mul = o.mul ?? 1;
-            const list = solids.concat(o.targets);
-            sh.recoil = 1; sh.flash = 0.06;
-            for (let i = 0; i < w.pell; i++) {
-              const d = dir.clone().add(new V(rnd(-sp, sp), rnd(-sp, sp), rnd(-sp, sp))).normalize();
-              ray.set(origin, d); ray.far = w.range;
-              const hit = ray.intersectObjects(list, true)[0];
-              let end = origin.clone().addScaledVector(d, w.range);
-              if (hit) {
-                end = hit.point;
-                const e = hit.object.userData.ent;
-                if (e && e.alive && e !== sh) {
-                  const headMul = hit.object.userData.part === 'head' ? 2 : 1;
-                  damageEnt(e, w.dmg * headMul * mul, sh);
-                  if (sh === P) { showHitMark(headMul > 1); headMul > 1 ? SFX.head() : SFX.hit(); }
-                }
-              }
-              tracer(o.muzzle || origin, end, sh === P);
-            }
-          }
-          function damageEnt(e, amt, by) {
-            if (!e.alive) return;
-            const a = Math.min(e.armor, amt);
-            e.armor -= a; e.hp -= amt - a;
-            if (e.isP) { flashDmg(); camShake = Math.min(0.5, camShake + 0.25); SFX.hurt(); }
-            if (e.hp <= 0) {
-              e.hp = 0; e.alive = false; e.deathT = 0;
-              if (e.isP) {
-                feed(by ? `${by.name} te eliminó` : 'La zona te eliminó');
-                slowT = 1.2;
-                if (!endQueued) { endQueued = true; setTimeout(() => endMatch(false), 1300); }
-              } else if (by === P) {
-                kills++; feed(`Eliminaste a ${e.name}`);
-              }
-            }
-          }
-          function equip(i) {
-            cur = i; reloadT = 0;
-            if (P.gun && P.gun.parent) P.gun.parent.remove(P.gun);
-            P.gun = makeGun(slots[i].id);
-            P.g.userData.hold.add(P.gun);
-            P.gun.traverse(c => { c.userData.ent = P; });
-          }
-          function setSlot(i) {
-            if (!running || !ready || !slots[i] || (i === cur && P.gun)) return;
-            equip(i);
-          }
-          function giveWeapon(id) {
-            const w = W[id];
-            const same = slots.findIndex(s => s && s.id === id);
-            if (same >= 0) { slots[same].res += w.mag * 2; feed(`+munición ${w.name}`); return true; }
-            const e = slots.indexOf(null);
-            if (e >= 0) slots[e] = { id, mag: w.mag, res: w.mag * 2 };
-            else { slots[cur] = { id, mag: w.mag, res: w.mag * 2 }; equip(cur); }
-            feed(`Recogiste ${w.name}`);
-            return true;
-          }
-          function startReload() {
-            const s = slots[cur]; if (!s || reloadT > 0 || !ready) return;
-            const w = W[s.id]; if (s.mag >= w.mag || s.res <= 0) return;
-            reloadT = w.reload; SFX.reload();
-          }
-          function finishReload() {
-            const s = slots[cur], w = W[s.id];
-            const take = Math.min(w.mag - s.mag, s.res);
-            s.mag += take; s.res -= take;
-          }
-          function playerShoot() {
-            const s = slots[cur];
-            const targets = bots.filter(b => b.alive).map(b => b.g);
-            const muzzle = P.gun ? P.gun.localToWorld(new V(0, 0.05, 0.78)) : camera.position;
-            SFX[s.id === 'pistol' ? 'pistol' : s.id === 'rifle' ? 'rifle' : 'shotgun']();
-            fireShot(P, s.id, camera.position.clone(), fwdVec(), { targets, muzzle });
-          }
-          function showHitMark(head) {
-            const h = $('hitm');
-            h.classList.remove('on'); void h.offsetWidth; h.classList.add('on');
-            h.style.filter = head ? 'hue-rotate(40deg) brightness(1.3)' : '';
-            clearTimeout(showHitMark.t);
-            showHitMark.t = setTimeout(() => h.classList.remove('on'), 160);
-          }
-          function flashDmg() {
-            const d = $('dmg'); d.style.opacity = 1;
-            clearTimeout(flashDmg.t); flashDmg.t = setTimeout(() => d.style.opacity = 0, 180);
-          }
-          function feed(t) {
-            const f = $('feed'), d = document.createElement('div');
-            d.textContent = t; f.prepend(d);
-            setTimeout(() => d.classList.add('out'), 3300);
-            setTimeout(() => d.remove(), 3800);
-            while (f.children.length > 5) f.lastChild.remove();
-          }
-          function showCount(t) {
-            const el = $('cd');
-            el.textContent = t;
-            el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
-          }
-
-          // ================= CONTROLES =================
-          const keys = {};
-          addEventListener('keydown', e => {
-            keys[e.code] = true;
-            if (e.code === 'Space') { e.preventDefault(); jump(); }
-            if (e.code === 'KeyR') startReload();
-            if (e.code === 'KeyF') { fireHeld = true; fireEdge = true; }
-            if (e.code === 'Digit1') setSlot(0);
-            if (e.code === 'Digit2') setSlot(1);
-            if (e.code === 'Digit3') setSlot(2);
-          });
-          addEventListener('keyup', e => { keys[e.code] = false; if (e.code === 'KeyF') fireHeld = false; });
-
-          const joyBase = $('joyBase'), joyKnob = $('joyKnob');
-          let joyId = null, jOX = 0, jOY = 0, lookId = null, lX = 0, lY = 0;
-          function look(dx, dy) {
-            P.yaw -= dx * 0.0055;
-            P.pitch = clamp(P.pitch - dy * 0.004, -0.6, 0.6);
-          }
-          addEventListener('pointerdown', e => {
-            if (!running || e.target.closest('button')) return;
-            if (e.pointerType === 'mouse') {
-              if (e.button === 0) { fireHeld = true; fireEdge = true; }
-              if (document.body.requestPointerLock) document.body.requestPointerLock();
-              return;
-            }
-            if (e.clientX < innerWidth * 0.45 && joyId === null) {
-              joyId = e.pointerId; jOX = e.clientX; jOY = e.clientY;
-              joyBase.style.left = jOX + 'px'; joyBase.style.top = jOY + 'px'; joyBase.style.display = 'block';
-            } else if (lookId === null) {
-              lookId = e.pointerId; lX = e.clientX; lY = e.clientY;
-            }
-          });
-          addEventListener('pointermove', e => {
-            if (!running) return;
-            if (e.pointerId === joyId) {
-              let dx = e.clientX - jOX, dy = e.clientY - jOY;
-              const d = Math.hypot(dx, dy), R = 55;
-              if (d > R) { dx *= R / d; dy *= R / d; }
-              joyX = dx / R; joyY = dy / R;
-              joyKnob.style.transform = `translate(${dx}px,${dy}px)`;
-            } else if (e.pointerId === lookId) {
-              look(e.clientX - lX, e.clientY - lY); lX = e.clientX; lY = e.clientY;
-            } else if (e.pointerType === 'mouse' && document.pointerLockElement) {
-              look(e.movementX, e.movementY);
-            }
-          });
-          function endPointer(e) {
-            if (e.pointerType === 'mouse') fireHeld = false;
-            if (e.pointerId === joyId) {
-              joyId = null; joyX = joyY = 0; joyBase.style.display = 'none'; joyKnob.style.transform = '';
-            }
-            if (e.pointerId === lookId) lookId = null;
-          }
-          addEventListener('pointerup', endPointer);
-          addEventListener('pointercancel', endPointer);
-
-          $('fire').addEventListener('pointerdown', e => { e.stopPropagation(); e.target.setPointerCapture(e.pointerId); fireHeld = true; fireEdge = true; });
-          $('fire').addEventListener('pointerup', () => fireHeld = false);
-          $('fire').addEventListener('pointercancel', () => fireHeld = false);
-          $('jump').addEventListener('pointerdown', e => { e.stopPropagation(); jump(); });
-          $('reload').addEventListener('pointerdown', e => { e.stopPropagation(); startReload(); });
-          [0, 1, 2].forEach(i => $('sl' + i).addEventListener('pointerdown', e => { e.stopPropagation(); setSlot(i); }));
-          function jump() {
-            if (running && ready && P.alive && P.ground) { P.vy = 8.5; P.ground = false; SFX.jump(); }
-          }
-
-          // ================= PARTIDA =================
-          function startMatch() {
-            audio(); SFX.click();
-            buildWorld();
-            const sp = randomFree(30, 80);
-            P = makeEnt('Tú', SKINS[selIdx], false, 'pistol');
-            P.isP = true; P.yaw = rnd(0, 6.283);
-            P.g.position.set(sp.x, 0, sp.z); P.lx = sp.x; P.lz = sp.z;
-            world.add(P.g);
-            const sk = SKINS[selIdx];
-            $('av').style.background = `radial-gradient(${hex(sk.type === 'anim' ? sk.body : sk.skin)},#222)`;
-
-            bots = [];
-            for (let i = 0; i < 19; i++) {
-              const t = randomFree(20, 105);
-              const b = makeEnt('BOT ' + (i + 1), pick(SKINS), true, 'rifle');
-              b.g.position.set(t.x, 0, t.z); b.tx = t.x; b.tz = t.z; b.lx = t.x; b.lz = t.z;
-              world.add(b.g); bots.push(b);
-            }
-            slots = [{ id: 'pistol', mag: 12, res: 48 }, null, null];
-            cur = 0; kills = 0; matchT = 0; zPh = 0; reloadT = 0;
-            zone.r = 130; zone.target = 130;
-            endQueued = false; slowT = 0; camShake = 0; camFov = 65; camSnap = true;
-            equip(0);
-            $('feed').innerHTML = '';
-            $('lobby').hidden = true; $('end').hidden = true; $('hud').hidden = false;
-            inGame = true; running = true; ready = false;
-            cdT = 3.5;
-            showCount('3'); SFX.count();
-          }
-          function endMatch(win) {
-            if (!running) return;
-            running = false; ready = false;
-            if (document.pointerLockElement) document.exitPointerLock();
-            win ? SFX.win() : SFX.lose();
-            const alive = bots.filter(b => b.alive).length;
-            const place = win ? 1 : alive + 1;
-            $('endT').textContent = win ? '🏆 ¡VICTORIA!' : '💀 ELIMINADO';
-            const s = Math.floor(matchT);
-            $('endS').textContent = `Puesto #${place} · Eliminaciones: ${kills} · Tiempo ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-            const end = $('end');
-            end.hidden = false;
-            end.style.animation = 'none'; void end.offsetWidth; end.style.animation = '';
-          }
-          function toLobby() {
-            running = false; inGame = false; ready = false;
-            $('hud').hidden = true; $('end').hidden = true; $('lobby').hidden = false;
-            resizePreview();
-          }
-          $('play').addEventListener('click', startMatch);
-          $('backLobby').addEventListener('click', () => { SFX.click(); toLobby(); });
-
-          // ================= LÓGICA =================
-          function updateZone(dt) {
-            matchT += dt;
-            if (zPh < ZPH.length && matchT >= ZPH[zPh].t) {
-              zone.target = ZPH[zPh].r; zPh++;
-              feed('⚠ La zona se reduce'); SFX.zone();
-            }
-            zone.r += (zone.target - zone.r) * Math.min(1, dt * 0.35);
-            zoneWall.scale.set(zone.r, 1, zone.r);
-            zoneWall.material.opacity = 0.3 + 0.1 * Math.sin(time * 4);
-            if (P.alive && Math.hypot(P.g.position.x, P.g.position.z) > zone.r) damageEnt(P, 3 * dt, null);
-            for (const b of bots) {
-              if (b.alive && Math.hypot(b.g.position.x, b.g.position.z) > zone.r) damageEnt(b, 4 * dt, null);
-            }
-            $('zone').classList.toggle('warn', zPh < ZPH.length && ZPH[zPh].t - matchT < 8);
-          }
-          function updatePlayer(dt) {
-            if (!P.alive) return;
-            const ix = clamp(joyX + (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0), -1, 1);
-            const iy = clamp(joyY + (keys.KeyS ? 1 : 0) - (keys.KeyW ? 1 : 0), -1, 1);
-            if (keys.ArrowLeft) P.yaw += 2.5 * dt;
-            if (keys.ArrowRight) P.yaw -= 2.5 * dt;
-            const fx = Math.sin(P.yaw), fz = Math.cos(P.yaw);
-            const rx = -fz, rz = fx;
-            const mx = fx * -iy + rx * ix, mz = fz * -iy + rz * ix;
-            const mag = Math.min(1, Math.hypot(ix, iy)), len = Math.hypot(mx, mz);
-            if (len > 0.001 && mag > 0.01) {
-              const sp = 6 * mag * dt;
-              moveEnt(P, mx / len * sp, mz / len * sp);
-            }
-            P.vy -= 22 * dt;
-            P.g.position.y += P.vy * dt;
-            if (P.g.position.y <= 0) { P.g.position.y = 0; P.vy = 0; P.ground = true; }
-            P.g.rotation.y = P.yaw;
-
-            P.cd = Math.max(0, (P.cd || 0) - dt);
-            if (reloadT > 0) { reloadT -= dt; if (reloadT <= 0) { reloadT = 0; finishReload(); } }
-            const s = slots[cur], w = W[s.id];
-            $('cross').classList.toggle('spread', fireHeld && w.auto);
-            if (fireHeld && (w.auto || fireEdge) && P.cd <= 0 && reloadT <= 0) {
-              if (s.mag > 0) { s.mag--; P.cd = w.rate; playerShoot(); }
-              else startReload();
-            }
-            fireEdge = false;
-          }
-          function updateBots(dt) {
-            const pp = P.g.position;
-            for (const b of bots) {
-              if (!b.alive) continue;
-              const p = b.g.position;
-              const dx = pp.x - p.x, dz = pp.z - p.z, d = Math.hypot(dx, dz) || 1;
-              b.cd -= dt;
-              if (P.alive && d < 42) {
-                b.yaw = Math.atan2(dx, dz); b.g.rotation.y = b.yaw;
-                const sp = 3.2 * dt;
-                if (d > 18) moveEnt(b, dx / d * sp, dz / d * sp);
-                else if (d < 9) moveEnt(b, -dx / d * sp, -dz / d * sp);
-                else moveEnt(b, -dz / d * sp * b.strafe, dx / d * sp * b.strafe);
-                if (b.cd <= 0) {
-                  const origin = new V(p.x, p.y + 2.6, p.z);
-                  const aim = new V(pp.x, pp.y + 2.0, pp.z).sub(origin).normalize();
-                  const muzzle = b.gun ? b.gun.localToWorld(new V(0, 0.05, 0.78)) : origin;
-                  if (d < 30) SFX.enemy();
-                  fireShot(b, 'rifle', origin, aim, { spread: 0.07, mul: 0.6, targets: [P.g], muzzle });
-                  b.cd = rnd(0.7, 1.4);
-                }
-              } else {
-                b.wander -= dt;
-                if (b.wander <= 0 || Math.hypot(b.tx - p.x, b.tz - p.z) < 1) {
-                  const t = randomFree(10, 95); b.tx = t.x; b.tz = t.z; b.wander = rnd(4, 9);
-                }
-                const dx2 = b.tx - p.x, dz2 = b.tz - p.z, d2 = Math.hypot(dx2, dz2) || 1;
-                moveEnt(b, dx2 / d2 * 2.2 * dt, dz2 / d2 * 2.2 * dt);
-                b.yaw = Math.atan2(dx2, dz2);
-                b.g.rotation.y = ease(b.g.rotation.y, b.yaw, 8, dt);
-              }
-            }
-          }
-          function updatePickups(dt) {
-            const pp = P.g.position;
-            for (const k of pickups) {
-              if (!k.m) continue;
-              k.appear = Math.min(1, k.appear + dt * 3);
-              k.m.rotation.y += dt * 1.5;
-              k.m.position.y = 0.6 + Math.sin(time * 3 + k.x) * 0.1;
-              k.m.scale.setScalar(0.6 + 0.4 * (1 - Math.pow(1 - k.appear, 3)));
-              k.m.userData.ring.scale.setScalar(1 + Math.sin(time * 4 + k.z) * 0.08);
-              if (P.alive && Math.hypot(pp.x - k.x, pp.z - k.z) < 1.8 && applyPickup(k)) {
-                world.remove(k.m); k.m = null;
-              }
-            }
-          }
-          function applyPickup(k) {
-            if (k.type === 'med') {
-              if (P.hp >= 100) return false;
-              P.hp = Math.min(100, P.hp + 35); feed('+35 vida'); SFX.pickup(); return true;
-            }
-            if (k.type === 'vest') {
-              if (P.armor >= 50) return false;
-              P.armor = 50; feed('Chaleco equipado'); SFX.pickup(); return true;
-            }
-            SFX.pickup();
-            return giveWeapon(k.type);
-          }
-          function updateGame(dt) {
-            updateZone(dt);
-            updatePlayer(dt);
-            updateBots(dt);
-            updatePickups(dt);
-            if (P.alive && bots.every(b => !b.alive)) endMatch(true);
-          }
-
-          // ================= CÁMARA CON COLISIÓN =================
-          function updateCam(dt) {
-            const pp = P.g.position, fx = Math.sin(P.yaw), fz = Math.cos(P.yaw);
-            const pivot = new V(pp.x, pp.y + 2.4, pp.z);
-            const desired = new V(
-              pivot.x - fx * 7 - fz * 1.2,
-              pivot.y - 1.0 - P.pitch * 3,
-              pivot.z - fz * 7 + fx * 1.2
-            );
-            // Si hay una pared, un árbol o una roca entre el personaje y la cámara, la acerca
-            let target = desired;
-            const dir = desired.clone().sub(pivot);
-            const len = dir.length();
-            if (len > 0.01) {
-              dir.normalize();
-              camRay.set(pivot, dir); camRay.far = len;
-              const hit = camRay.intersectObjects(solids, true)[0];
-              if (hit && hit.distance < len) target = pivot.clone().addScaledVector(dir, Math.max(1.2, hit.distance - 0.4));
-            }
-            if (camSnap) { camera.position.copy(target); camSnap = false; }
-            camera.position.lerp(target, Math.min(1, dt * 14));
-            if (camShake > 0) {
-              camera.position.x += rnd(-1, 1) * camShake * 0.4;
-              camera.position.y += rnd(-1, 1) * camShake * 0.3;
-              camShake = Math.max(0, camShake - dt * 2.2);
-            }
-            camera.lookAt(pivot.clone().add(fwdVec().multiplyScalar(10)));
-            const spdK = Math.min(1, (P.spd || 0) / 6);
-            camFov = ease(camFov, 65 + spdK * 5 + (P.recoil || 0) * 0.6, 6, dt);
-            camera.fov = camFov;
-            camera.updateProjectionMatrix();
-          }
-          function hud() {
-            $('hp').style.width = P.hp + '%';
-            $('ar').style.width = P.armor + '%';
-            $('hpt').textContent = Math.ceil(P.hp) + (P.armor > 0 ? '  ·  🛡 ' + Math.ceil(P.armor) : '');
-            const alive = bots.filter(b => b.alive).length + (P.alive ? 1 : 0);
-            $('alive').textContent = '👥 ' + alive;
-            $('zone').textContent = zPh < ZPH.length ? 'Zona en ' + Math.max(0, Math.ceil(ZPH[zPh].t - matchT)) + 's' : 'Zona final';
-            for (let i = 0; i < 3; i++) {
-              const el = $('sl' + i), s = slots[i];
-              el.classList.toggle('on', i === cur);
-              el.querySelector('b').textContent = s ? W[s.id].name : 'VACÍO';
-              el.querySelector('span').textContent = !s ? '—' : (reloadT > 0 && i === cur ? 'RECARGANDO' : s.mag + ' / ' + s.res);
-            }
-          }
-          function drawMini() {
-            const c = $('mini'), x = c.getContext('2d'), S = 260, R = S / 2, k = R / 135;
-            x.clearRect(0, 0, S, S);
-            x.fillStyle = 'rgba(40,130,210,.85)'; x.beginPath(); x.arc(R, R, R, 0, 7); x.fill();
-            x.fillStyle = 'rgba(120,200,90,.95)'; x.beginPath(); x.arc(R, R, 132 * k, 0, 7); x.fill();
-            x.strokeStyle = '#ff3b4a'; x.lineWidth = 4; x.beginPath(); x.arc(R, R, zone.r * k, 0, 7); x.stroke();
-            x.fillStyle = '#ff5252';
-            for (const b of bots) if (b.alive) { x.beginPath(); x.arc(R + b.g.position.x * k, R + b.g.position.z * k, 3.5, 0, 7); x.fill(); }
-            if (P.alive) {
-              x.save(); x.translate(R + P.g.position.x * k, R + P.g.position.z * k);
-              x.rotate(Math.PI - P.yaw);
-              x.fillStyle = '#ffe066'; x.strokeStyle = '#000'; x.lineWidth = 2;
-              x.beginPath(); x.moveTo(0, -11); x.lineTo(8, 8); x.lineTo(0, 4); x.lineTo(-8, 8); x.closePath(); x.fill(); x.stroke();
-              x.restore();
-            }
-          }
-
-          // ================= LOBBY =================
-          function renderPreview(dt) {
-            if (!prevDrag) prevRot += dt * 0.5;
-            if (prevChar) {
-              prevChar.rotation.y = ease(prevChar.rotation.y, prevRot, 12, dt);
-              animEnt(prevEnt, dt, 0, false);
-            }
-            pr.render(pscene, pcam);
-          }
-
-          // ================= BUCLE =================
-          let last = performance.now(), mini = 0, lastN = -1;
-          function loop(now) {
-            const raw = Math.min(0.05, (now - last) / 1000); last = now;
-            time += raw;
-            const slow = slowT > 0 ? 0.35 : 1;
-            slowT = Math.max(0, slowT - raw);
-            const dt = raw * slow;
-            if (inGame) {
-              if (running) {
-                if (!ready) {
-                  cdT -= raw;
-                  const n = Math.ceil(cdT);
-                  if (cdT > 0 && n !== lastN) { lastN = n; showCount(String(n)); SFX.count(); }
-                  if (cdT <= 0) { ready = true; showCount('¡YA!'); SFX.go(); feed('¡Partida iniciada!'); }
-                } else {
-                  updateGame(dt);
-                }
-                animateAll(dt);
-              }
-              updateTracers(raw);
-              updateCam(raw);
-              renderer.render(scene, camera);
-              hud();
-              if ((mini++) % 3 === 0) drawMini();
-            } else {
-              renderPreview(raw);
-            }
-            requestAnimationFrame(loop);
-          }
-
-          // ================= ARRANQUE =================
-          buildSkinUI(); setPreview(); resize();
-          requestAnimationFrame(loop);
-          </script>
-          </body>
-          </html>
+          cat > ${PROJECT_PATH}/ProjectSettings/ProjectVersion.txt << 'EOF'
+          m_EditorVersion: 2022.3.20f1
+          m_EditorVersionWithRevision: 2022.3.20f1 (c3fb0c8b0a4b)
           EOF
-          curl -fsSL -o www/three.min.js https://unpkg.com/three@0.128.0/build/three.min.js
 
-      - name: Instalar Capacitor
-        run: |
-          npm init -y
-          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
-          npx cap init BattleRoyale com.ejemplo.battleroyale --web-dir=www
-          npx cap add android
-          npx cap sync android
+          cat > ${PROJECT_PATH}/Assets/Editor/BuildScript.cs << 'EOF'
+          using UnityEditor;
+          using UnityEngine;
 
-      - name: Pantalla completa horizontal
-        run: |
-          python3 - << 'PY'
-          import re, pathlib
-          p = pathlib.Path("android/app/src/main/AndroidManifest.xml")
-          s = p.read_text()
-          s = re.sub(r'\s*android:screenOrientation="[^"]*"', '', s)
-          s = s.replace('android:name=".MainActivity"',
-                        'android:name=".MainActivity" android:screenOrientation="sensorLandscape"', 1)
-          p.write_text(s)
-          PY
-          mkdir -p android/app/src/main/java/com/ejemplo/battleroyale
-          cat > android/app/src/main/java/com/ejemplo/battleroyale/MainActivity.java << 'EOF'
-          package com.ejemplo.battleroyale;
+          public static class BuildScript
+          {
+              public static void BuildAndroid()
+              {
+                  PlayerSettings.companyName = "EjemploBR";
+                  PlayerSettings.productName = "Battle Royale";
+                  PlayerSettings.applicationIdentifier = "com.ejemplo.battleroyale";
+                  PlayerSettings.defaultInterfaceOrientation = UIOrientation.LandscapeLeft;
+                  PlayerSettings.allowedAutorotateToPortrait = false;
+                  PlayerSettings.allowedAutorotateToPortraitUpsideDown = false;
+                  PlayerSettings.allowedAutorotateToLandscapeLeft = true;
+                  PlayerSettings.allowedAutorotateToLandscapeRight = true;
+                  PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+                  PlayerSettings.SetScriptingBackend(BuildTargetGroup.Android, ScriptingImplementation.IL2CPP);
+                  PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel24;
+                  EditorUserBuildSettings.buildAppBundle = false;
+                  EditorUserBuildSettings.androidBuildSystem = AndroidBuildSystem.Gradle;
+                  EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Android, BuildTarget.Android);
 
-          import android.os.Bundle;
-          import android.view.View;
-          import android.view.WindowManager;
-          import com.getcapacitor.BridgeActivity;
-
-          public class MainActivity extends BridgeActivity {
-            @Override
-            public void onCreate(Bundle savedInstanceState) {
-              super.onCreate(savedInstanceState);
-              getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-            }
-
-            @Override
-            public void onWindowFocusChanged(boolean hasFocus) {
-              super.onWindowFocusChanged(hasFocus);
-              if (hasFocus) {
-                getWindow().getDecorView().setSystemUiVisibility(
-                  View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                  | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                  | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                  | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                  | View.SYSTEM_UI_FLAG_FULLSCREEN
-                  | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+                  string[] scenes = { "Assets/Scenes/Main.unity" };
+                  BuildPipeline.BuildPlayer(scenes, "Build/BattleRoyale.apk", BuildTarget.Android, BuildOptions.None);
               }
-            }
           }
           EOF
 
-      - name: Compilar APK
+          cat > ${PROJECT_PATH}/Assets/Scripts/GameManager.cs << 'EOF'
+          using UnityEngine;
+          using UnityEngine.UI;
+          using System.Collections.Generic;
+
+          public class GameManager : MonoBehaviour
+          {
+              public const int NumBots = 19;
+              public static readonly float[][] ZonePhases = {
+                  new float[]{50f, 85f}, new float[]{110f, 45f}, new float[]{170f, 20f}, new float[]{230f, 6f}
+              };
+
+              float matchTime, zoneRadius = 130f, zoneTarget = 130f;
+              int zonePhase, kills;
+              bool running, ready;
+              float countdown = 3.5f;
+              Transform zone;
+              readonly List<Character> bots = new List<Character>();
+              Character player;
+              Text hud, msg;
+
+              void Start()
+              {
+                  BuildEnvironment();
+                  SpawnPlayer();
+                  SpawnBots();
+                  BuildHud();
+                  running = true;
+              }
+
+              void Update()
+              {
+                  if (!running) return;
+                  if (!ready)
+                  {
+                      countdown -= Time.deltaTime;
+                      if (countdown <= 0f) { ready = true; msg.text = ""; }
+                      else msg.text = Mathf.CeilToInt(countdown).ToString();
+                      return;
+                  }
+                  matchTime += Time.deltaTime;
+                  UpdateZone();
+                  hud.text = "Vivos: " + (1 + bots.FindAll(b => b.alive).Count) + "   Eliminaciones: " + kills + "   Zona: " + Mathf.RoundToInt(zoneRadius) + " m";
+              }
+
+              void BuildEnvironment()
+              {
+                  var sun = new GameObject("Sun").AddComponent<Light>();
+                  sun.type = LightType.Directional;
+                  sun.transform.rotation = Quaternion.Euler(55, 30, 0);
+                  sun.shadows = LightShadows.Soft;
+
+                  var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
+                  ground.name = "Ground";
+                  ground.transform.localScale = new Vector3(26f, 1f, 26f);
+                  ground.GetComponent<Renderer>().material.color = new Color(0.42f, 0.72f, 0.35f);
+
+                  var water = GameObject.CreatePrimitive(PrimitiveType.Plane);
+                  water.name = "Water";
+                  water.transform.position = new Vector3(0, -0.8f, 0);
+                  water.transform.localScale = new Vector3(90f, 1f, 90f);
+                  water.GetComponent<Renderer>().material.color = new Color(0.23f, 0.65f, 0.91f);
+
+                  for (int i = 0; i < 16; i++)
+                  {
+                      var p = RandomFree(24f, 105f);
+                      float w = Random.Range(6f, 11f), d = Random.Range(6f, 11f), h = Random.Range(4f, 7f);
+                      var b = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                      b.transform.localScale = new Vector3(w, h, d);
+                      b.transform.position = new Vector3(p.x, h * 0.5f, p.y);
+                      b.GetComponent<Renderer>().material.color = new Color(0.95f, 0.88f, 0.75f);
+                      var roof = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                      roof.transform.localScale = new Vector3(w + 0.8f, 0.6f, d + 0.8f);
+                      roof.transform.position = new Vector3(p.x, h + 0.3f, p.y);
+                      roof.GetComponent<Renderer>().material.color = new Color(0.55f, 0.24f, 0.17f);
+                  }
+
+                  for (int i = 0; i < 90; i++)
+                  {
+                      var p = RandomFree(10f, 118f);
+                      var trunk = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                      trunk.transform.localScale = new Vector3(0.5f, 2.4f, 0.5f);
+                      trunk.transform.position = new Vector3(p.x, 1.2f, p.y);
+                      trunk.GetComponent<Renderer>().material.color = new Color(0.42f, 0.27f, 0.14f);
+                      var leaves = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                      float r = Random.Range(1.4f, 2f);
+                      leaves.transform.localScale = Vector3.one * r * 2f;
+                      leaves.transform.position = new Vector3(p.x, 3.4f, p.y);
+                      leaves.GetComponent<Renderer>().material.color = new Color(0.18f, 0.55f, 0.22f);
+                  }
+
+                  for (int i = 0; i < 40; i++)
+                  {
+                      var p = RandomFree(10f, 112f);
+                      var rock = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                      float r = Random.Range(0.9f, 1.5f);
+                      rock.transform.localScale = new Vector3(r * 2f, r * 1.6f, r * 2f);
+                      rock.transform.position = new Vector3(p.x, 0.6f, p.y);
+                      rock.GetComponent<Renderer>().material.color = new Color(0.5f, 0.53f, 0.56f);
+                  }
+
+                  zone = GameObject.CreatePrimitive(PrimitiveType.Cylinder).transform;
+                  zone.name = "Zone";
+                  zone.localScale = new Vector3(zoneRadius * 2f, 7f, zoneRadius * 2f);
+                  zone.position = new Vector3(0, 7f, 0);
+                  Destroy(zone.GetComponent<Collider>());
+                  var zm = zone.GetComponent<Renderer>().material;
+                  zm.color = new Color(1f, 0.17f, 0.23f, 0.35f);
+              }
+
+              void SpawnPlayer()
+              {
+                  var p = RandomFree(30f, 80f);
+                  player = Character.Build("Player", SkinData.Current(), p, true);
+                  var cam = Camera.main;
+                  cam.transform.SetParent(player.transform);
+                  cam.transform.localPosition = new Vector3(0, 3.5f, -6f);
+                  cam.transform.LookAt(player.transform.position + Vector3.up * 2f);
+              }
+
+              void SpawnBots()
+              {
+                  for (int i = 0; i < NumBots; i++)
+                  {
+                      var p = RandomFree(20f, 105f);
+                      bots.Add(Character.Build("Bot" + i, SkinData.Random(), p, false));
+                  }
+              }
+
+              void BuildHud()
+              {
+                  var canvas = new GameObject("HUD", typeof(Canvas), typeof(CanvasScaler)).GetComponent<Canvas>();
+                  canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                  hud = MakeText(canvas.transform, new Vector2(20, -20), 24, TextAnchor.UpperLeft);
+                  msg = MakeText(canvas.transform, Vector2.zero, 96, TextAnchor.MiddleCenter);
+              }
+
+              Text MakeText(Transform parent, Vector2 pos, int size, TextAnchor anchor)
+              {
+                  var go = new GameObject("Text", typeof(Text));
+                  go.transform.SetParent(parent, false);
+                  var t = go.GetComponent<Text>();
+                  t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                  t.fontSize = size;
+                  t.alignment = anchor;
+                  t.color = Color.white;
+                  var rt = go.GetComponent<RectTransform>();
+                  rt.anchorMin = rt.anchorMax = new Vector2(anchor == TextAnchor.UpperLeft ? 0 : 0.5f, anchor == TextAnchor.UpperLeft ? 1 : 0.5f);
+                  rt.anchoredPosition = pos;
+                  rt.sizeDelta = new Vector2(1200, 200);
+                  return t;
+              }
+
+              void UpdateZone()
+              {
+                  if (zonePhase < ZonePhases.Length && matchTime >= ZonePhases[zonePhase][0])
+                  {
+                      zoneTarget = ZonePhases[zonePhase][1];
+                      zonePhase++;
+                  }
+                  zoneRadius += (zoneTarget - zoneRadius) * Mathf.Min(1f, Time.deltaTime * 0.35f);
+                  zone.localScale = new Vector3(zoneRadius * 2f, 7f, zoneRadius * 2f);
+                  if (player.alive && new Vector2(player.transform.position.x, player.transform.position.z).magnitude > zoneRadius)
+                      player.Damage(3f * Time.deltaTime, null);
+                  foreach (var b in bots)
+                      if (b.alive && new Vector2(b.transform.position.x, b.transform.position.z).magnitude > zoneRadius)
+                          b.Damage(4f * Time.deltaTime, null);
+              }
+
+              public void RegisterKill(Character by, Character victim)
+              {
+                  if (by == player) kills++;
+              }
+
+              public static Vector2 RandomFree(float minR, float maxR)
+              {
+                  float a = Random.value * Mathf.PI * 2f, r = Random.Range(minR, maxR);
+                  return new Vector2(Mathf.Cos(a) * r, Mathf.Sin(a) * r);
+              }
+          }
+          EOF
+
+          cat > ${PROJECT_PATH}/Assets/Scripts/Character.cs << 'EOF'
+          using UnityEngine;
+
+          public class Character : MonoBehaviour
+          {
+              public bool alive = true;
+              public float hp = 100f;
+              public bool isPlayer;
+              float cd;
+
+              public static Character Build(string name, SkinData skin, Vector2 pos, bool player)
+              {
+                  var go = new GameObject(name);
+                  go.transform.position = new Vector3(pos.x, 0, pos.y);
+                  var c = go.AddComponent<Character>();
+                  c.isPlayer = player;
+                  var col = go.AddComponent<CapsuleCollider>();
+                  col.height = 2.3f; col.radius = 0.45f; col.center = new Vector3(0, 1.15f, 0);
+                  var rb = go.AddComponent<Rigidbody>();
+                  rb.freezeRotation = true;
+                  c.BuildBody(skin);
+                  return c;
+              }
+
+              void BuildBody(SkinData s)
+              {
+                  bool anim = s.isAnimatronic;
+                  Color skinCol = anim ? s.bodyColor : new Color(0.94f, 0.72f, 0.55f);
+                  Color vestCol = anim ? s.bodyColor * 0.75f : new Color(0.56f, 0.58f, 0.61f);
+                  Color pantsCol = anim ? new Color(0.16f, 0.16f, 0.16f) : new Color(0.23f, 0.24f, 0.27f);
+                  Color bootCol = new Color(0.35f, 0.23f, 0.12f);
+                  Color dark = new Color(0.1f, 0.1f, 0.1f);
+
+                  var body = new GameObject("Body").transform;
+                  body.SetParent(transform, false);
+                  Box(body, new Vector3(0.3f, 0.95f, 0.32f), new Vector3(-0.2f, 0.48f, 0), pantsCol);
+                  Box(body, new Vector3(0.3f, 0.95f, 0.32f), new Vector3(0.2f, 0.48f, 0), pantsCol);
+                  Box(body, new Vector3(0.36f, 0.22f, 0.46f), new Vector3(-0.2f, 0.11f, 0.05f), bootCol);
+                  Box(body, new Vector3(0.36f, 0.22f, 0.46f), new Vector3(0.2f, 0.11f, 0.05f), bootCol);
+                  Box(body, new Vector3(0.9f, 0.14f, 0.52f), new Vector3(0, 0.98f, 0), dark);
+                  Box(body, new Vector3(0.9f, 1.0f, 0.5f), new Vector3(0, 1.45f, 0), vestCol);
+                  Box(body, new Vector3(0.5f, 0.5f, 0.5f), new Vector3(0, 2.0f, 0), skinCol);
+                  if (anim)
+                  {
+                      Box(body, new Vector3(0.5f, 0.12f, 0.3f), new Vector3(0, 1.72f, 0.2f), dark);
+                      Box(body, new Vector3(0.2f, 0.9f, 0.12f), new Vector3(-0.2f, 2.7f, 0), skinCol);
+                      Box(body, new Vector3(0.2f, 0.9f, 0.12f), new Vector3(0.2f, 2.7f, 0), skinCol);
+                      for (int i = -1; i <= 1; i += 2)
+                          Box(body, new Vector3(0.2f, 0.2f, 0.05f), new Vector3(i * 0.15f, 2.12f, 0.27f), s.eyeColor);
+                  }
+                  else
+                  {
+                      Box(body, new Vector3(0.52f, 0.28f, 0.52f), new Vector3(0, 1.84f, 0), dark);
+                      Box(body, new Vector3(0.54f, 0.12f, 0.54f), new Vector3(0, 2.27f, 0), new Color(0.16f, 0.11f, 0.08f));
+                      Box(body, new Vector3(0.62f, 0.78f, 0.26f), new Vector3(0, 1.42f, -0.38f), new Color(0.18f, 0.2f, 0.23f));
+                      Box(body, new Vector3(0.12f, 0.16f, 1.0f), new Vector3(0.2f, 1.9f, -0.55f), new Color(0.1f, 0.1f, 0.1f));
+                      Box(body, new Vector3(0.2f, 0.7f, 0.04f), new Vector3(0.33f, 1.42f, -0.38f), new Color(1f, 0.8f, 0f));
+                      Box(body, new Vector3(0.06f, 0.28f, 0.1f), new Vector3(0.5f, 0.98f, 0.22f), dark);
+                      Box(body, new Vector3(0.03f, 0.32f, 0.06f), new Vector3(0.5f, 0.7f, 0.22f), new Color(0.85f, 0.87f, 0.9f));
+                  }
+                  var armR = new GameObject("ArmR").transform;
+                  armR.SetParent(body, false);
+                  armR.localPosition = new Vector3(0.63f, 1.8f, 0);
+                  armR.localRotation = Quaternion.Euler(-77f, 0, 0);
+                  Box(armR, new Vector3(0.3f, 0.6f, 0.3f), new Vector3(0, -0.3f, 0), vestCol);
+                  Box(armR, new Vector3(0.26f, 0.5f, 0.26f), new Vector3(0, -0.85f, 0), skinCol);
+                  var gun = new GameObject("Gun").transform;
+                  gun.SetParent(armR, false);
+                  gun.localPosition = new Vector3(0, -1.1f, 0.05f);
+                  Box(gun, new Vector3(0.1f, 0.15f, 0.9f), Vector3.zero, new Color(0.16f, 0.17f, 0.2f));
+                  Box(gun, new Vector3(0.09f, 0.14f, 0.42f), new Vector3(0, 0, -0.45f), new Color(0.48f, 0.29f, 0.13f));
+              }
+
+              static void Box(Transform parent, Vector3 size, Vector3 pos, Color c)
+              {
+                  var b = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                  b.transform.SetParent(parent, false);
+                  b.transform.localScale = size;
+                  b.transform.localPosition = pos;
+                  b.GetComponent<Renderer>().material.color = c;
+                  Destroy(b.GetComponent<Collider>());
+              }
+
+              public void Damage(float amt, Character by)
+              {
+                  if (!alive) return;
+                  hp -= amt;
+                  if (hp <= 0f)
+                  {
+                      alive = false;
+                      transform.rotation = Quaternion.Euler(-90, transform.eulerAngles.y, 0);
+                  }
+              }
+          }
+          EOF
+
+          cat > ${PROJECT_PATH}/Assets/Scripts/SkinData.cs << 'EOF'
+          using UnityEngine;
+
+          public class SkinData
+          {
+              public string name;
+              public bool isAnimatronic;
+              public Color bodyColor = new Color(0.72f, 0.74f, 0.76f);
+              public Color eyeColor = Color.green;
+
+              public static readonly SkinData[] All = {
+                  new SkinData { name = "Operador" },
+                  new SkinData { name = "Springtrap", isAnimatronic = true, bodyColor = new Color(0.85f, 0.8f, 0.17f), eyeColor = new Color(0.22f, 1f, 0.42f) },
+                  new SkinData { name = "Freddy", isAnimatronic = true, bodyColor = new Color(0.48f, 0.29f, 0.16f), eyeColor = new Color(0.31f, 0.76f, 1f) }
+              };
+
+              public static int selected = 0;
+              public static SkinData Current() => All[selected];
+              public static SkinData Random() => All[UnityEngine.Random.Range(0, All.Length)];
+          }
+          EOF
+
+          cat > ${PROJECT_PATH}/Assets/Scripts/PlayerController.cs << 'EOF'
+          using UnityEngine;
+
+          public class PlayerController : MonoBehaviour
+          {
+              public float speed = 6f;
+
+              void Update()
+              {
+                  float h = Input.GetAxis("Horizontal"), v = Input.GetAxis("Vertical");
+                  Vector3 dir = (transform.forward * v + transform.right * h).normalized;
+                  transform.position += dir * speed * Time.deltaTime;
+                  transform.Rotate(0, Input.GetAxis("Mouse X") * 2f, 0);
+              }
+          }
+          EOF
+
+      - name: Crear escena inicial
         run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          mkdir -p ${PROJECT_PATH}/Assets/Scenes
+          cat > ${PROJECT_PATH}/Assets/Editor/SceneSetup.cs << 'EOF'
+          using UnityEditor;
+          using UnityEditor.SceneManagement;
+          using UnityEngine;
+
+          public static class SceneSetup
+          {
+              public static void Create()
+              {
+                  var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
+                  var gm = new GameObject("GameManager");
+                  gm.AddComponent<GameManagerBootstrap>();
+                  EditorSceneManager.SaveScene(scene, "Assets/Scenes/Main.unity");
+              }
+          }
+
+          public class GameManagerBootstrap : MonoBehaviour
+          {
+              void Awake() { gameObject.AddComponent<GameManager>(); }
+          }
+          EOF
+
+      - name: Activar Unity y compilar APK
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        with:
+          projectPath: ${{ env.PROJECT_PATH }}
+          unityVersion: ${{ env.UNITY_VERSION }}
+          targetPlatform: Android
+          buildMethod: BuildScript.BuildAndroid
+          buildName: BattleRoyale
+          androidExportType: androidPackage
+          versioning: None
 
       - name: Subir APK
         uses: actions/upload-artifact@v4
         with:
-          name: battle-royale-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: battle-royale-unity-apk
+          path: ${{ env.PROJECT_PATH }}/build/Android

@@ -107,18 +107,6 @@
   #jumpscareFX.on::before,#jumpscareFX.on::after{height:clamp(24px,8vh,82px)}
   #scareText{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(.7);color:#fff;text-align:center;font:900 clamp(24px,7vw,64px) var(--mono);letter-spacing:clamp(3px,1vw,10px);text-shadow:5px 0 #a00012,-4px 0 #1a8294,0 0 30px #ff172b;opacity:0;white-space:nowrap}
   #jumpscareFX.on.hit #scareText{animation:scareTitle .52s steps(2) both}
-  #syncFade{position:fixed;inset:0;z-index:71;background:#000;opacity:0;pointer-events:none;transition:opacity .65s ease}
-  #syncFade.on{opacity:1}
-  #introScene{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.18);pointer-events:none;font-family:var(--mono)}
-  #introScene.on{display:flex}
-  #introScene::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(130,255,190,.08) 3px 4px),radial-gradient(ellipse,transparent 32%,rgba(0,0,0,.82) 100%);animation:introNoise .16s steps(2) infinite}
-  #introFrame{position:absolute;inset:6% 5%;border:2px solid rgba(126,255,173,.48);box-shadow:inset 0 0 36px #000,0 0 24px rgba(20,255,130,.12)}
-  #introTop{position:absolute;top:8%;left:8%;right:8%;display:flex;justify-content:space-between;color:#baffcb;font-size:clamp(11px,2vw,17px);letter-spacing:3px;text-shadow:0 0 8px #42ff92}
-  #introCaption{position:absolute;left:8%;right:8%;bottom:14%;min-height:3em;color:#f2f2e9;text-align:center;font-size:clamp(17px,3.4vw,30px);line-height:1.55;letter-spacing:2px;text-shadow:0 2px 12px #000,0 0 14px #000}
-  #introSkip{position:absolute;right:8%;bottom:6%;pointer-events:auto;touch-action:manipulation;color:#d7e8d9;background:rgba(5,12,8,.78);border:1px solid #83c99a;padding:10px 16px;font:700 12px var(--mono);letter-spacing:2px}
-  #introScene.scare #introFrame{border-color:#ff3344;box-shadow:inset 0 0 45px rgba(255,0,20,.22),0 0 24px rgba(255,0,35,.4)}
-  #introScene.scare::before{background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(255,35,55,.18) 2px 3px),radial-gradient(ellipse,transparent 18%,rgba(80,0,5,.78) 100%)}
-  @keyframes introNoise{0%,100%{opacity:.7}50%{opacity:1}}
   @keyframes scareFlicker{0%,100%{filter:brightness(.78) contrast(1.3)}50%{filter:brightness(1.3) contrast(1.6)}}
   @keyframes scareTitle{0%{opacity:0;transform:translate(-50%,-50%) scale(.5)}25%{opacity:1;transform:translate(-48%,-52%) scale(1.08)}55%{opacity:.35;transform:translate(-51%,-49%) scale(.98)}100%{opacity:1;transform:translate(-50%,-50%) scale(1)}}
   body.touch .kb{display:none}
@@ -152,13 +140,6 @@
 <div id="danger"></div>
 <div id="flash"></div>
 <div id="jumpscareFX"><div id="scareText">TE ATRAPÓ</div></div>
-<div id="syncFade"></div>
-<div id="introScene" aria-live="polite">
-  <div id="introFrame"></div>
-  <div id="introTop"><span id="introTag">OFICINA · CÁMARAS ACTIVAS</span><span>REC <b style="color:#ff3747">●</b></span></div>
-  <div id="introCaption"></div>
-  <button id="introSkip" type="button">SALTAR INTRO ›</button>
-</div>
 
 <div id="hud">
   <div id="leftcol">
@@ -281,7 +262,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const $ = id => document.getElementById(id);
-const CELL = 2, WALL_H = 3.2, GW = 40, GH = 28, EYE = 1.55, PLAYER_R = 0.3;
+const CELL = 2, WALL_H = 3.2, GW = 56, GH = 36, EYE = 1.55, PLAYER_R = 0.3;
 const FACE_OFFSET = 0; // si el modelo mira hacia atrás, cambia a Math.PI
 const DIFF = {
   facil:   { speed: 1.0, delay: 14 },
@@ -299,56 +280,54 @@ let runHeld = false;
 // ---------- Mapa de la pizzería (celdas de 2 m) ----------
 // 0 = libre, 1 = pared, 2 = objeto (mesa, mostrador...)
 const ROOMS = [
-  { name: 'SALÓN PRINCIPAL',   r: [2, 2, 25, 15],  floor: 'checker',  wall: 0x9a92e0 },
-  { name: 'SALA DE FIESTAS 1', r: [27, 2, 37, 8],  floor: 'confetti', wall: 0xe09abf },
-  { name: 'SALA DE FIESTAS 2', r: [27, 10, 37, 15], floor: 'confetti', wall: 0x92d6e0 },
-  { name: 'PASILLO',           r: [2, 17, 37, 18], floor: 'hall',     wall: 0x7e9aa6 },
-  { name: 'COCINA',            r: [2, 20, 11, 25], floor: 'kitchen',  wall: 0xd5dcdc },
-  { name: 'SALA DE PREMIOS',   r: [14, 20, 21, 25], floor: 'concrete', wall: 0xe0c092 },
-  { name: 'PARTES Y SERVICIO', r: [24, 20, 29, 25], floor: 'concrete', wall: 0x949478 },
-  { name: 'OFICINA',           r: [32, 20, 37, 25], floor: 'concrete', wall: 0x849484 }
+  { name: 'SALÓN PRINCIPAL', r: [2,2,25,15], floor: 'checker', wall: 0x9a92e0 },
+  { name: 'SALA DE FIESTAS 1', r: [27,2,37,8], floor: 'confetti', wall: 0xe09abf },
+  { name: 'SALA DE FIESTAS 2', r: [27,10,37,15], floor: 'confetti', wall: 0x92d6e0 },
+  { name: 'PASILLO PRINCIPAL', r: [2,17,53,18], floor: 'hall', wall: 0x7e9aa6 },
+  { name: 'COCINA', r: [2,20,11,25], floor: 'kitchen', wall: 0xd5dcdc },
+  { name: 'SALA DE PREMIOS', r: [14,20,21,25], floor: 'concrete', wall: 0xe0c092 },
+  { name: 'PARTES Y SERVICIO', r: [24,20,29,25], floor: 'concrete', wall: 0x949478 },
+  { name: 'OFICINA', r: [32,20,37,25], floor: 'concrete', wall: 0x849484 },
+  { name: 'COMEDOR NUEVO', r: [40,2,53,14], floor: 'checker', wall: 0x9a92e0 },
+  { name: 'PASILLO DE SERVICIO', r: [38,20,39,28], floor: 'hall', wall: 0x7e9aa6 },
+  { name: 'ALMACÉN AMPLIADO', r: [40,21,46,28], floor: 'concrete', wall: 0x949478 },
+  { name: 'ARCADE', r: [48,21,53,28], floor: 'confetti', wall: 0xe09abf }
 ];
-const START = [3, 17], EXIT_CELL = [37, 17]; // posición inicial de seguridad; cada partida elige otra sala
-const KEY_SPOTS = [[3, 23], [20, 23], [36, 3], [36, 14], [25, 22], [35, 23], [23, 14]];
-const BON_SPOTS = [[36, 3], [36, 14], [25, 22], [33, 23], [23, 3], [23, 14]];
+const START = [3,17], EXIT_CELL = [53,17];
+const KEY_SPOTS = [[3,23],[20,23],[36,3],[36,14],[25,22],[35,23],[23,14],[43,10],[45,26],[51,26],[51,6]];
+const BON_SPOTS = [[36,3],[36,14],[25,22],[33,23],[23,3],[23,14],[42,6],[51,10],[51,26],[44,26]];
 const PROPS = [];
 const CCTV_FEEDS = [
-  { name: 'SALÓN PRINCIPAL', x: 28, y: 3.0, z: 12, tx: 28, ty: 0.9, tz: 22 },
-  { name: 'FIESTAS 1', x: 64, y: 3.0, z: 5, tx: 65, ty: 0.9, tz: 17 },
-  { name: 'FIESTAS 2', x: 65, y: 3.0, z: 25, tx: 64, ty: 0.9, tz: 31 },
-  { name: 'PASILLO', x: 12, y: 2.8, z: 34, tx: 48, ty: 1.0, tz: 34 },
-  { name: 'COCINA', x: 12, y: 3.0, z: 48, tx: 14, ty: 0.8, tz: 44 },
-  { name: 'OFICINA / COMPUTADORAS', x: 69, y: 3.0, z: 48, tx: 68, ty: 1.0, tz: 43 }
+  { name:'SALÓN PRINCIPAL',x:28,y:3,z:12,tx:28,ty:0.9,tz:22 },
+  { name:'FIESTAS 1',x:64,y:3,z:5,tx:65,ty:0.9,tz:17 },
+  { name:'FIESTAS 2',x:65,y:3,z:25,tx:64,ty:0.9,tz:31 },
+  { name:'PASILLO',x:12,y:2.8,z:34,tx:48,ty:1,tz:34 },
+  { name:'COCINA',x:12,y:3,z:48,tx:14,ty:0.8,tz:44 },
+  { name:'OFICINA / COMPUTADORAS',x:69,y:3,z:48,tx:68,ty:1,tz:43 },
+  { name:'COMEDOR NUEVO',x:94,y:3.1,z:12,tx:94,ty:0.9,tz:24 },
+  { name:'ALMACÉN AMPLIADO',x:85,y:3,z:55,tx:84,ty:0.9,tz:48 },
+  { name:'ARCADE',x:101,y:3,z:55,tx:100,ty:1,tz:49 }
 ];
-let selectedCCTV = -1;
-let lastStartCell = null;
-const { grid, roomMap } = (function () {
-  const g = Array.from({ length: GH }, () => Array(GW).fill(1));
-  const rm = Array.from({ length: GH }, () => Array(GW).fill(-1));
-  const carve = (x0, y0, x1, y1, v, id) => {
-    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { g[y][x] = v; if (id !== undefined && id >= 0) rm[y][x] = id; }
-  };
-  ROOMS.forEach((R, i) => carve(R.r[0], R.r[1], R.r[2], R.r[3], 0, i));
-  // puertas
-  [[6, 16, 7, 16, 3], [18, 16, 19, 16, 3], [31, 16, 32, 16, 3], [26, 4, 26, 5, 0], [26, 11, 26, 12, 0], [31, 9, 32, 9, 1],
-   [6, 19, 7, 19, 3], [17, 19, 18, 19, 3], [26, 19, 27, 19, 3], [34, 19, 35, 19, 3]]
-    .forEach(d => carve(d[0], d[1], d[2], d[3], 0, d[4]));
-  // objetos
-  const prop = (type, x0, y0, x1, y1) => { carve(x0, y0, x1, y1, 2); PROPS.push({ type, x0, y0, x1, y1 }); };
-  prop('stage', 8, 2, 19, 4);
-  prop('cove', 3, 2, 5, 4);
-  for (const x of [6, 10, 14, 18, 22]) for (const y of [8, 12]) prop('table', x, y, x, y);
-  prop('ptable', 30, 4, 34, 5);
-  prop('ptable', 30, 12, 34, 13);
-  prop('island', 5, 22, 8, 23);
-  prop('counter', 3, 25, 10, 25);
-  prop('shelf', 14, 25, 21, 25);
-  prop('gift', 17, 22, 18, 23);
-  prop('shelf', 24, 25, 29, 25);
-  prop('crates', 27, 23, 28, 24);
-  prop('security', 33, 21, 36, 22);
-  prop('desk', 33, 24, 36, 24);
-  return { grid: g, roomMap: rm };
+let selectedCCTV=-1, lastStartCell=null;
+const { grid, roomMap } = (function(){
+  const g=Array.from({length:GH},()=>Array(GW).fill(1));
+  const rm=Array.from({length:GH},()=>Array(GW).fill(-1));
+  const carve=(x0,y0,x1,y1,v,id)=>{for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){g[y][x]=v;if(id!==undefined&&id>=0)rm[y][x]=id;}};
+  ROOMS.forEach((r,i)=>carve(r.r[0],r.r[1],r.r[2],r.r[3],0,i));
+  const doors=[[6,16,7,16,3],[18,16,19,16,3],[31,16,32,16,3],[26,4,26,5,0],[26,11,26,12,0],[31,9,32,9,1],
+    [6,19,7,19,3],[17,19,18,19,3],[26,19,27,19,3],[34,19,35,19,3],
+    [46,15,47,16,8],[38,19,39,20,9],[39,24,40,24,10],[47,24,47,25,11]];
+  doors.forEach(d=>carve(d[0],d[1],d[2],d[3],0,d[4]));
+  const prop=(type,x0,y0,x1,y1)=>{carve(x0,y0,x1,y1,2);PROPS.push({type,x0,y0,x1,y1});};
+  prop('stage',8,2,19,4); prop('cove',3,2,5,4);
+  for(const x of [6,10,14,18,22])for(const y of [8,12])prop('table',x,y,x,y);
+  prop('ptable',30,4,34,5); prop('ptable',30,12,34,13);
+  prop('island',5,22,8,23); prop('counter',3,25,10,25); prop('shelf',14,25,21,25);
+  prop('gift',17,22,18,23); prop('shelf',24,25,29,25); prop('crates',27,23,28,24);
+  prop('security',33,21,36,22); prop('desk',33,24,36,24);
+  for(const [x,y] of [[43,6],[49,8]])prop('table',x,y,x,y);
+  prop('shelf',41,24,45,25); prop('arcade',49,22,52,22); prop('table',50,26,50,26);
+  return {grid:g,roomMap:rm};
 })();
 // MAP-END
 
@@ -358,7 +337,7 @@ let keysGot = 0, battery = 100, stamina = 100, flashOn = true, elapsed = 0;
 let heartT = 0, voiceT = 12, curRoom = -1, caughtTime = 0;
 const input = {};
 const player = { x: START[0] * CELL, z: START[1] * CELL, yaw: -Math.PI / 2, pitch: 0 };
-const EXIT = { x: 74, z: 35 };
+const EXIT = { x: 106, z: 35 };
 const bonnie = { x: 0, z: 0, heading: 0, path: [], timer: 0, active: false, ready: false, delay: 8, stun: 0, group: new THREE.Group() };
 const keyIcons = [...document.querySelectorAll('#keysRow .kico')];
 
@@ -368,15 +347,15 @@ function setTC(on) { $('tc').style.display = (IS_TOUCH && on) ? 'block' : 'none'
 // ---------- Movimiento procedural e IK de Bonnie ----------
 let enemyMixer = null, enemyWalkAction = null, enemyWalking = false;
 const enemyRig = { root: null };
-const springDisplay = { group: null, root: null, bones: {}, list: [], jaw: null, head: null, baseY: 0.63, time: 0 };
+const springDisplay = { group: null, root: null, bones: {}, list: [], jaw: null, head: null, baseY: 0.63, time: 0, blinkTimer: 9, hiddenTime: 0, cell: null, yawBase: 0 };
 // ---------- Renderer / escena ----------
 const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x040507);
-scene.fog = new THREE.Fog(0x040507, 4, 34);
-const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 100);
+scene.fog = new THREE.Fog(0x040507, 4, 52);
+const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 150);
 scene.add(camera);
 
 const torch = new THREE.SpotLight(0xfff1d6, 80, 28, 0.42, 0.5, 2);
@@ -573,6 +552,16 @@ function buildWorld() {
     } else if (P.type === 'crates') {
       box(w * 0.85, 1.5, d * 0.85, lamb(0x6b4a2a), cx, 0.75, cz);
       const t = box(w * 0.5, 1.1, d * 0.5, lamb(0x7a5832), cx + 0.2, 2.05, cz - 0.2); t.rotation.y = 0.3;
+    } else if (P.type === 'arcade') {
+      const cols=[0xff3b63,0x38d9ff,0xffcc38,0x9c65ff];
+      for(let i=0;i<4;i++) {
+        const ax=cx-w/2+1+i*((w-2)/3);
+        box(1.35,2.2,0.9,lamb(0x171923),ax,1.1,cz);
+        box(1.12,0.78,0.07,lamb(cols[i]),ax,1.55,cz-0.49);
+        box(1.18,0.10,0.11,lamb(0x818893),ax,2.02,cz-0.5);
+        box(0.42,0.12,0.1,lamb(0xffef9a),ax-0.18,0.89,cz-0.52);
+        box(0.15,0.15,0.1,lamb(cols[(i+1)%4]),ax+0.32,0.89,cz-0.52);
+      }
     } else if (P.type === 'desk' || P.type === 'security') {
       box(w - 0.2, 0.85, d - 0.2, lamb(P.type === 'security' ? 0x292b2d : 0x2f2a26), cx, 0.425, cz);
       const count = P.type === 'security' ? 4 : 2;
@@ -646,23 +635,25 @@ function buildWorld() {
       actor.getWorldQuaternion(actorQ); head.getWorldQuaternion(headQ);
       glasses.quaternion.copy(headQ.invert().multiply(actorQ)); head.add(glasses);
     } else { glasses.position.set(0.05,1.89,0.43); actor.add(glasses); }
-    springDisplay.time = Math.random() * 6;
+    springDisplay.time = Math.random() * 6; springDisplay.blinkTimer=8+Math.random()*5; springDisplay.cell=[13.5,6]; springDisplay.yawBase=amyrStageGroup.rotation.y;
   }, undefined, err => { console.warn('Spring Bonnie de AMYR no cargó:', err); });
 
   // Sin letreros ni marcas de YouTube/Discord en esta pared.
 
   // puerta de salida
   const door = new THREE.Mesh(new THREE.BoxGeometry(0.3, 2.8, 3.2), new THREE.MeshStandardMaterial({ color: 0x0b6a40, emissive: 0x0a8f55, emissiveIntensity: 0.6 }));
-  door.position.set(74.85, 1.4, 35); worldGroup.add(door);
+  door.position.set(106.85, 1.4, 35); worldGroup.add(door);
   const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.7), new THREE.MeshBasicMaterial({ map: signTex('SALIDA', 256, 80, '#38ff9a', '#04170c', 'bold 48px Arial') }));
-  sign.rotation.y = -Math.PI / 2; sign.position.set(74.65, 3.0, 35); worldGroup.add(sign);
+  sign.rotation.y = -Math.PI / 2; sign.position.set(106.65, 3.0, 35); worldGroup.add(sign);
 
   // ---------- Luces ----------
   const cfg = [
     { col: 0xffe6bd, i: 15, flick: 0.04, dead: 0.3 }, { col: 0xff4fd8, i: 14, flick: 0.08, dead: 0.1 },
     { col: 0x4fe0ff, i: 14, flick: 0.08, dead: 0.1 }, { col: 0xcfe9ff, i: 13, flick: 0.14, dead: 0.35 },
     { col: 0xffffff, i: 16, flick: 0.05, dead: 0.15 }, { col: 0xffc46b, i: 11, flick: 0.06, dead: 0.2 },
-    { col: 0xd9d27a, i: 9, flick: 0.12, dead: 0.3 }, { col: 0x7ad1ff, i: 9, flick: 0.08, dead: 0.2 }
+    { col: 0xd9d27a, i: 9, flick: 0.12, dead: 0.3 }, { col: 0x7ad1ff, i: 9, flick: 0.08, dead: 0.2 },
+    { col: 0xffc46b, i: 15, flick: 0.07, dead: 0.12 }, { col: 0x8ac8ff, i: 10, flick: 0.05, dead: 0.2 },
+    { col: 0xffad56, i: 10, flick: 0.11, dead: 0.18 }, { col: 0x8c5cff, i: 13, flick: 0.08, dead: 0.1 }
   ];
   ROOMS.forEach((R, id) => {
     const [x0, y0, x1, y1] = R.r, k = cfg[id];
@@ -678,7 +669,7 @@ function buildWorld() {
   });
   [[10, 0xff2a40], [13.5, 0x4a6bff], [17, 0xffb030]].forEach(([x, c]) =>
     addSource({ x: x * CELL, y: 2.9, z: 11, col: c, i: 26, flick: 0.1, lamp: true, room: 0 }));
-  addSource({ x: 73, y: 2.4, z: 35, col: 0x38ff9a, i: 9, flick: 0, room: 3 });
+  addSource({ x: 105, y: 2.4, z: 35, col: 0x38ff9a, i: 9, flick: 0, room: 3 });
   addSource({ x: 69, y: 1.6, z: 46, col: 0x4fc8ff, i: 7, flick: 0.15, room: 7 });
 }
 
@@ -800,76 +791,16 @@ function newGame() {
   bonnie.active = false; bonnie.delay = DIFF[diff].delay; bonnie.stun = 0;
 
   buildKeys();
-}
-
-const INTRO_STORAGE_KEY = 'bonniesTerror_intro_seen_v2';
-let introTime = 0, introFinished = false;
-function introWasSeen() {
-  try { return localStorage.getItem(INTRO_STORAGE_KEY) === '1'; } catch (_) { return false; }
-}
-function beginIntro() {
-  introTime=0; introFinished=false; updateIntro.voicePlayed=false; updateIntro.hitPlayed=false;
-  $('introScene').classList.add('on'); $('introScene').classList.remove('scare');
-  $('syncFade').classList.remove('on'); $('introCaption').textContent='23:48 · TURNO DE NOCHE. LA OFICINA ESTÁ EN SILENCIO.';
-  $('introTag').textContent='OFICINA · CÁMARAS ACTIVAS'; $('introSkip').style.display='block';
-  $('hud').style.display='none'; $('vig').style.display='block'; $('flash').style.opacity=0;
-  setTC(false); state='intro'; startAmb();
-}
-function finishIntro() {
-  if(introFinished)return; introFinished=true;
-  updateIntro.voicePlayed=false; updateIntro.hitPlayed=false;
-  if(window.speechSynthesis)window.speechSynthesis.cancel();
-  $('introScene').classList.remove('on','scare'); $('introCaption').textContent=''; $('introSkip').style.display='none';
-  $('syncFade').classList.remove('on'); $('hud').style.display='block'; $('vig').style.display='block';
-  state='playing'; setTC(true); lock(); stopAmb(); startAmb();
-  say('Encuentra 3 llaves y escapa por la puerta verde.',4000);
-}
-function updateIntro(dt) {
-  introTime+=dt; const t=introTime;
-  if(t<2.25) {
-    $('introTag').textContent='OFICINA · CÁMARAS ACTIVAS';
-    $('introCaption').textContent='23:48 · TURNO DE NOCHE. La oficina está en silencio.';
-    camera.position.set(69,1.62,47.2); camera.rotation.set(-0.025,0,0,'YXZ');
-  } else if(t<4.45) {
-    $('introTag').textContent='CAM 01 · SALÓN PRINCIPAL';
-    $('introCaption').textContent='En los monitores, la pizzería parece vacía.';
-    const feed=CCTV_FEEDS[0]; camera.position.set(feed.x,feed.y,feed.z); camera.lookAt(feed.tx,feed.ty,feed.tz);
-  } else if(t<6.2) {
-    $('introTag').textContent='AUDIO DETECTADO · PASILLO';
-    $('introCaption').textContent='«¿Hola? ¿Hay alguien ahí...? Tengo miedo.»';
-    camera.position.set(69,1.62,47.2); camera.rotation.set(-0.035,0.04,0,'YXZ');
-    if(!updateIntro.voicePlayed) {
-      updateIntro.voicePlayed=true;
-      if(window.speechSynthesis && window.SpeechSynthesisUtterance) {
-        const line=new SpeechSynthesisUtterance('¿Hola? ¿Hay alguien ahí? Tengo miedo.');
-        line.lang='es-MX'; line.pitch=1.55; line.rate=0.86; line.volume=0.9;
-        try { window.speechSynthesis.speak(line); } catch(_) { playSnd('hello',0.48,0,0.78); }
-      } else playSnd('hello',0.48,0,0.78);
-    }
-  } else if(t<8.1) {
-    $('introScene').classList.add('scare'); $('introTag').textContent='SEÑAL PERDIDA';
-    $('introCaption').textContent='¡Un golpe sacude la oficina! Algo corre por el pasillo.';
-    camera.position.set(69,1.62,47.2);
-    camera.rotation.set(-0.06+Math.sin(t*37)*0.025,Math.sin(t*29)*0.11,0,'YXZ');
-    if(!updateIntro.hitPlayed) { updateIntro.hitPlayed=true; tone(64,0.58,0.62,'sawtooth'); }
-  } else {
-    $('introScene').classList.remove('scare'); $('introTag').textContent='SINCRONIZANDO POSICIÓN';
-    $('introCaption').textContent='Te levantas de golpe. Encuentra las llaves y escapa.';
-    $('syncFade').classList.add('on');
-    // La pantalla negra cubre el cambio de la cámara de oficina al punto de inicio del jugador.
-    if(t>=8.32) { camera.position.set(player.x,EYE,player.z); camera.rotation.set(player.pitch,player.yaw,0,'YXZ'); }
+  if (springDisplay.root) {
+    springDisplay.hiddenTime=0; springDisplay.group.visible=true;
+    springDisplay.blinkTimer=8+Math.random()*5;
   }
-  if(t>=9.2)finishIntro();
 }
-updateIntro.voicePlayed=false; updateIntro.hitPlayed=false;
-function skipIntro(){if(state==='intro')finishIntro();}
 
 function startGame() {
   initAudio(); newGame(); show(null);
-  $('introScene').classList.remove('on','scare'); $('syncFade').classList.remove('on');
-  $('hud').style.display='none'; $('vig').style.display='block'; $('flash').style.opacity=0; stopAmb();
-  if(!introWasSeen()) { beginIntro(); return; }
-  $('hud').style.display='block'; state='playing'; setTC(true); lock(); startAmb();
+  $('hud').style.display='block'; $('vig').style.display='block'; $('flash').style.opacity=0;
+  state='playing'; setTC(true); lock(); stopAmb(); startAmb();
   say('Encuentra 3 llaves y escapa por la puerta verde.',4000);
 }
 
@@ -878,12 +809,11 @@ function resume() { state = 'playing'; show(null); setTC(true); lock(); duckAmb(
 function toMenu() {
   resetTouchState();
   selectedCCTV = -1; $('cctv').classList.add('hidden');
-  state = 'menu'; $('introScene').classList.remove('on','scare'); $('syncFade').classList.remove('on'); show('menu'); setTC(false); stopAmb();
+  state = 'menu'; show('menu'); setTC(false); stopAmb();
   $('hud').style.display = 'none'; $('vig').style.display = 'none';
   newGame();
 }
 function endGame(type) {
-  try { localStorage.setItem(INTRO_STORAGE_KEY,'1'); } catch (_) {}
   resetTouchState();
   selectedCCTV = -1; $('cctv').classList.add('hidden');
   state = type;
@@ -1141,7 +1071,7 @@ function resetTouchState() {
   jId = null; lId = null; joy.x = 0; joy.y = 0; runHeld = false;
   const knob = $('knob'), base = $('joyBase');
   if (knob) knob.style.transform = 'translate(0,0)';
-  if (base) { base.style.left = '0px'; base.style.top = '0px'; base.style.opacity = '0'; }
+  if (base) { base.style.left = '0px'; base.style.top = '0px'; base.style.opacity = '0'; base.dataset.offsetX='0'; base.dataset.offsetY='0'; }
 }
 function jset(clientX, clientY) {
   let dx = clientX - jcx, dy = clientY - jcy;
@@ -1152,26 +1082,31 @@ function jset(clientX, clientY) {
   const magnitude = raw <= 0.12 ? 0 : Math.min(1,(raw - 0.12) / 0.88);
   if (raw > 0.001) { joy.x = (dx / Math.hypot(dx,dy)) * magnitude; joy.y = (dy / Math.hypot(dx,dy)) * magnitude; }
   else { joy.x = 0; joy.y = 0; }
-  $('knob').style.transform = `translate(${dx}px,${dy}px)`;
+  const visualX=dx,visualY=dy;
+  $('knob').style.transform = `translate(${visualX}px,${visualY}px)`;
 }
 function beginJoy(id,x,y,captureTarget) {
   if (jId !== null) return;
   jId=id; jcx=x; jcy=y;
   const rect=$('tc').getBoundingClientRect(),base=$('joyBase');
-  const px=Math.max(82,Math.min(rect.width*0.48-18,x)), py=Math.max(82,Math.min(rect.height-82,y));
-  base.style.left=px+'px'; base.style.top=py+'px'; base.style.opacity='1';
-  if(captureTarget && captureTarget.setPointerCapture) { try{captureTarget.setPointerCapture(id);}catch(_){} }
-  jset(x,y);
+  const radius=Math.min(76,Math.max(56,Math.min(rect.width*0.20,rect.height*0.20)));
+  const px=Math.max(radius,Math.min(rect.width*0.48-radius,x));
+  const py=Math.max(radius,Math.min(rect.height-radius,y));
+  const ox=x-px,oy=y-py;
+  base.dataset.offsetX=String(ox);base.dataset.offsetY=String(oy);
+  base.style.left=px+'px';base.style.top=py+'px';base.style.opacity='1';
+  if(captureTarget&&captureTarget.setPointerCapture){try{captureTarget.setPointerCapture(id);}catch(_){}}
+  jcx=px;jcy=py;jset(x,y);
 }
 function endJoy(id) {
   if(jId!==id)return;
   jId=null;joy.x=0;joy.y=0;
-  $('knob').style.transform='translate(0,0)';$('joyBase').style.opacity='0';
+  $('knob').style.transform='translate(0,0)';$('joyBase').style.opacity='0';$('joyBase').dataset.offsetX='0';$('joyBase').dataset.offsetY='0';
 }
 const jz=$('joyZone'),lz=$('lookZone');
 if (window.PointerEvent) {
   jz.addEventListener('pointerdown',e=>{ if(e.pointerType==='mouse'&&e.button!==0)return;e.preventDefault();beginJoy(e.pointerId,e.clientX,e.clientY,jz); });
-  jz.addEventListener('pointermove',e=>{if(e.pointerId===jId){e.preventDefault();jset(e.clientX,e.clientY);}});
+  document.addEventListener('pointermove',e=>{if(e.pointerId===jId){e.preventDefault();jset(e.clientX,e.clientY);}});
   ['pointerup','pointercancel','lostpointercapture'].forEach(n=>jz.addEventListener(n,e=>endJoy(e.pointerId)));
   document.addEventListener('pointerup',e=>endJoy(e.pointerId));document.addEventListener('pointercancel',e=>endJoy(e.pointerId));
   lz.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse'&&e.button!==0)return;e.preventDefault();if(lId!==null)return;lId=e.pointerId;lx=e.clientX;ly=e.clientY;try{lz.setPointerCapture(e.pointerId);}catch(_){}});
@@ -1179,8 +1114,8 @@ if (window.PointerEvent) {
   const endLook=e=>{if(e.pointerId===lId)lId=null;};['pointerup','pointercancel','lostpointercapture'].forEach(n=>lz.addEventListener(n,endLook));
 } else {
   jz.addEventListener('touchstart',e=>{e.preventDefault();const t=e.changedTouches[0];if(t)beginJoy(t.identifier,t.clientX,t.clientY,null);},{passive:false});
-  jz.addEventListener('touchmove',e=>{e.preventDefault();for(const t of e.changedTouches)if(t.identifier===jId)jset(t.clientX,t.clientY);},{passive:false});
-  ['touchend','touchcancel'].forEach(n=>jz.addEventListener(n,e=>{for(const t of e.changedTouches)endJoy(t.identifier);},{passive:false}));
+  document.addEventListener('touchmove',e=>{for(const t of e.changedTouches)if(t.identifier===jId)jset(t.clientX,t.clientY);});
+  ['touchend','touchcancel'].forEach(n=>document.addEventListener(n,e=>{for(const t of e.changedTouches)endJoy(t.identifier);},{passive:false}));
   lz.addEventListener('touchstart',e=>{e.preventDefault();if(lId!==null)return;const t=e.changedTouches[0];if(t){lId=t.identifier;lx=t.clientX;ly=t.clientY;}},{passive:false});
   lz.addEventListener('touchmove',e=>{e.preventDefault();for(const t of e.changedTouches)if(t.identifier===lId){if(state==='playing'&&selectedCCTV<0){player.yaw-=(t.clientX-lx)*0.0055;player.pitch=Math.max(-1.45,Math.min(1.45,player.pitch-(t.clientY-ly)*0.0055));}lx=t.clientX;ly=t.clientY;}},{passive:false});
   ['touchend','touchcancel'].forEach(n=>lz.addEventListener(n,e=>{for(const t of e.changedTouches)if(t.identifier===lId)lId=null;},{passive:false}));
@@ -1267,7 +1202,6 @@ bindTap($('cctvClose'), closeCCTV);
 
 // ---------- Menús ----------
 bindTap($('playBtn'), startGame);
-bindTap($('introSkip'), skipIntro);
 bindTap($('helpBtn'), () => show('help'));
 bindTap($('helpBack'), () => show('menu'));
 document.querySelectorAll('[data-d]').forEach(b => bindTap(b, () => {
@@ -1404,9 +1338,33 @@ new GLTFLoader().load(
 function updateSpringDisplay(dt) {
   if (!springDisplay.root) return;
   springDisplay.time += dt;
+  if (state === 'playing') {
+    if (springDisplay.hiddenTime > 0) {
+      springDisplay.hiddenTime -= dt;
+      if (springDisplay.hiddenTime <= 0) {
+        const choices=[];
+        for(let r=0;r<GH;r++) for(let c=0;c<GW;c++) {
+          if(grid[r][c]!==0 || roomMap[r][c]<0) continue;
+          const prev=springDisplay.cell;
+          if(prev && Math.hypot(c-prev[0],r-prev[1])<7) continue;
+          if(Math.hypot(c*CELL-player.x,r*CELL-player.z)<9) continue;
+          choices.push([c,r]);
+        }
+        if(choices.length) {
+          const next=choices[(Math.random()*choices.length)|0]; springDisplay.cell=next;
+          springDisplay.group.position.set(next[0]*CELL,springDisplay.baseY,next[1]*CELL);
+          springDisplay.yawBase=Math.random()*Math.PI*2; springDisplay.group.rotation.y=springDisplay.yawBase;
+        }
+        springDisplay.group.visible=true; springDisplay.blinkTimer=9+Math.random()*8;
+      }
+      return;
+    }
+    springDisplay.blinkTimer-=dt;
+    if(springDisplay.blinkTimer<=0) { springDisplay.group.visible=false; springDisplay.hiddenTime=0.5; return; }
+  }
   const t = springDisplay.time;
   springDisplay.group.position.y = springDisplay.baseY + Math.sin(t * 1.35) * 0.018;
-  springDisplay.group.rotation.y = Math.sin(t * 0.42) * 0.04;
+  springDisplay.group.rotation.y = springDisplay.yawBase + Math.sin(t * 0.42) * 0.018;
   // A very restrained servo idle layered on the file's genuine 63-bone rig.
   for (const bone of springDisplay.list) if (bone.userData.springBase) bone.quaternion.copy(bone.userData.springBase);
   if (springDisplay.head) springDisplay.head.rotation.y += Math.sin(t * 0.73) * 0.045;
@@ -1435,7 +1393,6 @@ const HRS = ['12', '1', '2', '3', '4', '5', '6'];
 function update(dt) {
   const t = performance.now() / 1000;
   updateSpringDisplay(dt);
-  if (state === 'intro') updateIntro(dt);
   updateLights(dt);
   drawStatic(dt);
 
@@ -1511,7 +1468,7 @@ function update(dt) {
     const feed = CCTV_FEEDS[selectedCCTV];
     camera.position.set(feed.x, feed.y, feed.z);
     camera.lookAt(feed.tx, feed.ty, feed.tz);
-  } else if (state !== 'intro') {
+  } else {
     if (state !== 'caught') camera.position.set(player.x, EYE, player.z);
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
   }

@@ -285,9 +285,9 @@ const ROOMS = [
   { name: 'PARTES Y SERVICIO', r: [24, 20, 29, 25], floor: 'concrete', wall: 0x949478 },
   { name: 'OFICINA',           r: [32, 20, 37, 25], floor: 'concrete', wall: 0x849484 }
 ];
-const EXIT_CELL = [37, 17];
-const KEY_SPOTS = [[3, 23], [20, 23], [36, 3], [36, 14], [25, 22], [36, 22], [23, 14]];
-const BON_SPOTS = [[36, 3], [36, 14], [25, 22], [36, 22], [23, 3], [23, 14]];
+const START = [3, 17], EXIT_CELL = [37, 17]; // posición inicial de seguridad; cada partida elige otra sala
+const KEY_SPOTS = [[3, 23], [20, 23], [36, 3], [36, 14], [25, 22], [35, 23], [23, 14]];
+const BON_SPOTS = [[36, 3], [36, 14], [25, 22], [33, 23], [23, 3], [23, 14]];
 const PROPS = [];
 const CCTV_FEEDS = [
   { name: 'SALÓN PRINCIPAL', x: 28, y: 3.0, z: 12, tx: 28, ty: 0.9, tz: 22 },
@@ -615,14 +615,14 @@ function buildWorld() {
   sx.fillStyle = '#090b0e'; sx.fillRect(0, 0, 1200, 190);
   sx.strokeStyle = '#697078'; sx.lineWidth = 6; sx.strokeRect(5, 5, 1190, 180);
   // YouTube: botón rojo y triángulo blanco.
-  sx.fillStyle = '#ff0033'; sx.beginPath(); sx.roundRect(42, 44, 118, 82, 22); sx.fill();
+  sx.fillStyle = '#ff0033'; sx.beginPath(); sx.moveTo(64,44); sx.lineTo(138,44); sx.quadraticCurveTo(160,44,160,66); sx.lineTo(160,104); sx.quadraticCurveTo(160,126,138,126); sx.lineTo(64,126); sx.quadraticCurveTo(42,126,42,104); sx.lineTo(42,66); sx.quadraticCurveTo(42,44,64,44); sx.fill();
   sx.fillStyle = '#fff'; sx.beginPath(); sx.moveTo(90, 62); sx.lineTo(90, 108); sx.lineTo(127, 85); sx.closePath(); sx.fill();
   sx.fillStyle = '#f2f2f2'; sx.font = 'bold 43px Arial'; sx.textBaseline = 'middle'; sx.fillText('YouTube', 185, 84);
   sx.fillStyle = '#ff6b79'; sx.font = 'bold 38px Arial'; sx.fillText('@AMYR ANIMATIONS', 385, 84);
   // Separador central.
   sx.fillStyle = '#4a4e55'; sx.fillRect(648, 30, 3, 130);
   // Discord: burbuja violeta con glifo de mando estilizado y dos ojos.
-  sx.fillStyle = '#5865f2'; sx.beginPath(); sx.roundRect(700, 43, 120, 84, 26); sx.fill();
+  sx.fillStyle = '#5865f2'; sx.beginPath(); sx.moveTo(726,43); sx.lineTo(794,43); sx.quadraticCurveTo(820,43,820,69); sx.lineTo(820,101); sx.quadraticCurveTo(820,127,794,127); sx.lineTo(726,127); sx.quadraticCurveTo(700,127,700,101); sx.lineTo(700,69); sx.quadraticCurveTo(700,43,726,43); sx.fill();
   sx.fillStyle = '#fff'; sx.beginPath(); sx.arc(737, 84, 7, 0, Math.PI * 2); sx.arc(783, 84, 7, 0, Math.PI * 2); sx.fill();
   sx.strokeStyle = '#fff'; sx.lineWidth = 6; sx.lineCap = 'round'; sx.beginPath(); sx.moveTo(732, 59); sx.quadraticCurveTo(758, 46, 788, 59); sx.stroke();
   sx.fillStyle = '#f2f2f2'; sx.font = 'bold 43px Arial'; sx.fillText('Discord', 842, 84);

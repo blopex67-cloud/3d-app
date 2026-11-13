@@ -79,20 +79,6 @@
   .seg::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 10px,#0b0b0d 10px 12px)}
   #cam{position:absolute;top:14px;left:50%;transform:translateX(-50%);font-size:14px;letter-spacing:4px;text-transform:uppercase;white-space:nowrap;text-shadow:0 0 6px rgba(0,0,0,.9)}
   #cam i{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--red);margin-right:8px;box-shadow:0 0 8px var(--red);animation:blink 1s steps(2) infinite}
-  #cameraHudBtn{position:fixed;top:14px;right:calc(16px + env(safe-area-inset-right,0px));pointer-events:auto;touch-action:manipulation;z-index:8;padding:10px 14px;border:1px solid #6b7078;border-radius:4px;color:#d8e7d6;background:linear-gradient(#343940,#101216);font:700 12px var(--mono);letter-spacing:2px;box-shadow:0 0 12px #000;cursor:pointer}
-  #cameraHudBtn::before{content:'● ';color:#ff3747;animation:blink 1s steps(2) infinite}
-  #cctv.screen{z-index:60;padding:12px;background:rgba(0,0,0,.16);justify-content:flex-start;overflow:hidden;}
-  #cctvPanel{position:relative;width:100%;height:100%;max-height:none;overflow:visible;padding:0;border:0;background:transparent;box-shadow:none;pointer-events:none;}
-  #cctvHead{position:relative;z-index:2;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;margin-bottom:0;background:linear-gradient(90deg,rgba(5,10,7,.84),rgba(5,10,7,.38));pointer-events:auto;}
-  #cctvHead h2{font-size:clamp(16px,3vw,24px);margin:0;letter-spacing:3px;color:#c8d9c8}
-  #cctvClose{min-width:auto;margin:0;padding:8px 14px;font-size:14px}
-  #cctvMonitor{position:absolute;inset:0;border:8px solid rgba(20,26,22,.84);outline:1px solid #78847a;background:transparent;box-shadow:inset 0 0 40px #000;overflow:hidden;pointer-events:none}
-  #cctvMonitor::after{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(0,0,0,.22) 3px 4px);box-shadow:inset 0 0 65px rgba(0,0,0,.72)}
-  #cctvStatus{position:absolute;z-index:2;left:18px;top:18px;color:#b8d0b6;font:700 12px var(--mono);letter-spacing:2px;text-shadow:0 1px 4px #000;pointer-events:none}
-  #cctvControls{position:absolute;left:50%;bottom:48px;transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:7px;width:min(760px,96%);padding:10px;background:rgba(4,7,5,.78);border:1px solid rgba(155,185,160,.45);pointer-events:auto;touch-action:manipulation;}
-  .feedBtn{min-width:0!important;margin:0!important;padding:9px 12px!important;font-size:12px!important;letter-spacing:1px!important}
-  .feedBtn.sel{border-color:#69e99a;color:#8dffb4;box-shadow:0 0 12px rgba(70,255,150,.35)}
-  #cctvHint{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);width:max-content;max-width:90%;font-size:11px;opacity:.78;letter-spacing:1px;margin:0;color:#e0eadf;text-shadow:0 1px 6px #000;pointer-events:none;}
   .kb{position:absolute;bottom:16px;right:16px;font-size:13px;line-height:1.8;opacity:.85}
   .kb b{color:var(--amber)}
   #msg{position:fixed;top:46px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.65);border:1px solid #ffffff2a;padding:8px 18px;border-radius:4px;font-size:14px;letter-spacing:2px;text-transform:uppercase;
@@ -115,11 +101,13 @@
   /* ---------- Controles táctiles ---------- */
   #tc{position:fixed;inset:0;z-index:7;display:none;touch-action:none;pointer-events:none}
   #tc #joyZone,#tc #lookZone,#tc .tbtn{touch-action:none;-webkit-user-select:none;user-select:none}
-  #lookZone{position:absolute;top:0;bottom:0;left:48%;right:0;touch-action:none;pointer-events:auto}
-  #joyZone{position:absolute;left:0;top:0;width:48%;height:100%;touch-action:none;pointer-events:auto}
-  #joyBase{position:absolute;left:0;top:0;width:154px;height:154px;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none;opacity:0;transition:opacity .1s ease;z-index:1;
+  #lookZone{position:absolute;top:0;bottom:0;left:48%;right:0;touch-action:none;pointer-events:auto;overscroll-behavior:contain}
+  #joyZone{position:absolute;left:0;top:0;width:48%;height:100%;touch-action:none;pointer-events:auto;overscroll-behavior:contain}
+  #joyBase{position:absolute;left:calc(94px + env(safe-area-inset-left,0px));top:auto;bottom:calc(22px + env(safe-area-inset-bottom,0px));width:140px;height:140px;transform:translateX(-50%);border-radius:50%;pointer-events:none;opacity:.78;transition:opacity .12s ease,filter .15s ease;z-index:1;
     background:radial-gradient(circle at 50% 50%,rgba(12,14,18,.95) 0 50%,#24262a 52%,#62676d 56%,#171a1d 62%,#ee3645 64%,#70202a 67%,#151619 70%,rgba(5,6,8,.76) 100%);box-shadow:0 0 0 2px rgba(245,60,75,.65),0 0 22px rgba(255,39,56,.38),inset 0 0 18px #000}
-  #knob{position:absolute;left:45px;top:45px;width:64px;height:64px;border-radius:50%;pointer-events:none;
+  #joyBase.active{transform:translate(-50%,-50%);opacity:1;filter:brightness(1.08)}
+  @media (max-width:700px){#joyBase{width:clamp(116px,32vw,140px);height:clamp(116px,32vw,140px)}#knob{left:calc(50% - 30px);top:calc(50% - 30px);width:60px;height:60px}}
+  #knob{position:absolute;left:38px;top:38px;width:64px;height:64px;border-radius:50%;pointer-events:none;
     background:radial-gradient(circle at 34% 28%,#ffd1d4 0,#ff6673 18%,#c8162b 54%,#590b17 82%,#26070c 100%);box-shadow:0 2px 14px rgba(255,42,58,.72),inset 0 2px 4px rgba(255,255,255,.48),inset 0 -5px 8px rgba(0,0,0,.75)}
   .tbtn{position:absolute;z-index:2;pointer-events:auto;width:78px;height:78px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
     font-family:var(--cond);font-weight:800;font-size:10px;letter-spacing:2px;color:var(--ink);touch-action:none;border:3px solid #0b0b0d;
@@ -166,21 +154,13 @@
       </div>
     </div>
   </div>
-  <div id="cam"><i></i><span id="camTxt">PASILLO</span></div>
+  <div id="cam"><i></i><span id="camTxt">PIZZERÍA</span></div>
   <div class="plate kb" style="position:absolute">
     <b>WASD</b> mover · <b>Ratón</b> mirar · <b>Shift</b> correr<br>
     <b>F</b> linterna · <b>Esc</b> pausa
   </div>
 </div>
-<button id="cameraHudBtn" type="button">CÁMARAS</button>
-<div id="cctv" class="screen hidden">
-  <div id="cctvPanel">
-    <div id="cctvHead"><h2>MONITORES DE SEGURIDAD</h2><button id="cctvClose" class="btn sec" type="button">CERRAR</button></div>
-    <div id="cctvMonitor"><div id="cctvStatus">CAM 01 · SALÓN PRINCIPAL · REC ●</div></div>
-    <div id="cctvControls"></div>
-    <p id="cctvHint">VISTA EN VIVO · Usa las cámaras para vigilar los pasillos.</p>
-  </div>
-</div>
+
 <div id="msg"></div>
 
 <div id="tc">
@@ -297,18 +277,7 @@ const START = [3,17], EXIT_CELL = [53,17];
 const KEY_SPOTS = [[3,23],[20,23],[36,3],[36,14],[25,22],[35,23],[23,14],[43,10],[45,26],[51,26],[51,6]];
 const BON_SPOTS = [[36,3],[36,14],[25,22],[33,23],[23,3],[23,14],[42,6],[51,10],[51,26],[44,26]];
 const PROPS = [];
-const CCTV_FEEDS = [
-  { name:'SALÓN PRINCIPAL',x:28,y:3,z:12,tx:28,ty:0.9,tz:22 },
-  { name:'FIESTAS 1',x:64,y:3,z:5,tx:65,ty:0.9,tz:17 },
-  { name:'FIESTAS 2',x:65,y:3,z:25,tx:64,ty:0.9,tz:31 },
-  { name:'PASILLO',x:12,y:2.8,z:34,tx:48,ty:1,tz:34 },
-  { name:'COCINA',x:12,y:3,z:48,tx:14,ty:0.8,tz:44 },
-  { name:'OFICINA / COMPUTADORAS',x:69,y:3,z:48,tx:68,ty:1,tz:43 },
-  { name:'COMEDOR NUEVO',x:94,y:3.1,z:12,tx:94,ty:0.9,tz:24 },
-  { name:'ALMACÉN AMPLIADO',x:85,y:3,z:55,tx:84,ty:0.9,tz:48 },
-  { name:'ARCADE',x:101,y:3,z:55,tx:100,ty:1,tz:49 }
-];
-let selectedCCTV=-1, lastStartCell=null;
+let lastStartCell=null;
 const { grid, roomMap } = (function(){
   const g=Array.from({length:GH},()=>Array(GW).fill(1));
   const rm=Array.from({length:GH},()=>Array(GW).fill(-1));
@@ -740,7 +709,6 @@ function clearLine(x0, z0, x1, z1, R) {
 // ---------- Partida ----------
 function newGame() {
   resetTouchState();
-  selectedCCTV = -1; $('cctv').classList.add('hidden');
   keys = KEY_SPOTS.slice().sort(() => Math.random() - 0.5).slice(0, 3);
   keysGot = 0; battery = 100; stamina = 100; elapsed = 0; flashOn = true; curRoom = -1; voiceT = 12; caughtTime = 0;
   $('jumpscareFX').className = ''; $('flash').style.opacity = 0; camera.fov = 72; camera.updateProjectionMatrix();
@@ -804,18 +772,16 @@ function startGame() {
   say('Encuentra 3 llaves y escapa por la puerta verde.',4000);
 }
 
-function pause() { resetTouchState(); selectedCCTV = -1; $('cctv').classList.add('hidden'); state = 'paused'; setTC(false); show('pause'); document.exitPointerLock(); duckAmb(true); }
+function pause() { resetTouchState(); state = 'paused'; setTC(false); show('pause'); document.exitPointerLock(); duckAmb(true); }
 function resume() { state = 'playing'; show(null); setTC(true); lock(); duckAmb(false); }
 function toMenu() {
   resetTouchState();
-  selectedCCTV = -1; $('cctv').classList.add('hidden');
   state = 'menu'; show('menu'); setTC(false); stopAmb();
   $('hud').style.display = 'none'; $('vig').style.display = 'none';
   newGame();
 }
 function endGame(type) {
   resetTouchState();
-  selectedCCTV = -1; $('cctv').classList.add('hidden');
   state = type;
   setTC(false); stopAmb();
   document.exitPointerLock();
@@ -1045,8 +1011,7 @@ addEventListener('keydown', e => {
   input[e.code] = true;
   if (e.repeat) return;
   if (e.code === 'KeyF') toggleFlash();
-  if (e.code === 'Escape' && selectedCCTV >= 0) closeCCTV();
-  else if (e.code === 'Escape' && state === 'paused') resume();
+  if (e.code === 'Escape' && state === 'paused') resume();
 });
 addEventListener('keyup', e => input[e.code] = false);
 addEventListener('blur', () => { resetTouchState(); for (const k in input) input[k] = false; });
@@ -1060,7 +1025,7 @@ $('c').addEventListener('click', () => {
   if (state === 'playing' && !document.pointerLockElement) lock();
 });
 document.addEventListener('pointerlockchange', () => {
-  if (!IS_TOUCH && !document.pointerLockElement && state === 'playing' && selectedCCTV < 0) pause();
+  if (!IS_TOUCH && !document.pointerLockElement && state === 'playing') pause();
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'playing') pause(); });
 
@@ -1071,7 +1036,7 @@ function resetTouchState() {
   jId = null; lId = null; joy.x = 0; joy.y = 0; runHeld = false;
   const knob = $('knob'), base = $('joyBase');
   if (knob) knob.style.transform = 'translate(0,0)';
-  if (base) { base.style.left = '0px'; base.style.top = '0px'; base.style.opacity = '0'; base.dataset.offsetX='0'; base.dataset.offsetY='0'; }
+  if (base) { base.classList.remove('active'); base.style.left=''; base.style.top=''; base.style.bottom=''; base.style.opacity='.78'; base.dataset.offsetX='0'; base.dataset.offsetY='0'; }
 }
 function jset(clientX, clientY) {
   let dx = clientX - jcx, dy = clientY - jcy;
@@ -1082,7 +1047,8 @@ function jset(clientX, clientY) {
   const magnitude = raw <= 0.12 ? 0 : Math.min(1,(raw - 0.12) / 0.88);
   if (raw > 0.001) { joy.x = (dx / Math.hypot(dx,dy)) * magnitude; joy.y = (dy / Math.hypot(dx,dy)) * magnitude; }
   else { joy.x = 0; joy.y = 0; }
-  const visualX=dx,visualY=dy;
+  const base=$('joyBase'),ox=Number(base.dataset.offsetX||0),oy=Number(base.dataset.offsetY||0);
+  const visualX=Math.max(-JR,Math.min(JR,ox+dx)),visualY=Math.max(-JR,Math.min(JR,oy+dy));
   $('knob').style.transform = `translate(${visualX}px,${visualY}px)`;
 }
 function beginJoy(id,x,y,captureTarget) {
@@ -1094,30 +1060,30 @@ function beginJoy(id,x,y,captureTarget) {
   const py=Math.max(radius,Math.min(rect.height-radius,y));
   const ox=x-px,oy=y-py;
   base.dataset.offsetX=String(ox);base.dataset.offsetY=String(oy);
-  base.style.left=px+'px';base.style.top=py+'px';base.style.opacity='1';
+  base.classList.add('active');base.style.left=px+'px';base.style.top=py+'px';base.style.bottom='';base.style.opacity='1';
   if(captureTarget&&captureTarget.setPointerCapture){try{captureTarget.setPointerCapture(id);}catch(_){}}
   jcx=px;jcy=py;jset(x,y);
 }
 function endJoy(id) {
   if(jId!==id)return;
   jId=null;joy.x=0;joy.y=0;
-  $('knob').style.transform='translate(0,0)';$('joyBase').style.opacity='0';$('joyBase').dataset.offsetX='0';$('joyBase').dataset.offsetY='0';
+  $('knob').style.transform='translate(0,0)';$('joyBase').classList.remove('active');$('joyBase').style.left='';$('joyBase').style.top='';$('joyBase').style.bottom='';$('joyBase').style.opacity='.78';$('joyBase').dataset.offsetX='0';$('joyBase').dataset.offsetY='0';
 }
 const jz=$('joyZone'),lz=$('lookZone');
 if (window.PointerEvent) {
   jz.addEventListener('pointerdown',e=>{ if(e.pointerType==='mouse'&&e.button!==0)return;e.preventDefault();beginJoy(e.pointerId,e.clientX,e.clientY,jz); });
   document.addEventListener('pointermove',e=>{if(e.pointerId===jId){e.preventDefault();jset(e.clientX,e.clientY);}});
   ['pointerup','pointercancel','lostpointercapture'].forEach(n=>jz.addEventListener(n,e=>endJoy(e.pointerId)));
-  document.addEventListener('pointerup',e=>endJoy(e.pointerId));document.addEventListener('pointercancel',e=>endJoy(e.pointerId));
+  document.addEventListener('pointerup',e=>endJoy(e.pointerId));document.addEventListener('pointercancel',e=>endJoy(e.pointerId));document.addEventListener('lostpointercapture',e=>endJoy(e.pointerId));
   lz.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse'&&e.button!==0)return;e.preventDefault();if(lId!==null)return;lId=e.pointerId;lx=e.clientX;ly=e.clientY;try{lz.setPointerCapture(e.pointerId);}catch(_){}});
-  lz.addEventListener('pointermove',e=>{if(e.pointerId!==lId)return;e.preventDefault();if(state==='playing'&&selectedCCTV<0){player.yaw-=(e.clientX-lx)*0.0055;player.pitch=Math.max(-1.45,Math.min(1.45,player.pitch-(e.clientY-ly)*0.0055));}lx=e.clientX;ly=e.clientY;});
+  lz.addEventListener('pointermove',e=>{if(e.pointerId!==lId)return;e.preventDefault();if(state==='playing'){player.yaw-=(e.clientX-lx)*0.0055;player.pitch=Math.max(-1.45,Math.min(1.45,player.pitch-(e.clientY-ly)*0.0055));}lx=e.clientX;ly=e.clientY;});
   const endLook=e=>{if(e.pointerId===lId)lId=null;};['pointerup','pointercancel','lostpointercapture'].forEach(n=>lz.addEventListener(n,endLook));
 } else {
   jz.addEventListener('touchstart',e=>{e.preventDefault();const t=e.changedTouches[0];if(t)beginJoy(t.identifier,t.clientX,t.clientY,null);},{passive:false});
   document.addEventListener('touchmove',e=>{for(const t of e.changedTouches)if(t.identifier===jId)jset(t.clientX,t.clientY);});
   ['touchend','touchcancel'].forEach(n=>document.addEventListener(n,e=>{for(const t of e.changedTouches)endJoy(t.identifier);},{passive:false}));
   lz.addEventListener('touchstart',e=>{e.preventDefault();if(lId!==null)return;const t=e.changedTouches[0];if(t){lId=t.identifier;lx=t.clientX;ly=t.clientY;}},{passive:false});
-  lz.addEventListener('touchmove',e=>{e.preventDefault();for(const t of e.changedTouches)if(t.identifier===lId){if(state==='playing'&&selectedCCTV<0){player.yaw-=(t.clientX-lx)*0.0055;player.pitch=Math.max(-1.45,Math.min(1.45,player.pitch-(t.clientY-ly)*0.0055));}lx=t.clientX;ly=t.clientY;}},{passive:false});
+  lz.addEventListener('touchmove',e=>{e.preventDefault();for(const t of e.changedTouches)if(t.identifier===lId){if(state==='playing'){player.yaw-=(t.clientX-lx)*0.0055;player.pitch=Math.max(-1.45,Math.min(1.45,player.pitch-(t.clientY-ly)*0.0055));}lx=t.clientX;ly=t.clientY;}},{passive:false});
   ['touchend','touchcancel'].forEach(n=>lz.addEventListener(n,e=>{for(const t of e.changedTouches)if(t.identifier===lId)lId=null;},{passive:false}));
 }
 // Unifica Pointer, Touch y click. Deduplica eventos sintéticos para que cada toque active una vez.
@@ -1170,35 +1136,6 @@ function bindHold(el, down, up) {
 bindHold($('btnRun'), () => { runHeld = true; }, () => { runHeld = false; });
 bindTap($('btnFlash'), toggleFlash);
 bindTap($('btnPause'), () => { if (state === 'playing') pause(); });
-
-// ---------- Cámaras de seguridad ----------
-const cctvButtons = [];
-CCTV_FEEDS.forEach((feed, i) => {
-  const b = document.createElement('button');
-  b.type = 'button'; b.className = 'btn feedBtn' + (i === 0 ? ' sel' : '');
-  b.textContent = `CAM ${String(i + 1).padStart(2, '0')}`;
-  b.setAttribute('aria-label', feed.name);
-  b.title = feed.name;
-  bindTap(b, () => selectCCTV(i));
-  $('cctvControls').appendChild(b); cctvButtons.push(b);
-});
-function selectCCTV(i) {
-  selectedCCTV = i;
-  cctvButtons.forEach((b, n) => b.classList.toggle('sel', n === i));
-  $('cctvStatus').textContent = `CAM ${String(i + 1).padStart(2, '0')} · ${CCTV_FEEDS[i].name} · EN VIVO ●`;
-}
-function openCCTV() {
-  if (state !== 'playing') return;
-  selectedCCTV = 0; selectCCTV(0);
-  $('cctv').classList.remove('hidden'); setTC(false);
-  if (document.pointerLockElement) document.exitPointerLock();
-}
-function closeCCTV() {
-  $('cctv').classList.add('hidden'); selectedCCTV = -1;
-  if (state === 'playing') { setTC(true); if (!IS_TOUCH) lock(); }
-}
-bindTap($('cameraHudBtn'), openCCTV);
-bindTap($('cctvClose'), closeCCTV);
 
 // ---------- Menús ----------
 bindTap($('playBtn'), startGame);
@@ -1464,14 +1401,8 @@ function update(dt) {
   }
   $('stat').style.opacity = statOp;
 
-  if (selectedCCTV >= 0 && state === 'playing') {
-    const feed = CCTV_FEEDS[selectedCCTV];
-    camera.position.set(feed.x, feed.y, feed.z);
-    camera.lookAt(feed.tx, feed.ty, feed.tz);
-  } else {
-    if (state !== 'caught') camera.position.set(player.x, EYE, player.z);
-    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
-  }
+  if (state !== 'caught') camera.position.set(player.x, EYE, player.z);
+  camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
 
   bonnie.group.position.set(bonnie.x, 0, bonnie.z);
   bonnie.group.rotation.y = bonnie.heading;

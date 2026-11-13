@@ -107,6 +107,18 @@
   #jumpscareFX.on::before,#jumpscareFX.on::after{height:clamp(24px,8vh,82px)}
   #scareText{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(.7);color:#fff;text-align:center;font:900 clamp(24px,7vw,64px) var(--mono);letter-spacing:clamp(3px,1vw,10px);text-shadow:5px 0 #a00012,-4px 0 #1a8294,0 0 30px #ff172b;opacity:0;white-space:nowrap}
   #jumpscareFX.on.hit #scareText{animation:scareTitle .52s steps(2) both}
+  #syncFade{position:fixed;inset:0;z-index:71;background:#000;opacity:0;pointer-events:none;transition:opacity .65s ease}
+  #syncFade.on{opacity:1}
+  #introScene{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.18);pointer-events:none;font-family:var(--mono)}
+  #introScene.on{display:flex}
+  #introScene::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(130,255,190,.08) 3px 4px),radial-gradient(ellipse,transparent 32%,rgba(0,0,0,.82) 100%);animation:introNoise .16s steps(2) infinite}
+  #introFrame{position:absolute;inset:6% 5%;border:2px solid rgba(126,255,173,.48);box-shadow:inset 0 0 36px #000,0 0 24px rgba(20,255,130,.12)}
+  #introTop{position:absolute;top:8%;left:8%;right:8%;display:flex;justify-content:space-between;color:#baffcb;font-size:clamp(11px,2vw,17px);letter-spacing:3px;text-shadow:0 0 8px #42ff92}
+  #introCaption{position:absolute;left:8%;right:8%;bottom:14%;min-height:3em;color:#f2f2e9;text-align:center;font-size:clamp(17px,3.4vw,30px);line-height:1.55;letter-spacing:2px;text-shadow:0 2px 12px #000,0 0 14px #000}
+  #introSkip{position:absolute;right:8%;bottom:6%;pointer-events:auto;touch-action:manipulation;color:#d7e8d9;background:rgba(5,12,8,.78);border:1px solid #83c99a;padding:10px 16px;font:700 12px var(--mono);letter-spacing:2px}
+  #introScene.scare #introFrame{border-color:#ff3344;box-shadow:inset 0 0 45px rgba(255,0,20,.22),0 0 24px rgba(255,0,35,.4)}
+  #introScene.scare::before{background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(255,35,55,.18) 2px 3px),radial-gradient(ellipse,transparent 18%,rgba(80,0,5,.78) 100%)}
+  @keyframes introNoise{0%,100%{opacity:.7}50%{opacity:1}}
   @keyframes scareFlicker{0%,100%{filter:brightness(.78) contrast(1.3)}50%{filter:brightness(1.3) contrast(1.6)}}
   @keyframes scareTitle{0%{opacity:0;transform:translate(-50%,-50%) scale(.5)}25%{opacity:1;transform:translate(-48%,-52%) scale(1.08)}55%{opacity:.35;transform:translate(-51%,-49%) scale(.98)}100%{opacity:1;transform:translate(-50%,-50%) scale(1)}}
   body.touch .kb{display:none}
@@ -115,12 +127,12 @@
   /* ---------- Controles táctiles ---------- */
   #tc{position:fixed;inset:0;z-index:7;display:none;touch-action:none;pointer-events:none}
   #tc #joyZone,#tc #lookZone,#tc .tbtn{touch-action:none;-webkit-user-select:none;user-select:none}
-  #lookZone{position:absolute;top:0;bottom:0;left:43%;right:0;touch-action:none;pointer-events:auto}
-  #joyZone{position:absolute;left:0;bottom:0;width:43%;height:72%;touch-action:none;pointer-events:auto}
-  #joyBase{position:absolute;left:calc(40px + env(safe-area-inset-left,0px));bottom:36px;width:130px;height:130px;border-radius:50%;pointer-events:none;
-    background:radial-gradient(circle at 50% 50%,#101012 0 52%,#3b3d42 54%,#17181b 62%,#6a6d73 64%,#2a2b2f 72%,#0d0d0f 100%);box-shadow:0 4px 12px rgba(0,0,0,.8)}
-  #knob{position:absolute;left:35px;top:35px;width:60px;height:60px;border-radius:50%;pointer-events:none;
-    background:radial-gradient(circle at 35% 30%,#ff8a8a,#d4141f 55%,#4a0710);box-shadow:0 0 14px rgba(255,42,58,.7),inset 0 -3px 5px rgba(0,0,0,.5)}
+  #lookZone{position:absolute;top:0;bottom:0;left:48%;right:0;touch-action:none;pointer-events:auto}
+  #joyZone{position:absolute;left:0;top:0;width:48%;height:100%;touch-action:none;pointer-events:auto}
+  #joyBase{position:absolute;left:0;top:0;width:154px;height:154px;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none;opacity:0;transition:opacity .1s ease;z-index:1;
+    background:radial-gradient(circle at 50% 50%,rgba(12,14,18,.95) 0 50%,#24262a 52%,#62676d 56%,#171a1d 62%,#ee3645 64%,#70202a 67%,#151619 70%,rgba(5,6,8,.76) 100%);box-shadow:0 0 0 2px rgba(245,60,75,.65),0 0 22px rgba(255,39,56,.38),inset 0 0 18px #000}
+  #knob{position:absolute;left:45px;top:45px;width:64px;height:64px;border-radius:50%;pointer-events:none;
+    background:radial-gradient(circle at 34% 28%,#ffd1d4 0,#ff6673 18%,#c8162b 54%,#590b17 82%,#26070c 100%);box-shadow:0 2px 14px rgba(255,42,58,.72),inset 0 2px 4px rgba(255,255,255,.48),inset 0 -5px 8px rgba(0,0,0,.75)}
   .tbtn{position:absolute;z-index:2;pointer-events:auto;width:78px;height:78px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
     font-family:var(--cond);font-weight:800;font-size:10px;letter-spacing:2px;color:var(--ink);touch-action:none;border:3px solid #0b0b0d;
     background:radial-gradient(circle at 35% 28%,#a2a5ab,#55575d 52%,#232428);box-shadow:inset 0 2px 0 rgba(255,255,255,.4),inset 0 -4px 8px rgba(0,0,0,.55),0 4px 10px rgba(0,0,0,.8),0 0 0 2px #17171a}
@@ -131,7 +143,7 @@
   #btnFlash{right:calc(28px + env(safe-area-inset-right,0px));bottom:118px}
   #btnPause{right:calc(16px + env(safe-area-inset-right,0px));top:14px;width:50px;height:50px}
   #btnPause svg{width:22px;height:22px}
-  @media (max-height:480px){#joyZone{height:78%}#joyBase{width:112px;height:112px;left:calc(28px + env(safe-area-inset-left,0px));bottom:22px}#knob{left:26px;top:26px;width:60px;height:60px} .tbtn{width:66px;height:66px}#btnFlash{bottom:94px}#btnRun{bottom:20px}}
+  @media (max-height:480px){.tbtn{width:66px;height:66px}#btnFlash{bottom:94px}#btnRun{bottom:20px}}
 </style>
 </head>
 <body>
@@ -140,6 +152,13 @@
 <div id="danger"></div>
 <div id="flash"></div>
 <div id="jumpscareFX"><div id="scareText">TE ATRAPÓ</div></div>
+<div id="syncFade"></div>
+<div id="introScene" aria-live="polite">
+  <div id="introFrame"></div>
+  <div id="introTop"><span id="introTag">OFICINA · CÁMARAS ACTIVAS</span><span>REC <b style="color:#ff3747">●</b></span></div>
+  <div id="introCaption"></div>
+  <button id="introSkip" type="button">SALTAR INTRO ›</button>
+</div>
 
 <div id="hud">
   <div id="leftcol">
@@ -347,83 +366,9 @@ function lock() { if (!IS_TOUCH) $('c').requestPointerLock(); }
 function setTC(on) { $('tc').style.display = (IS_TOUCH && on) ? 'block' : 'none'; if (!on) resetTouchState(); }
 
 // ---------- Movimiento procedural e IK de Bonnie ----------
-const bonnieRig = { root: null, bones: {}, list: [], legs: [], arms: [] };
-let proceduralClock = 0;
+let enemyMixer = null, enemyWalkAction = null, enemyWalking = false;
+const enemyRig = { root: null };
 const springDisplay = { group: null, root: null, bones: {}, list: [], jaw: null, head: null, baseY: 0.63, time: 0 };
-function restoreProceduralPose() {
-  for (const bone of bonnieRig.list) if (bone.userData.btRestQuat) bone.quaternion.copy(bone.userData.btRestQuat);
-}
-function solveTwoBoneIK(upper, lower, end, targetWorld, weight) {
-  if (!upper || !lower || !end || weight <= 0) return;
-  const target = targetWorld;
-  const bones = [lower, upper];
-  const qWorld = new THREE.Quaternion(), qParent = new THREE.Quaternion(), qLocal = new THREE.Quaternion(), delta = new THREE.Quaternion();
-  const jointPos = new THREE.Vector3(), endPos = new THREE.Vector3(), toEnd = new THREE.Vector3(), toTarget = new THREE.Vector3();
-  for (let iter = 0; iter < 2; iter++) {
-    bonnieRig.root.updateMatrixWorld(true);
-    for (const joint of bones) {
-      joint.getWorldPosition(jointPos); end.getWorldPosition(endPos);
-      toEnd.subVectors(endPos, jointPos); toTarget.subVectors(target, jointPos);
-      if (toEnd.lengthSq() < 1e-8 || toTarget.lengthSq() < 1e-8) continue;
-      delta.setFromUnitVectors(toEnd.normalize(), toTarget.normalize());
-      joint.getWorldQuaternion(qWorld); qWorld.premultiply(delta);
-      if (joint.parent) joint.parent.getWorldQuaternion(qParent); else qParent.identity();
-      qLocal.copy(qParent.invert()).multiply(qWorld);
-      joint.quaternion.slerp(qLocal, Math.min(0.42, weight * 0.42));
-    }
-  }
-}
-function applyProceduralRobot(dt) {
-  if (!bonnieRig.root || !bonnieRig.list.length) return;
-  restoreProceduralPose();
-  const active = bonnie.active && (state === 'playing' || state === 'caught' || state === 'gameover');
-  const isGameplay = state === 'playing' || state === 'caught' || state === 'gameover';
-  const weight = active ? (bonnie.stun > 0 ? 0.22 : 0.76) : (isGameplay ? 0.15 : 0);
-  if (weight <= 0) return;
-  proceduralClock += dt;
-  const t = proceduralClock, freq = active ? 7.4 : 1.8;
-  // Servo-like head, torso and arm offsets are generated procedurally; no authored clips are played.
-  const offsets = [
-    ['Spine_Bn_09', 0.025 * Math.sin(t * freq), 0.018 * Math.sin(t * freq * 0.61), 0],
-    ['Neck_Bn_021', 0.035 * Math.sin(t * freq * 0.71 + 1), 0.055 * Math.sin(t * 0.8), 0],
-    ['Head_Bn_022', 0.045 * Math.sin(t * 1.3), 0.10 * Math.sin(t * 0.65), 0],
-    ['L_Arm_01_Bn_011', 0.025 * Math.sin(t * freq + 0.7), 0, 0.045 * Math.sin(t * freq)],
-    ['R_Arm_01_Bn_040', 0.025 * Math.sin(t * freq + Math.PI + 0.7), 0, 0.045 * Math.sin(t * freq + Math.PI)]
-  ];
-  for (const [name, rx, ry, rz] of offsets) {
-    const bone = bonnieRig.bones[name]; if (!bone) continue;
-    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(rx * weight, ry * weight, rz * weight, 'XYZ'));
-    bone.quaternion.multiply(q);
-  }
-  // Two-bone leg IK softly plants alternating feet; targets are relative to the actual imported rig.
-  if (active) {
-    const phase = t * freq;
-    for (let i = 0; i < bonnieRig.legs.length; i++) {
-      const leg = bonnieRig.legs[i];
-      if (!leg.upper || !leg.lower || !leg.end) continue;
-      leg.end.getWorldPosition(leg.originWorld);
-      leg.targetLocal.copy(leg.originWorld).applyMatrix4(bonnieRig.inverseRoot);
-      const p = phase + (i ? Math.PI : 0), swing = Math.sin(p);
-      leg.targetLocal.z += swing * 0.085;
-      leg.targetLocal.y += Math.max(0, Math.cos(p)) * 0.09;
-      leg.targetWorld.copy(leg.targetLocal).applyMatrix4(bonnieRig.root.matrixWorld);
-      solveTwoBoneIK(leg.upper, leg.lower, leg.end, leg.targetWorld, weight);
-    }
-    // Real upper/lower arm chains use the same IK solver for restrained servo-like gestures.
-    for (let i = 0; i < bonnieRig.arms.length; i++) {
-      const arm = bonnieRig.arms[i];
-      if (!arm.upper || !arm.lower || !arm.end) continue;
-      arm.end.getWorldPosition(arm.originWorld);
-      arm.targetLocal.copy(arm.originWorld).applyMatrix4(bonnieRig.inverseRoot);
-      const phase = t * 1.25 + (i ? Math.PI : 0);
-      arm.targetLocal.z += Math.sin(phase) * 0.045;
-      arm.targetLocal.y += (0.035 + Math.cos(phase) * 0.025) * (bonnie.stun > 0 ? 0.25 : 1);
-      arm.targetWorld.copy(arm.targetLocal).applyMatrix4(bonnieRig.root.matrixWorld);
-      solveTwoBoneIK(arm.upper, arm.lower, arm.end, arm.targetWorld, weight * 0.68);
-    }
-  }
-}
-
 // ---------- Renderer / escena ----------
 const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -857,18 +802,75 @@ function newGame() {
   buildKeys();
 }
 
+const INTRO_STORAGE_KEY = 'bonniesTerror_intro_seen_v2';
+let introTime = 0, introFinished = false;
+function introWasSeen() {
+  try { return localStorage.getItem(INTRO_STORAGE_KEY) === '1'; } catch (_) { return false; }
+}
+function beginIntro() {
+  introTime=0; introFinished=false; updateIntro.voicePlayed=false; updateIntro.hitPlayed=false;
+  $('introScene').classList.add('on'); $('introScene').classList.remove('scare');
+  $('syncFade').classList.remove('on'); $('introCaption').textContent='23:48 · TURNO DE NOCHE. LA OFICINA ESTÁ EN SILENCIO.';
+  $('introTag').textContent='OFICINA · CÁMARAS ACTIVAS'; $('introSkip').style.display='block';
+  $('hud').style.display='none'; $('vig').style.display='block'; $('flash').style.opacity=0;
+  setTC(false); state='intro'; startAmb();
+}
+function finishIntro() {
+  if(introFinished)return; introFinished=true;
+  updateIntro.voicePlayed=false; updateIntro.hitPlayed=false;
+  if(window.speechSynthesis)window.speechSynthesis.cancel();
+  $('introScene').classList.remove('on','scare'); $('introCaption').textContent=''; $('introSkip').style.display='none';
+  $('syncFade').classList.remove('on'); $('hud').style.display='block'; $('vig').style.display='block';
+  state='playing'; setTC(true); lock(); stopAmb(); startAmb();
+  say('Encuentra 3 llaves y escapa por la puerta verde.',4000);
+}
+function updateIntro(dt) {
+  introTime+=dt; const t=introTime;
+  if(t<2.25) {
+    $('introTag').textContent='OFICINA · CÁMARAS ACTIVAS';
+    $('introCaption').textContent='23:48 · TURNO DE NOCHE. La oficina está en silencio.';
+    camera.position.set(69,1.62,47.2); camera.rotation.set(-0.025,0,0,'YXZ');
+  } else if(t<4.45) {
+    $('introTag').textContent='CAM 01 · SALÓN PRINCIPAL';
+    $('introCaption').textContent='En los monitores, la pizzería parece vacía.';
+    const feed=CCTV_FEEDS[0]; camera.position.set(feed.x,feed.y,feed.z); camera.lookAt(feed.tx,feed.ty,feed.tz);
+  } else if(t<6.2) {
+    $('introTag').textContent='AUDIO DETECTADO · PASILLO';
+    $('introCaption').textContent='«¿Hola? ¿Hay alguien ahí...? Tengo miedo.»';
+    camera.position.set(69,1.62,47.2); camera.rotation.set(-0.035,0.04,0,'YXZ');
+    if(!updateIntro.voicePlayed) {
+      updateIntro.voicePlayed=true;
+      if(window.speechSynthesis && window.SpeechSynthesisUtterance) {
+        const line=new SpeechSynthesisUtterance('¿Hola? ¿Hay alguien ahí? Tengo miedo.');
+        line.lang='es-MX'; line.pitch=1.55; line.rate=0.86; line.volume=0.9;
+        try { window.speechSynthesis.speak(line); } catch(_) { playSnd('hello',0.48,0,0.78); }
+      } else playSnd('hello',0.48,0,0.78);
+    }
+  } else if(t<8.1) {
+    $('introScene').classList.add('scare'); $('introTag').textContent='SEÑAL PERDIDA';
+    $('introCaption').textContent='¡Un golpe sacude la oficina! Algo corre por el pasillo.';
+    camera.position.set(69,1.62,47.2);
+    camera.rotation.set(-0.06+Math.sin(t*37)*0.025,Math.sin(t*29)*0.11,0,'YXZ');
+    if(!updateIntro.hitPlayed) { updateIntro.hitPlayed=true; tone(64,0.58,0.62,'sawtooth'); }
+  } else {
+    $('introScene').classList.remove('scare'); $('introTag').textContent='SINCRONIZANDO POSICIÓN';
+    $('introCaption').textContent='Te levantas de golpe. Encuentra las llaves y escapa.';
+    $('syncFade').classList.add('on');
+    // La pantalla negra cubre el cambio de la cámara de oficina al punto de inicio del jugador.
+    if(t>=8.32) { camera.position.set(player.x,EYE,player.z); camera.rotation.set(player.pitch,player.yaw,0,'YXZ'); }
+  }
+  if(t>=9.2)finishIntro();
+}
+updateIntro.voicePlayed=false; updateIntro.hitPlayed=false;
+function skipIntro(){if(state==='intro')finishIntro();}
+
 function startGame() {
-  initAudio();
-  newGame();
-  show(null);
-  $('hud').style.display = 'block';
-  $('vig').style.display = 'block';
-  $('flash').style.opacity = 0;
-  state = 'playing';
-  setTC(true);
-  lock();
-  stopAmb(); startAmb();
-  say('Encuentra 3 llaves y escapa por la puerta verde.', 4000);
+  initAudio(); newGame(); show(null);
+  $('introScene').classList.remove('on','scare'); $('syncFade').classList.remove('on');
+  $('hud').style.display='none'; $('vig').style.display='block'; $('flash').style.opacity=0; stopAmb();
+  if(!introWasSeen()) { beginIntro(); return; }
+  $('hud').style.display='block'; state='playing'; setTC(true); lock(); startAmb();
+  say('Encuentra 3 llaves y escapa por la puerta verde.',4000);
 }
 
 function pause() { resetTouchState(); selectedCCTV = -1; $('cctv').classList.add('hidden'); state = 'paused'; setTC(false); show('pause'); document.exitPointerLock(); duckAmb(true); }
@@ -876,11 +878,12 @@ function resume() { state = 'playing'; show(null); setTC(true); lock(); duckAmb(
 function toMenu() {
   resetTouchState();
   selectedCCTV = -1; $('cctv').classList.add('hidden');
-  state = 'menu'; show('menu'); setTC(false); stopAmb();
+  state = 'menu'; $('introScene').classList.remove('on','scare'); $('syncFade').classList.remove('on'); show('menu'); setTC(false); stopAmb();
   $('hud').style.display = 'none'; $('vig').style.display = 'none';
   newGame();
 }
 function endGame(type) {
+  try { localStorage.setItem(INTRO_STORAGE_KEY,'1'); } catch (_) {}
   resetTouchState();
   selectedCCTV = -1; $('cctv').classList.add('hidden');
   state = type;
@@ -917,7 +920,7 @@ function movePlayer(dt) {
   fwd = Math.max(-1, Math.min(1, fwd));
   strafe = Math.max(-1, Math.min(1, strafe));
   const mag = Math.min(1, Math.hypot(fwd, strafe));
-  const moving = mag > 0.12;
+  const moving = mag > 0.04;
   const sprint = (input.ShiftLeft || input.ShiftRight || runHeld) && moving && stamina > 0;
   if (sprint) stamina = Math.max(0, stamina - 24 * dt);
   else stamina = Math.min(100, stamina + 15 * dt);
@@ -1131,59 +1134,57 @@ document.addEventListener('pointerlockchange', () => {
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'playing') pause(); });
 
-// ---------- Entrada móvil: Pointer Events + captura para no perder el joystick ----------
-const JR = 45;
+// ---------- Entrada móvil: joystick flotante con zona amplia y eje normalizado ----------
+const JR = 46;
 let jId = null, jcx = 0, jcy = 0, lId = null, lx = 0, ly = 0;
 function resetTouchState() {
   jId = null; lId = null; joy.x = 0; joy.y = 0; runHeld = false;
-  const knob = $('knob'); if (knob) knob.style.transform = 'translate(0,0)';
+  const knob = $('knob'), base = $('joyBase');
+  if (knob) knob.style.transform = 'translate(0,0)';
+  if (base) { base.style.left = '0px'; base.style.top = '0px'; base.style.opacity = '0'; }
 }
 function jset(clientX, clientY) {
   let dx = clientX - jcx, dy = clientY - jcy;
   const d = Math.hypot(dx, dy);
   if (d > JR) { dx = dx / d * JR; dy = dy / d * JR; }
-  joy.x = dx / JR; joy.y = dy / JR;
+  // Calibrated radial dead-zone; normalize the remaining travel for stable movement input.
+  const raw = Math.hypot(dx,dy) / JR;
+  const magnitude = raw <= 0.12 ? 0 : Math.min(1,(raw - 0.12) / 0.88);
+  if (raw > 0.001) { joy.x = (dx / Math.hypot(dx,dy)) * magnitude; joy.y = (dy / Math.hypot(dx,dy)) * magnitude; }
+  else { joy.x = 0; joy.y = 0; }
   $('knob').style.transform = `translate(${dx}px,${dy}px)`;
 }
-const jz = $('joyZone'), lz = $('lookZone');
-if (window.PointerEvent) {
-  jz.addEventListener('pointerdown', e => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    e.preventDefault(); if (jId !== null) return;
-    jId = e.pointerId;
-    const r = $('joyBase').getBoundingClientRect(); jcx = r.left + r.width / 2; jcy = r.top + r.height / 2;
-    try { jz.setPointerCapture(e.pointerId); } catch (_) {}
-    jset(e.clientX, e.clientY);
-  });
-  jz.addEventListener('pointermove', e => { if (e.pointerId === jId) { e.preventDefault(); jset(e.clientX, e.clientY); } });
-  const finishJoy = e => { if (e.pointerId === jId) { e.preventDefault(); jId = null; joy.x = 0; joy.y = 0; $('knob').style.transform = 'translate(0,0)'; } };
-  ['pointerup','pointercancel','lostpointercapture'].forEach(n => jz.addEventListener(n, finishJoy));
-  lz.addEventListener('pointerdown', e => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    e.preventDefault(); if (lId !== null) return;
-    lId = e.pointerId; lx = e.clientX; ly = e.clientY;
-    try { lz.setPointerCapture(e.pointerId); } catch (_) {}
-  });
-  lz.addEventListener('pointermove', e => {
-    if (e.pointerId !== lId) return; e.preventDefault();
-    if (state === 'playing' && selectedCCTV < 0) {
-      player.yaw -= (e.clientX - lx) * 0.0055;
-      player.pitch = Math.max(-1.45, Math.min(1.45, player.pitch - (e.clientY - ly) * 0.0055));
-    }
-    lx = e.clientX; ly = e.clientY;
-  });
-  const finishLook = e => { if (e.pointerId === lId) { e.preventDefault(); lId = null; } };
-  ['pointerup','pointercancel','lostpointercapture'].forEach(n => lz.addEventListener(n, finishLook));
-} else {
-  // Fallback para WebViews antiguas que todavía no exponen Pointer Events.
-  jz.addEventListener('touchstart', e => { e.preventDefault(); if (jId !== null) return; const t=e.changedTouches[0]; jId=t.identifier; const r=$('joyBase').getBoundingClientRect(); jcx=r.left+r.width/2; jcy=r.top+r.height/2; jset(t.clientX,t.clientY); }, {passive:false});
-  jz.addEventListener('touchmove', e => { e.preventDefault(); for (const t of e.changedTouches) if (t.identifier===jId) jset(t.clientX,t.clientY); }, {passive:false});
-  ['touchend','touchcancel'].forEach(n=>jz.addEventListener(n,e=>{for(const t of e.changedTouches)if(t.identifier===jId){jId=null;joy.x=0;joy.y=0;$('knob').style.transform='translate(0,0)';}}));
-  lz.addEventListener('touchstart', e => { e.preventDefault(); if(lId!==null)return; const t=e.changedTouches[0];lId=t.identifier;lx=t.clientX;ly=t.clientY; }, {passive:false});
-  lz.addEventListener('touchmove', e => { e.preventDefault(); for(const t of e.changedTouches)if(t.identifier===lId){if(state==='playing'&&selectedCCTV<0){player.yaw-=(t.clientX-lx)*0.0055;player.pitch=Math.max(-1.45,Math.min(1.45,player.pitch-(t.clientY-ly)*0.0055));}lx=t.clientX;ly=t.clientY;} }, {passive:false});
-  ['touchend','touchcancel'].forEach(n=>lz.addEventListener(n,e=>{for(const t of e.changedTouches)if(t.identifier===lId)lId=null;}));
+function beginJoy(id,x,y,captureTarget) {
+  if (jId !== null) return;
+  jId=id; jcx=x; jcy=y;
+  const rect=$('tc').getBoundingClientRect(),base=$('joyBase');
+  const px=Math.max(82,Math.min(rect.width*0.48-18,x)), py=Math.max(82,Math.min(rect.height-82,y));
+  base.style.left=px+'px'; base.style.top=py+'px'; base.style.opacity='1';
+  if(captureTarget && captureTarget.setPointerCapture) { try{captureTarget.setPointerCapture(id);}catch(_){} }
+  jset(x,y);
 }
-
+function endJoy(id) {
+  if(jId!==id)return;
+  jId=null;joy.x=0;joy.y=0;
+  $('knob').style.transform='translate(0,0)';$('joyBase').style.opacity='0';
+}
+const jz=$('joyZone'),lz=$('lookZone');
+if (window.PointerEvent) {
+  jz.addEventListener('pointerdown',e=>{ if(e.pointerType==='mouse'&&e.button!==0)return;e.preventDefault();beginJoy(e.pointerId,e.clientX,e.clientY,jz); });
+  jz.addEventListener('pointermove',e=>{if(e.pointerId===jId){e.preventDefault();jset(e.clientX,e.clientY);}});
+  ['pointerup','pointercancel','lostpointercapture'].forEach(n=>jz.addEventListener(n,e=>endJoy(e.pointerId)));
+  document.addEventListener('pointerup',e=>endJoy(e.pointerId));document.addEventListener('pointercancel',e=>endJoy(e.pointerId));
+  lz.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse'&&e.button!==0)return;e.preventDefault();if(lId!==null)return;lId=e.pointerId;lx=e.clientX;ly=e.clientY;try{lz.setPointerCapture(e.pointerId);}catch(_){}});
+  lz.addEventListener('pointermove',e=>{if(e.pointerId!==lId)return;e.preventDefault();if(state==='playing'&&selectedCCTV<0){player.yaw-=(e.clientX-lx)*0.0055;player.pitch=Math.max(-1.45,Math.min(1.45,player.pitch-(e.clientY-ly)*0.0055));}lx=e.clientX;ly=e.clientY;});
+  const endLook=e=>{if(e.pointerId===lId)lId=null;};['pointerup','pointercancel','lostpointercapture'].forEach(n=>lz.addEventListener(n,endLook));
+} else {
+  jz.addEventListener('touchstart',e=>{e.preventDefault();const t=e.changedTouches[0];if(t)beginJoy(t.identifier,t.clientX,t.clientY,null);},{passive:false});
+  jz.addEventListener('touchmove',e=>{e.preventDefault();for(const t of e.changedTouches)if(t.identifier===jId)jset(t.clientX,t.clientY);},{passive:false});
+  ['touchend','touchcancel'].forEach(n=>jz.addEventListener(n,e=>{for(const t of e.changedTouches)endJoy(t.identifier);},{passive:false}));
+  lz.addEventListener('touchstart',e=>{e.preventDefault();if(lId!==null)return;const t=e.changedTouches[0];if(t){lId=t.identifier;lx=t.clientX;ly=t.clientY;}},{passive:false});
+  lz.addEventListener('touchmove',e=>{e.preventDefault();for(const t of e.changedTouches)if(t.identifier===lId){if(state==='playing'&&selectedCCTV<0){player.yaw-=(t.clientX-lx)*0.0055;player.pitch=Math.max(-1.45,Math.min(1.45,player.pitch-(t.clientY-ly)*0.0055));}lx=t.clientX;ly=t.clientY;}},{passive:false});
+  ['touchend','touchcancel'].forEach(n=>lz.addEventListener(n,e=>{for(const t of e.changedTouches)if(t.identifier===lId)lId=null;},{passive:false}));
+}
 // Unifica Pointer, Touch y click. Deduplica eventos sintéticos para que cada toque active una vez.
 function bindTap(el, action) {
   let lastAction = 0;
@@ -1266,6 +1267,7 @@ bindTap($('cctvClose'), closeCCTV);
 
 // ---------- Menús ----------
 bindTap($('playBtn'), startGame);
+bindTap($('introSkip'), skipIntro);
 bindTap($('helpBtn'), () => show('help'));
 bindTap($('helpBack'), () => show('menu'));
 document.querySelectorAll('[data-d]').forEach(b => bindTap(b, () => {
@@ -1375,20 +1377,16 @@ new GLTFLoader().load(
     const m = gltf.scene;
     m.traverse(o => { if (o.isMesh) { o.frustumCulled = false; } });
     fitModel(m);
-    bonnieRig.root = m; bonnieRig.bones = {}; bonnieRig.list = []; bonnieRig.legs = []; bonnieRig.arms = [];
-    m.traverse(o => { if (o.isBone) { bonnieRig.bones[o.name] = o; bonnieRig.list.push(o); o.userData.btRestQuat = o.quaternion.clone(); } });
-    bonnieRig.legs = [
-      { upper: bonnieRig.bones.L_Leg_01_Bn_03, lower: bonnieRig.bones.L_Leg_02_Bn_04, end: bonnieRig.bones.L_Leg_03_Bn_05 },
-      { upper: bonnieRig.bones.R_Leg_01_Bn_06, lower: bonnieRig.bones.R_Leg_02_Bn_07, end: bonnieRig.bones.R_Leg_03_Bn_08 }
-    ].map(x => Object.assign(x, { originWorld: new THREE.Vector3(), targetLocal: new THREE.Vector3(), targetWorld: new THREE.Vector3() }));
-    bonnieRig.arms = [
-      { upper: bonnieRig.bones.L_Arm_01_Bn_011, lower: bonnieRig.bones.L_Arm_02_Bn_012, end: bonnieRig.bones.L_Arm_03_Bn_013 },
-      { upper: bonnieRig.bones.R_Arm_01_Bn_040, lower: bonnieRig.bones.R_Arm_02_Bn_041, end: bonnieRig.bones.R_Arm_03_Bn_042 }
-    ].map(x => Object.assign(x, { originWorld: new THREE.Vector3(), targetLocal: new THREE.Vector3(), targetWorld: new THREE.Vector3() }));
+    enemyRig.root = m;
     m.updateMatrixWorld(true);
-    // Sustituir respaldo por el modelo real sin tocar el estado de la partida.
     if (fallbackBonnie) { bonnie.group.remove(fallbackBonnie); fallbackBonnie = null; }
     bonnie.group.add(m);
+    enemyMixer = new THREE.AnimationMixer(m);
+    const walkClip = gltf.animations.find(a => /(?:^|--)Charge$/i.test(a.name)) || gltf.animations.find(a => /walk/i.test(a.name));
+    if (walkClip) {
+      enemyWalkAction = enemyMixer.clipAction(walkClip);
+      enemyWalkAction.reset(); enemyWalkAction.setLoop(THREE.LoopRepeat, Infinity); enemyWalkAction.enabled=true;
+    } else console.warn('El modelo no trae clip Charge/Walk; se mantiene la pose base.');
     bonnieReady('LISTO');
   },
   event => {
@@ -1437,15 +1435,17 @@ const HRS = ['12', '1', '2', '3', '4', '5', '6'];
 function update(dt) {
   const t = performance.now() / 1000;
   updateSpringDisplay(dt);
+  if (state === 'intro') updateIntro(dt);
   updateLights(dt);
   drawStatic(dt);
 
   if (state === 'menu') player.yaw += dt * 0.08;
 
-  if (bonnieRig.root) {
-    bonnieRig.root.updateMatrixWorld(true);
-    bonnieRig.inverseRoot = bonnieRig.root.matrixWorld.clone().invert();
-    applyProceduralRobot(dt);
+  if (enemyMixer && enemyWalkAction) {
+    const shouldWalk=state==='playing' && bonnie.active && bonnie.stun<=0;
+    if(shouldWalk && !enemyWalking){enemyWalkAction.reset();enemyWalkAction.play();enemyWalking=true;}
+    else if(!shouldWalk && enemyWalking){enemyWalkAction.stop();enemyWalking=false;}
+    if(enemyWalking) enemyMixer.update(dt);
   }
 
   let statOp = (state === 'menu' || state === 'gameover' || state === 'win' || state === 'paused') ? 0.16 : 0.06;
@@ -1511,7 +1511,7 @@ function update(dt) {
     const feed = CCTV_FEEDS[selectedCCTV];
     camera.position.set(feed.x, feed.y, feed.z);
     camera.lookAt(feed.tx, feed.ty, feed.tz);
-  } else {
+  } else if (state !== 'intro') {
     if (state !== 'caught') camera.position.set(player.x, EYE, player.z);
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
   }

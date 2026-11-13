@@ -10,15 +10,6 @@
   html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:var(--mono);color:var(--ink);user-select:none;-webkit-user-select:none;touch-action:none}
   #c{position:fixed;inset:0;width:100%;height:100%;display:block}
 
-  /* ---------- Efecto de cámara retro ligero, inspirado en consolas de 32 bits ---------- */
-  #stat{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:49;opacity:.06;image-rendering:pixelated}
-  #crt{position:fixed;inset:0;pointer-events:none;z-index:50;overflow:hidden;
-    background:repeating-linear-gradient(0deg,rgba(0,0,0,.11) 0,rgba(0,0,0,.11) 1px,transparent 1px,transparent 4px);
-    box-shadow:inset 0 0 90px rgba(0,0,0,.55);animation:none;opacity:.62}
-  #crt::after{content:none}
-  #crt::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,rgba(20,120,255,.035),transparent 13%,transparent 87%,rgba(255,25,45,.035)),radial-gradient(ellipse at center,transparent 58%,rgba(70,22,38,.10));mix-blend-mode:screen;pointer-events:none}
-  @keyframes roll{to{transform:translateY(calc(100vh + 180px))}}
-  @keyframes tvflick{0%{opacity:.95}50%{opacity:1}100%{opacity:.97}}
   @keyframes blink{50%{opacity:0}}
   @keyframes glitch{0%,90%,100%{transform:none}91%{transform:translate(-4px,1px) skewX(6deg)}93%{transform:translate(5px,-1px)}95%{transform:translate(-2px,0) skewX(-5deg)}97%{transform:none}}
 
@@ -65,36 +56,51 @@
 
   /* ---------- HUD ---------- */
   #hud{position:fixed;inset:0;pointer-events:none;z-index:5;display:none;font-family:var(--mono)}
-  .plate{position:relative;background:linear-gradient(180deg,rgba(44,46,50,.9),rgba(14,15,17,.93));border:2px solid #07070a;border-radius:6px;padding:8px 12px;
+  .plate{position:relative;background:linear-gradient(180deg,rgba(44,46,50,.9),rgba(14,15,17,.93));border:2px solid #07070a;border-radius:6px;padding:6px 9px;
     box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 3px 10px rgba(0,0,0,.7)}
-  #leftcol{position:absolute;top:14px;left:calc(14px + env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:8px}
-  #clk{font-size:30px;font-weight:900;color:#ff3b30;text-shadow:0 0 10px rgba(255,40,30,.8);letter-spacing:2px;line-height:1}
-  #night{font-size:11px;letter-spacing:3px;opacity:.7;margin-top:4px}
-  #keysRow{display:flex;align-items:center;gap:6px;margin-top:7px;font-size:12px;letter-spacing:2px}
-  .kico{width:22px;height:22px;color:#4a4d54;flex:none}
+  #leftcol{position:absolute;top:8px;left:calc(8px + env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:4px;transform:scale(.84);transform-origin:top left}
+  #clk{font-size:24px;font-weight:900;color:#ff3b30;text-shadow:0 0 10px rgba(255,40,30,.8);letter-spacing:2px;line-height:1}
+  #night{font-size:9px;letter-spacing:3px;opacity:.7;margin-top:4px}
+  #keysRow{display:flex;align-items:center;gap:4px;margin-top:3px;font-size:10px;letter-spacing:2px}
+  .kico{width:17px;height:17px;color:#4a4d54;flex:none}
   .kico.on{color:var(--amber);filter:drop-shadow(0 0 5px rgba(255,194,61,.9))}
-  .brow{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:11px;letter-spacing:1px}
-  .brow svg{width:18px;height:18px;flex:none;color:#b9b5a4}
-  .seg{position:relative;width:120px;height:12px;background:#0b0b0d;border:1px solid #000;border-radius:2px;overflow:hidden}
+  .brow{display:flex;align-items:center;gap:6px;margin:2px 0;font-size:9px;letter-spacing:1px}
+  .brow svg{width:15px;height:15px;flex:none;color:#b9b5a4}
+  .seg{position:relative;width:84px;height:9px;background:#0b0b0d;border:1px solid #000;border-radius:2px;overflow:hidden}
   .seg>div{height:100%;transition:width .15s}
   .seg::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 10px,#0b0b0d 10px 12px)}
-  #missionPanel{width:238px;padding:8px 10px;background:linear-gradient(180deg,rgba(26,30,34,.88),rgba(7,9,12,.91));border-color:#202328;pointer-events:none}
-  .missionTitle{font-size:10px;letter-spacing:2px;color:#ffcf78;margin-bottom:5px;font-weight:900}
-  .missionLine{font-size:10px;line-height:1.55;letter-spacing:.3px;color:#c8c8c3}
+  #missionPanel{width:220px;padding:5px 8px;background:linear-gradient(180deg,rgba(26,30,34,.88),rgba(7,9,12,.91));border-color:#202328;pointer-events:none}
+  .missionTitle{font-size:9px;letter-spacing:1.5px;color:#ffcf78;margin-bottom:3px;font-weight:900}
+  .missionLine{font-size:9px;line-height:1.35;letter-spacing:.3px;color:#c8c8c3}
   .missionLine.done{color:#53e4a5;text-shadow:0 0 7px rgba(83,228,165,.42)}
-  #freezeLabel{font-size:9px;letter-spacing:.5px;color:#b6c8d4;margin-top:5px}
+  #freezeLabel{font-size:8px;letter-spacing:.3px;color:#b6c8d4;margin-top:3px}
   .freezeTrack{height:5px;background:#090b0d;border:1px solid #000;margin-top:3px;border-radius:4px;overflow:hidden}
   #freezeBar{height:100%;width:0;background:linear-gradient(90deg,#42c9ff,#a4f7ff);transition:width .12s linear}
-  @media(max-width:700px){#missionPanel{width:210px;padding:6px 8px}.missionLine{font-size:9px}#missionPanel .missionTitle{font-size:9px}}
+  @media(max-width:700px){#leftcol{transform:scale(.74)}#missionPanel{width:204px;padding:4px 7px}.missionLine{font-size:8px}#missionPanel .missionTitle{font-size:8px}.seg{width:76px}}
   #cam{position:absolute;top:14px;left:50%;transform:translateX(-50%);font-size:14px;letter-spacing:4px;text-transform:uppercase;white-space:nowrap;text-shadow:0 0 6px rgba(0,0,0,.9)}
   #cam i{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--red);margin-right:8px;box-shadow:0 0 8px var(--red);animation:blink 1s steps(2) infinite}
   .kb{position:absolute;bottom:16px;right:16px;font-size:13px;line-height:1.8;opacity:.85}
   .kb b{color:var(--amber)}
   #msg{position:fixed;top:46px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.65);border:1px solid #ffffff2a;padding:8px 18px;border-radius:4px;font-size:14px;letter-spacing:2px;text-transform:uppercase;
     opacity:0;transition:opacity .3s;z-index:6;pointer-events:none;white-space:nowrap}
+  #diplomaModal{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(2,3,5,.78);backdrop-filter:blur(3px);pointer-events:auto}
+  #diplomaModal.open{display:flex}
+  #diplomaCard{position:relative;width:min(580px,94vw);min-height:300px;padding:26px 32px 24px;color:#21190b;background:#fff7d8 url('assets/diploma-bg.jpg') center/100% 100% no-repeat;border:5px ridge #c6a34d;box-shadow:0 15px 70px #000;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+  #diplomaClose{position:absolute;right:8px;top:8px;width:38px;height:38px;border:2px solid #5c471c;border-radius:50%;background:#fff5d6;color:#241c0b;font:900 25px Arial;line-height:1;cursor:pointer;pointer-events:auto}
+  #diplomaIcon{width:62px;height:62px;object-fit:cover;border-radius:50%;display:block;margin:0 auto 8px;background:#fff5d6;border:3px solid #815b17;box-shadow:0 2px 9px #6b4b2399}
+  #diplomaKicker{font:700 10px var(--mono);letter-spacing:3px;text-transform:uppercase;opacity:.8}
+  #diplomaName{font:900 clamp(22px,5vw,36px) Georgia,serif;letter-spacing:1px;margin:6px 26px 8px}
+  #diplomaPhrase{max-width:430px;font:italic 16px/1.5 Georgia,serif;margin:0 0 12px}
+  #diplomaCount{font:700 10px var(--mono);letter-spacing:2px;color:#5c471c}
+  @media(max-width:560px){#diplomaCard{min-height:270px;padding:24px 18px 18px}#diplomaPhrase{font-size:14px}#diplomaIcon{width:52px;height:52px}}
   #vig{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,.92));z-index:4;display:none}
   #danger{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 35%,rgba(255,0,40,.55));opacity:0;z-index:4}
   #flash{position:fixed;inset:0;pointer-events:none;background:#ff1030;opacity:0;z-index:9;transition:opacity 1.2s}
+  #bloodOverlay{position:fixed;inset:0;z-index:9;display:none;pointer-events:none;opacity:0;background:radial-gradient(ellipse at 0% 0%,rgba(91,0,9,.84) 0 3%,transparent 22%),radial-gradient(ellipse at 100% 0%,rgba(106,0,12,.82) 0 4%,transparent 24%),radial-gradient(ellipse at 0% 100%,rgba(97,0,10,.78) 0 4%,transparent 25%),radial-gradient(ellipse at 100% 100%,rgba(111,0,13,.82) 0 5%,transparent 26%),radial-gradient(ellipse at 50% 0%,rgba(92,0,10,.78) 0 2%,transparent 20%),linear-gradient(180deg,rgba(100,0,12,.45),transparent 18%);}
+  #bloodOverlay::before{content:'';position:absolute;left:0;right:0;top:0;height:clamp(58px,13vh,132px);background:radial-gradient(ellipse at 12% 0%,#7f0710 0 10%,transparent 11%),radial-gradient(ellipse at 19% 0%,#60050b 0 5%,transparent 6%),radial-gradient(ellipse at 82% 0%,#78060e 0 9%,transparent 10%),radial-gradient(ellipse at 89% 0%,#5b050a 0 4%,transparent 5%),linear-gradient(180deg,rgba(81,0,8,.8),transparent);}
+  #bloodOverlay::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at 8% 30%,rgba(161,13,25,.7) 0 2px,transparent 4px),radial-gradient(circle at 16% 72%,rgba(122,5,16,.76) 0 3px,transparent 6px),radial-gradient(circle at 92% 34%,rgba(172,18,32,.68) 0 2px,transparent 5px),radial-gradient(circle at 84% 78%,rgba(117,4,14,.8) 0 3px,transparent 6px);}
+  #bloodOverlay.on{display:block;animation:bloodReveal .24s ease-out both}
+  @keyframes bloodReveal{from{opacity:0;filter:brightness(1.8)}to{opacity:.92;filter:brightness(1)}}
   #jumpscareFX{position:fixed;inset:0;z-index:8;display:none;pointer-events:none;background:radial-gradient(ellipse at center,rgba(150,0,12,.06),rgba(0,0,0,.94));overflow:hidden}
   #jumpscareFX.on{display:block;animation:scareFlicker .09s steps(2) infinite}
   #jumpscareFX::before,#jumpscareFX::after{content:'';position:absolute;left:0;right:0;height:0;background:#000;transition:height .35s ease}
@@ -136,6 +142,7 @@
 <div id="vig"></div>
 <div id="danger"></div>
 <div id="flash"></div>
+<div id="bloodOverlay" aria-hidden="true"></div>
 <div id="jumpscareFX"><div id="scareText">TE ATRAPÓ</div></div>
 
 <div id="hud">
@@ -165,6 +172,7 @@
     <div id="missionPanel" class="plate">
       <div class="missionTitle">OBJETIVOS DE NOCHE</div>
       <div class="missionLine" id="missionKeys">○ Reúne 3 llaves · 0/3</div>
+      <div class="missionLine" id="missionDiplomas">○ Diplomas · 0/4</div>
       <div class="missionLine" id="missionFreeze">○ Congela a Bonnie · opcional</div>
       <div class="missionLine" id="missionExit">○ Llega a la salida</div>
       <div id="freezeLabel">Linterna · apunta a Bonnie</div>
@@ -179,6 +187,16 @@
 </div>
 
 <div id="msg"></div>
+<div id="diplomaModal" aria-hidden="true">
+  <div id="diplomaCard" role="dialog" aria-modal="true" aria-labelledby="diplomaName">
+    <button id="diplomaClose" type="button" aria-label="Cerrar diploma">×</button>
+    <img id="diplomaIcon" src="assets/galaxy-x3d.jpg" alt="Logo de Galaxy X3D">
+    <div id="diplomaKicker">DIPLOMA DE GRADUACIÓN · BONNIE’S TERROR</div>
+    <div id="diplomaName">AMYR ANIMATIONS</div>
+    <p id="diplomaPhrase"></p>
+    <div id="diplomaCount">DIPLOMA 1 DE 4</div>
+  </div>
+</div>
 
 <div id="tc">
   <div id="lookZone"></div>
@@ -210,7 +228,7 @@
 <div id="help" class="screen hidden">
   <h2>CÓMO JUGAR</h2>
   <div class="help">
-    Estás atrapado en la pizzería de noche. Encuentra <b>3 llaves</b> repartidas por las salas y llega a la <b>puerta verde de SALIDA</b>, al fondo del pasillo.<br><br>
+    Estás atrapado en la pizzería de noche. Encuentra <b>3 llaves</b> repartidas por las salas y llega a la <b>puerta verde de SALIDA</b>, al fondo del pasillo. También puedes buscar los <b>4 diplomas</b> con mensajes especiales; son opcionales.<br><br>
     Un animatrónico te persigue. Es <b>lento</b>, pero nunca se detiene. Si te alcanza, es el final.<br><br>
     La <b>linterna</b> puede congelar a Bonnie: mantenla apuntada de frente medio segundo para detenerlo <b>4.5 segundos</b>; después tarda 6 segundos en recuperarse. La linterna consume batería. También puedes <b>correr</b>, aunque la energía se agota.<br><br>
     <b>Móvil:</b> joystick a la izquierda, desliza a la derecha para mirar, botones LUZ y CORRER.<br>
@@ -241,8 +259,6 @@
   <button class="btn sec" id="winMenu">MENÚ PRINCIPAL</button>
 </div>
 
-<canvas id="stat"></canvas>
-<div id="crt"></div>
 
 <script type="importmap">
 {
@@ -318,12 +334,19 @@ const { grid, roomMap } = (function(){
 // MAP-END
 
 let diff = 'normal', state = 'menu';
-let keys = [], keyMeshes = [], keyGroup = null;
-let keysGot = 0, battery = 100, stamina = 100, flashOn = true, elapsed = 0;
+let keys = [], keyMeshes = [], keyGroup = null, diplomaMeshes=[];
+let keysGot = 0, diplomasGot = 0, battery = 100, stamina = 100, flashOn = true, elapsed = 0, diplomaOpen=false;
 let heartT = 0, voiceT = 12, curRoom = -1, caughtTime = 0, missionUiT = 0;
 const input = {};
 const player = { x: START[0] * CELL, z: START[1] * CELL, yaw: -Math.PI / 2, pitch: 0 };
 const EXIT = { x: 106, z: 35 };
+const DIPLOMAS=[
+  {name:'GALAXY X3D',icon:'GX',image:'assets/galaxy-x3d.jpg',phrase:'Tus metas tienen mucho camino por delante, y cada paso que das te acerca a ellas. Confía en tu talento: aún te esperan cosas grandes.'},
+  {name:'ATLAS 3D',icon:'A3',image:'assets/atlas-3d.jpg',phrase:'Tu talento y creatividad convierten cada idea en una posibilidad. Sigue creando a tu manera: el mundo todavía no ha visto todo lo que puedes hacer.'},
+  {name:'AMYR ANIMATIONS',icon:'AM',image:'assets/amyr-animations.jpg',phrase:'Tu creatividad no solo crea contenido: también deja huella. Sigue adelante; tu generosidad y tu forma de ser inspiran a quienes te rodean.'},
+  {name:'VOLUMI3D',icon:'V3',image:'assets/volumi3d.jpg',phrase:'Tus sueños merecen hacerse realidad. Cada intento te acerca a ellos; sigue creyendo en ti, incluso cuando el camino se ponga difícil.'}
+];
+const DIPLOMA_SPOTS=[[4,8],[23,10],[29,7],[42,11]]; // Galaxy a la izquierda; Atlas a la derecha
 const FREEZE_SECONDS=4.5, FREEZE_CHARGE=0.45, FREEZE_COOLDOWN=6.0; // carga continua al apuntar, duración congelado y recarga
 const bonnie = { x: 0, z: 0, heading: 0, path: [], timer: 0, active: false, ready: false, delay: 8, stun: 0, beamCharge: 0, freezeCooldown: 0, freezeDone: false, group: new THREE.Group() };
 const keyIcons = [...document.querySelectorAll('#keysRow .kico')];
@@ -676,6 +699,30 @@ function buildKeys() {
     return k;
   });
 }
+const diplomaGeo=new THREE.PlaneGeometry(0.72,0.88);
+const diplomaFrameGeo=new THREE.EdgesGeometry(diplomaGeo);
+const diplomaTextureLoader=new THREE.TextureLoader();
+const diplomaPickupMats=DIPLOMAS.map(d=>{
+  const tex=diplomaTextureLoader.load(d.image);tex.colorSpace=THREE.SRGBColorSpace;
+  return new THREE.MeshBasicMaterial({map:tex,side:THREE.DoubleSide});
+});
+function buildDiplomas(){
+  for(const m of diplomaMeshes)scene.remove(m); diplomaMeshes=[];
+  DIPLOMA_SPOTS.forEach(([c,r],i)=>{
+    const g=new THREE.Group();g.position.set(c*CELL,1.05,r*CELL);g.rotation.y=(i%2?0.18:-0.18);
+    const card=new THREE.Mesh(diplomaGeo,diplomaPickupMats[i]);g.add(card);
+    const edge=new THREE.LineSegments(diplomaFrameGeo,new THREE.LineBasicMaterial({color:[0x62d9ff,0xc19aff,0xffd45a,0x62ffc1][i]}));edge.position.z=0.004;g.add(edge);
+    g.userData.diplomaIndex=i;g.userData.baseY=1.05;scene.add(g);diplomaMeshes.push(g);
+  });
+}
+function showDiploma(index){
+  const d=DIPLOMAS[index]; if(!d)return;
+  diplomaOpen=true;
+  $('diplomaIcon').src=d.image;$('diplomaIcon').alt='Logo de '+d.name;$('diplomaName').textContent=d.name;$('diplomaPhrase').textContent=d.phrase;
+  $('diplomaCount').textContent=`DIPLOMA ${index+1} DE ${DIPLOMAS.length} · ${diplomasGot}/${DIPLOMAS.length} ENCONTRADOS`;
+  $('diplomaModal').classList.add('open');$('diplomaModal').setAttribute('aria-hidden','false');
+}
+function closeDiploma(){diplomaOpen=false;$('diplomaModal').classList.remove('open');$('diplomaModal').setAttribute('aria-hidden','true');}
 
 // ---------- Luces dinámicas (pool de 4 luces puntuales) ----------
 const POOL = [];
@@ -735,8 +782,8 @@ function clearLine(x0, z0, x1, z1, R) {
 function newGame() {
   resetTouchState();
   keys = KEY_SPOTS.slice().sort(() => Math.random() - 0.5).slice(0, 3);
-  keysGot = 0; battery = 100; stamina = 100; elapsed = 0; flashOn = true; curRoom = -1; voiceT = 12; caughtTime = 0; missionUiT=0;
-  $('jumpscareFX').className = ''; $('flash').style.opacity = 0; camera.fov = 72; camera.updateProjectionMatrix();
+  keysGot = 0; diplomasGot=0; diplomaOpen=false; closeDiploma(); battery = 100; stamina = 100; elapsed = 0; flashOn = true; curRoom = -1; voiceT = 12; caughtTime = 0; missionUiT=0;
+  $('jumpscareFX').className = ''; $('bloodOverlay').classList.remove('on'); $('flash').style.opacity = 0; camera.fov = 72; camera.updateProjectionMatrix();
   keyIcons.forEach(k => k.classList.remove('on')); $('keysTxt').textContent = '0/3';
 
   // Elegir sala al azar y una casilla abierta con espacio para moverse.
@@ -783,7 +830,7 @@ function newGame() {
   bonnie.x = bc * CELL; bonnie.z = br * CELL; bonnie.path = []; bonnie.timer = 0;
   bonnie.active = false; bonnie.delay = DIFF[diff].delay; bonnie.stun = 0; bonnie.beamCharge=0; bonnie.freezeCooldown=0; bonnie.freezeDone=false;
 
-  buildKeys();
+  buildKeys(); buildDiplomas();
 }
 
 function startGame() {
@@ -952,7 +999,10 @@ function caught() {
   sfxScare();
   playSnd('scream', 1);
   $('jumpscareFX').className = 'on';
-  $('flash').style.opacity = 0.92;
+  $('bloodOverlay').classList.remove('on');
+  void $('bloodOverlay').offsetWidth;
+  $('bloodOverlay').classList.add('on');
+  $('flash').style.opacity = 0.62;
   const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
   bonnie.x = player.x + fx * 0.78; bonnie.z = player.z + fz * 0.78;
   bonnie.heading = Math.atan2(-fx, -fz) + FACE_OFFSET;
@@ -1044,7 +1094,8 @@ addEventListener('keydown', e => {
   input[e.code] = true;
   if (e.repeat) return;
   if (e.code === 'KeyF') toggleFlash();
-  if (e.code === 'Escape' && state === 'paused') resume();
+  if (e.code === 'Escape' && diplomaOpen) closeDiploma();
+  else if (e.code === 'Escape' && state === 'paused') resume();
 });
 addEventListener('keyup', e => input[e.code] = false);
 addEventListener('blur', () => { resetTouchState(); for (const k in input) input[k] = false; });
@@ -1169,6 +1220,10 @@ function bindHold(el, down, up) {
 bindHold($('btnRun'), () => { runHeld = true; }, () => { runHeld = false; });
 bindTap($('btnFlash'), toggleFlash);
 bindTap($('btnPause'), () => { if (state === 'playing') pause(); });
+bindTap($('diplomaClose'), closeDiploma);
+$('diplomaModal').addEventListener('pointerdown',e=>{if(e.target===$('diplomaModal'))closeDiploma();});
+$('diplomaModal').addEventListener('touchmove',e=>e.stopPropagation(),{passive:false});
+
 
 // ---------- Menús ----------
 bindTap($('playBtn'), startGame);
@@ -1329,26 +1384,12 @@ function updateSpringDisplay(dt) {
   head.quaternion.slerp(springDisplay.targetQ,1-Math.exp(-dt*5.5));
 }
 
-// ---------- Estática de televisión ----------
-const statC = $('stat'), sctx = statC.getContext('2d');
-statC.width = 80; statC.height = 45;
-const simg = sctx.createImageData(80, 45);
-let statT = 0;
-function drawStatic(dt) {
-  statT -= dt; if (statT > 0) return;
-  statT = 0.18;
-  const d = simg.data;
-  for (let i = 0; i < d.length; i += 4) { const v = Math.random() * 255 | 0; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255; }
-  sctx.putImageData(simg, 0, 0);
-}
-
 // ---------- Bucle principal ----------
 const HRS = ['12', '1', '2', '3', '4', '5', '6'];
 function update(dt) {
   const t = performance.now() / 1000;
   updateSpringDisplay(dt);
   updateLights(dt);
-  drawStatic(dt);
 
   if (state === 'menu') player.yaw += dt * 0.08;
 
@@ -1359,9 +1400,8 @@ function update(dt) {
     if(enemyWalking) enemyMixer.update(dt);
   }
 
-  let statOp = (state === 'menu' || state === 'gameover' || state === 'win' || state === 'paused') ? 0.16 : 0.06;
 
-  if (state === 'playing') {
+  if (state === 'playing' && !diplomaOpen) {
     elapsed += dt;
     movePlayer(dt);
     bonnieUpdate(dt);
@@ -1374,6 +1414,13 @@ function update(dt) {
         keyMeshes[i].visible = false; keysGot++; sfxKey();
         keyIcons[keysGot - 1].classList.add('on');
         say(`Llave ${keysGot}/3 encontrada`);
+      }
+    }
+
+    for(let i=0;i<diplomaMeshes.length;i++){
+      const item=diplomaMeshes[i];
+      if(item.visible && Math.hypot(player.x-item.position.x,player.z-item.position.z)<1.65){
+        item.visible=false;diplomasGot++;playSnd('mask',0.65);showDiploma(item.userData.diplomaIndex);break;
       }
     }
 
@@ -1397,8 +1444,9 @@ function update(dt) {
     missionUiT-=dt;
     if(missionUiT<=0){
       missionUiT=0.1;
-      const keyMission=$('missionKeys'),freezeMission=$('missionFreeze'),exitMission=$('missionExit');
-      keyMission.textContent=`${keysGot>=3?'✓':'○'} Reúne 3 llaves · ${keysGot}/3`; keyMission.classList.toggle('done',keysGot>=3);
+      const keyMission=$('missionKeys'),diplomaMission=$('missionDiplomas'),freezeMission=$('missionFreeze'),exitMission=$('missionExit');
+      keyMission.textContent=`${keysGot>=3?'✓':'○'} Llaves ${keysGot}/3`; keyMission.classList.toggle('done',keysGot>=3);
+      diplomaMission.textContent=`${diplomasGot>=4?'✓':'○'} Diplomas ${diplomasGot}/4`; diplomaMission.classList.toggle('done',diplomasGot>=4);
       freezeMission.textContent=`${bonnie.freezeDone?'✓':'○'} Congela a Bonnie · ${bonnie.freezeDone?'completo':'opcional'}`; freezeMission.classList.toggle('done',bonnie.freezeDone);
       const nearExit=Math.hypot(player.x-EXIT.x,player.z-EXIT.z)<2.4;
       exitMission.textContent=`${keysGot>=3&&nearExit?'✓':'○'} Llega a la salida${keysGot<3?' · requiere 3 llaves':''}`; exitMission.classList.toggle('done',keysGot>=3&&nearExit);
@@ -1418,7 +1466,6 @@ function update(dt) {
     $('btnRun').classList.toggle('on', runHeld);
     const dng = bonnie.active ? Math.max(0, 1 - dist / 9) : 0;
     $('danger').style.opacity = dng * 0.9;
-    statOp = 0.06 + dng * 0.22;
   }
 
   if (state === 'caught') {
@@ -1430,9 +1477,7 @@ function update(dt) {
     player.pitch = Math.max(-0.12, Math.min(0.12, (1.4 - caughtTime) * 0.08));
     if (caughtTime > 0.65) $('jumpscareFX').classList.add('hit');
     if (caughtTime > 2.5) { $('flash').style.opacity = 0; endGame('gameover'); }
-    statOp = caughtTime < 1.6 ? 0.62 : 0.24;
   }
-  $('stat').style.opacity = statOp;
 
   if (state !== 'caught') camera.position.set(player.x, EYE, player.z);
   camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
@@ -1446,6 +1491,8 @@ function update(dt) {
   bonnieAura.material.opacity = bonnie.stun > 0 ? 0.88 : 0.42;
 
   keyMeshes.forEach(k => { if (k.visible) k.rotation.y += dt * 2; });
+  const diplomaTime=performance.now()*0.0018;
+  diplomaMeshes.forEach((d,i)=>{if(d.visible){d.position.y=d.userData.baseY+Math.sin(diplomaTime+i)*0.07;d.rotation.y=Math.sin(diplomaTime*0.56+i)*0.14;}});
 }
 
 addEventListener('resize', () => {

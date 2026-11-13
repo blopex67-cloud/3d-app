@@ -1,1860 +1,639 @@
-name: Build Godot APK Battle Royale
+name: EL ALMACÉN - Juego de terror (GitHub Pages)
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
 jobs:
   build:
-    runs-on: ubuntu-22.04
-    env:
-      GODOT_VERSION: "4.3-stable"
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Descargar Godot y plantillas
+      - name: Generar el juego
         run: |
-          set -e
-          mkdir -p /tmp/godot && cd /tmp/godot
-          curl -fsSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
-          unzip -q godot.zip
-          sudo mv Godot_v${GODOT_VERSION}_linux.x86_64 /usr/local/bin/godot
-          sudo chmod +x /usr/local/bin/godot
-          curl -fsSL -o templates.tpz "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_export_templates.tpz"
-          TPL_DIR=~/.local/share/godot/export_templates/${GODOT_VERSION/-stable/.stable}
-          mkdir -p "$TPL_DIR"
-          unzip -q templates.tpz -d tpl
-          mv tpl/templates/* "$TPL_DIR"/
+          mkdir -p site
+          if [ -d assets ]; then cp -r assets site/; fi
+          cat > site/index.html << 'HTML_EOF'
+          <!DOCTYPE html>
+          <html lang="es">
+          <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width,initial-scale=1">
+          <title>EL ALMACÉN - Terror en primera persona</title>
+          <style>
+            *{box-sizing:border-box}
+            html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:'Segoe UI',Tahoma,Arial,sans-serif;color:#e8e6f0;user-select:none}
+            #c{position:fixed;inset:0;width:100%;height:100%;display:block}
+            .screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;background:radial-gradient(ellipse at center,rgba(20,8,30,.80),rgba(0,0,0,.98));z-index:10;transition:opacity .4s}
+            .screen.hidden{opacity:0;pointer-events:none}
+            h1{font-size:clamp(34px,7vw,76px);letter-spacing:6px;margin:0 0 6px;color:#ff3b5c;text-shadow:0 0 18px #ff3b5c99;font-weight:800}
+            h2{letter-spacing:4px;color:#ff3b5c;margin:0 0 18px}
+            .sub{opacity:.6;margin-bottom:36px;letter-spacing:3px;font-size:13px}
+            .btn{background:linear-gradient(180deg,#2a1830,#120818);border:1px solid #ff3b5c66;color:#fff;padding:14px 36px;margin:7px;font-size:17px;letter-spacing:2px;border-radius:10px;cursor:pointer;min-width:260px;transition:all .2s;font-family:inherit}
+            .btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 0 22px #ff3b5c88;border-color:#ff3b5c}
+            .btn:disabled{opacity:.35;cursor:not-allowed}
+            .btn.sec{border-color:#ffffff33;background:linear-gradient(180deg,#1b1b24,#0c0c12)}
+            .btn.sel{border-color:#ffd166;box-shadow:0 0 16px #ffd16688}
+            .diffs{display:flex;flex-wrap:wrap;justify-content:center;margin-bottom:12px}
+            .diffs .btn{min-width:150px;font-size:14px;padding:12px 18px}
+            .help{max-width:640px;line-height:1.7;font-size:16px;opacity:.9;margin-bottom:24px;text-align:left}
+            .help b{color:#ffd166}
+            .stats{margin:8px 0 26px;font-size:18px;opacity:.85}
+            #hud{position:fixed;inset:0;pointer-events:none;z-index:5;display:none}
+            .panel{position:absolute;background:rgba(0,0,0,.55);border:1px solid #ffffff22;border-radius:10px;padding:10px 14px;backdrop-filter:blur(3px);font-size:14px;letter-spacing:1px}
+            .bar{height:10px;width:200px;background:#222;border-radius:5px;overflow:hidden;margin-top:6px}
+            .bar>div{height:100%;transition:width .15s}
+            #msg{position:fixed;bottom:120px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.6);padding:10px 22px;border-radius:8px;font-size:17px;letter-spacing:1px;opacity:0;transition:opacity .3s;z-index:6;pointer-events:none;white-space:nowrap}
+            #vig{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,.92));z-index:4;display:none}
+            #danger{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 35%,rgba(255,0,40,.55));opacity:0;z-index:4}
+            #flash{position:fixed;inset:0;pointer-events:none;background:#ff1030;opacity:0;z-index:9;transition:opacity 1.2s}
+            @media (max-width:700px){.panel{font-size:12px}.bar{width:130px}#msg{white-space:normal;width:90%;text-align:center}}
+          </style>
+          </head>
+          <body>
+          <canvas id="c"></canvas>
+          <div id="vig"></div>
+          <div id="danger"></div>
+          <div id="flash"></div>
 
-      - name: Configurar Godot para Android
-        run: |
-          mkdir -p ~/.config/godot
-          cat > ~/.config/godot/editor_settings-4.3.tres << EOF
-          [gd_resource type="EditorSettings" format=3]
+          <div id="hud">
+            <div class="panel" style="top:16px;left:16px">
+              <div id="keysTxt">LLAVES 0/3</div>
+              <div id="timer" style="font-size:13px;opacity:.7;margin-top:4px">00:00</div>
+            </div>
+            <div class="panel" style="bottom:16px;left:16px;width:240px">
+              <div>LINTERNA <span id="batPct"></span></div>
+              <div class="bar"><div id="batBar" style="background:#ffd166;width:100%"></div></div>
+              <div style="margin-top:10px">RESISTENCIA</div>
+              <div class="bar"><div id="stBar" style="background:#06d6a0;width:100%"></div></div>
+            </div>
+            <div class="panel" style="bottom:16px;right:16px;font-size:13px;opacity:.8;line-height:1.8">
+              <b>WASD</b> mover &nbsp;·&nbsp; <b>Ratón</b> mirar &nbsp;·&nbsp; <b>Shift</b> correr<br>
+              <b>F</b> linterna &nbsp;·&nbsp; <b>Esc</b> pausa
+            </div>
+          </div>
+          <div id="msg"></div>
 
-          [resource]
-          export/android/android_sdk_path = "${ANDROID_HOME}"
-          export/android/java_sdk_path = "${JAVA_HOME}"
-          EOF
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "JAVA_HOME=$JAVA_HOME"
-          ls "$ANDROID_HOME/build-tools" || true
+          <div id="menu" class="screen">
+            <h1>EL ALMACÉN</h1>
+            <div class="sub">SILENCIO · OSCURIDAD · UNA COSA QUE NO SE DETIENE</div>
+            <div style="font-size:14px;opacity:.8;margin-bottom:10px">DIFICULTAD</div>
+            <div class="diffs">
+              <button class="btn" data-d="facil">FÁCIL</button>
+              <button class="btn sel" data-d="normal">NORMAL</button>
+              <button class="btn" data-d="dificil">DIFÍCIL</button>
+            </div>
+            <button class="btn" id="playBtn" disabled>JUGAR</button>
+            <button class="btn sec" id="helpBtn">CÓMO JUGAR</button>
+            <div id="loadTxt" style="margin-top:14px;font-size:13px;opacity:.6">Cargando modelo...</div>
+          </div>
 
-      - name: Crear proyecto Godot
-        run: |
-          mkdir -p game/scripts game/scenes
-          cd game
+          <div id="help" class="screen hidden">
+            <h2>CÓMO JUGAR</h2>
+            <div class="help">
+              Estás atrapado en un almacén oscuro y laberíntico. Tienes que encontrar <b>3 llaves</b> dispersas por el lugar y llegar a la <b>puerta verde</b> para escapar.<br><br>
+              Un robot de peluche te persigue. Es <b>lento</b>, pero nunca se detiene y no pierde tu rastro. Si la alcanza, es el final.<br><br>
+              La <b>linterna</b> la aturde si la iluminas de frente, pero gasta batería. Usa <b>Shift</b> para correr, aunque la resistencia se agota.<br><br>
+              <b>Consejo:</b> escucha el latido. Cuanto más cerca esté, más rápido late.
+            </div>
+            <button class="btn sec" id="helpBack">VOLVER</button>
+          </div>
 
-          cat > project.godot << 'EOF'
-          config_version=5
+          <div id="pause" class="screen hidden">
+            <h2>PAUSA</h2>
+            <button class="btn" id="resumeBtn">CONTINUAR</button>
+            <button class="btn sec" id="pauseRestart">REINICIAR</button>
+            <button class="btn sec" id="pauseMenu">MENÚ PRINCIPAL</button>
+          </div>
 
-          [application]
+          <div id="gameover" class="screen hidden">
+            <h1 style="color:#ff1030">TE ATRAPÓ</h1>
+            <div class="stats" id="goStats"></div>
+            <button class="btn" id="retryBtn">REINTENTAR</button>
+            <button class="btn sec" id="goMenu">MENÚ PRINCIPAL</button>
+          </div>
 
-          config/name="Battle Royale"
-          run/main_scene="res://scenes/main.tscn"
-          config/features=PackedStringArray("4.3", "Mobile")
+          <div id="win" class="screen hidden">
+            <h1 style="color:#06d6a0;text-shadow:0 0 18px #06d6a099">ESCAPASTE</h1>
+            <div class="stats" id="winStats"></div>
+            <button class="btn" id="winAgain">JUGAR DE NUEVO</button>
+            <button class="btn sec" id="winMenu">MENÚ PRINCIPAL</button>
+          </div>
 
-          [display]
+          <script type="importmap">
+          {
+            "imports": {
+              "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+              "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+          }
+          </script>
 
-          window/size/viewport_width=1280
-          window/size/viewport_height=720
-          window/handheld/orientation=0
-          window/stretch/mode="canvas_items"
-          window/stretch/aspect="expand"
+          <script type="module">
+          import * as THREE from 'three';
+          import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-          [input_devices]
+          const $ = id => document.getElementById(id);
+          const CELL = 4, WALL_H = 3.5, GRID = 21, EYE = 1.6, PLAYER_R = 0.3;
+          const FACE_OFFSET = 0; // si el modelo mira hacia atrás, cambia a Math.PI
+          const DIFF = {
+            facil:   { speed: 1.0, delay: 14 },
+            normal:  { speed: 1.5, delay: 8 },
+            dificil: { speed: 2.0, delay: 4 }
+          };
 
-          pointing/emulate_touch_from_mouse=false
-          pointing/emulate_mouse_from_touch=true
+          let diff = 'normal', state = 'menu';
+          let grid, keys = [], keyMeshes = [], exitCell, exitMesh;
+          let keysGot = 0, battery = 100, stamina = 100, flashOn = true, elapsed = 0;
+          let flickerT = 0, heartT = 0, worldGroup = null;
+          const input = {};
+          const player = { x: CELL, z: CELL, yaw: 0, pitch: 0 };
+          const bonnie = { x: 0, z: 0, heading: 0, path: [], timer: 0, active: false, ready: false, delay: 8, stun: 0, group: new THREE.Group() };
 
-          [rendering]
+          // ---------- Renderer / escena ----------
+          const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true });
+          renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+          renderer.setSize(innerWidth, innerHeight);
+          const scene = new THREE.Scene();
+          scene.background = new THREE.Color(0x030305);
+          scene.fog = new THREE.Fog(0x030305, 3, 24);
+          const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 100);
+          scene.add(camera);
 
-          renderer/rendering_method="mobile"
-          textures/vram_compression/import_etc2_astc=true
-          EOF
+          const torch = new THREE.SpotLight(0xfff1d6, 80, 28, 0.42, 0.5, 2);
+          torch.target.position.set(0, 0, -5);
+          camera.add(torch); camera.add(torch.target);
 
-          cat > export_presets.cfg << 'EOF'
-          [preset.0]
-          name="Android"
-          platform="Android"
-          runnable=true
-          export_path="../battle_royale.apk"
-          script_export_mode=2
+          scene.add(new THREE.HemisphereLight(0x3a3450, 0x0a0806, 0.6));
+          const lamp = new THREE.PointLight(0xff9966, 4, 9, 2); scene.add(lamp);
+          const bonnieLight = new THREE.PointLight(0x8a5cff, 6, 7, 2); scene.add(bonnieLight);
+          scene.add(bonnie.group);
 
-          [preset.0.options]
-          custom_template/debug=""
-          custom_template/release=""
-          gradle_build/use_gradle_build=false
-          architectures/armeabi-v7a=false
-          architectures/arm64-v8a=true
-          architectures/x86=false
-          architectures/x86_64=false
-          package/unique_name="com.ejemplo.battleroyale"
-          package/name="Battle Royale"
-          package/signed=true
-          package/app_category=3
-          screen/orientation=0
-          screen/immersive_mode=true
-          keystore/debug=""
-          keystore/debug_user=""
-          keystore/debug_password=""
-          EOF
-
-          cat > scenes/main.tscn << 'EOF'
-          [gd_scene load_steps=2 format=3]
-
-          [ext_resource type="Script" path="res://scripts/game.gd" id="1"]
-
-          [node name="Main" type="Node3D"]
-          script = ExtResource("1")
-          EOF
-
-          cat > scripts/game.gd << 'EOF'
-          extends Node3D
-
-          const MAP_R := 380.0
-          const SR := 22050.0
-          const WEAPON_ORDER := ["pistola", "rifle", "escopeta"]
-          const MODES := ["1v1", "4v4", "train"]
-          const MODE_NAMES := ["1 VS 1", "4 VS 4", "ENTRENAMIENTO"]
-          const FIRE_R := 62.0
-          const JUMP_R := 42.0
-          const RELOAD_R := 36.0
-          const ARMA_R := 32.0
-          const JOY_R := 70.0
-
-          var WEAPONS := {
-              "pistola": {"name": "PISTOLA", "dmg": 18.0, "rate": 0.25, "mag": 12, "reload": 1.0, "dist": 120.0, "spread": 0.012, "pellets": 1, "auto": false, "acc": 0.85, "col": Color(0.7, 0.72, 0.75)},
-              "rifle": {"name": "RIFLE AK", "dmg": 14.0, "rate": 0.1, "mag": 30, "reload": 1.9, "dist": 160.0, "spread": 0.02, "pellets": 1, "auto": true, "acc": 0.7, "col": Color(1.0, 0.7, 0.2)},
-              "escopeta": {"name": "ESCOPETA", "dmg": 11.0, "rate": 0.75, "mag": 6, "reload": 2.2, "dist": 45.0, "spread": 0.07, "pellets": 6, "auto": false, "acc": 0.6, "col": Color(1.0, 0.35, 0.2)}
+          // ---------- Laberinto ----------
+          function generateMaze(n) {
+            const g = Array.from({ length: n }, () => Array(n).fill(1));
+            const stack = [[1, 1]]; g[1][1] = 0;
+            const dirs = [[2, 0], [-2, 0], [0, 2], [0, -2]];
+            while (stack.length) {
+              const [x, y] = stack[stack.length - 1];
+              const opts = dirs.filter(([dx, dy]) => {
+                const nx = x + dx, ny = y + dy;
+                return nx > 0 && ny > 0 && nx < n - 1 && ny < n - 1 && g[ny][nx] === 1;
+              });
+              if (!opts.length) { stack.pop(); continue; }
+              const [dx, dy] = opts[Math.floor(Math.random() * opts.length)];
+              g[y + dy / 2][x + dx / 2] = 0;
+              g[y + dy][x + dx] = 0;
+              stack.push([x + dx, y + dy]);
+            }
+            // abrir atajos para que la persecución sea más interesante
+            for (let i = 0; i < 70; i++) {
+              const r = 1 + Math.floor(Math.random() * (n - 2));
+              const c = 1 + Math.floor(Math.random() * (n - 2));
+              if (g[r][c] === 1 && ((g[r - 1][c] === 0 && g[r + 1][c] === 0) || (g[r][c - 1] === 0 && g[r][c + 1] === 0))) g[r][c] = 0;
+            }
+            return g;
           }
 
-          var SKINS := [
-              {"name": "Operador V", "rarity": "Común", "kind": "soldier", "cloth": Color(0.55, 0.57, 0.6), "armor": Color(0.72, 0.74, 0.76), "pants": Color(0.22, 0.23, 0.25), "mask": Color(0.04, 0.04, 0.05), "glow": true, "camo": false},
-              {"name": "Camuflaje", "rarity": "Raro", "kind": "soldier", "cloth": Color(1, 1, 1), "armor": Color(0.3, 0.33, 0.2), "pants": Color(1, 1, 1), "mask": Color(0.2, 0.24, 0.14), "glow": false, "camo": true},
-              {"name": "Springtrap", "rarity": "Legendario", "kind": "animatronic", "body": Color(0.85, 0.8, 0.17), "eye": Color(0.22, 1.0, 0.42), "bow": Color(0.42, 0.17, 0.57)},
-              {"name": "Freddy", "rarity": "Épico", "kind": "animatronic", "body": Color(0.48, 0.29, 0.16), "eye": Color(0.31, 0.76, 1.0), "bow": Color(0.75, 0.15, 0.17)}
-          ]
+          const wallGeo = new THREE.BoxGeometry(CELL, WALL_H, CELL);
+          const wallMat = new THREE.MeshStandardMaterial({ color: 0x3b3a44, roughness: 0.9 });
+          const floorMat = new THREE.MeshStandardMaterial({ color: 0x2a2620, roughness: 1 });
+          const ceilMat = new THREE.MeshStandardMaterial({ color: 0x17161c, roughness: 1 });
+          const keyGeo = new THREE.TorusGeometry(0.25, 0.08, 8, 16);
+          const keyMat = new THREE.MeshStandardMaterial({ color: 0xffd166, emissive: 0xffaa00, emissiveIntensity: 0.8 });
 
-          var env_node: WorldEnvironment
-          var lobby_root: Node3D
-          var lobby_ui: CanvasLayer
-          var lobby_char: CharacterBody3D
-          var lobby_btns: Array = []
-          var mode_btns: Array = []
-          var skin_index := 0
-          var sel_mode := "1v1"
+          function buildWorld() {
+            if (worldGroup) scene.remove(worldGroup);
+            worldGroup = new THREE.Group(); scene.add(worldGroup);
+            const size = GRID * CELL, half = (GRID - 1) * CELL / 2;
 
-          var mats := {}
-          var mcache := {}
-          var texs := {}
-          var sounds := {}
-          var sfx_pool: Array = []
-          var time_s := 0.0
+            const floor = new THREE.Mesh(new THREE.PlaneGeometry(size + CELL, size + CELL), floorMat);
+            floor.rotation.x = -Math.PI / 2; floor.position.set(half, 0, half); worldGroup.add(floor);
+            const ceil = new THREE.Mesh(new THREE.PlaneGeometry(size + CELL, size + CELL), ceilMat);
+            ceil.rotation.x = Math.PI / 2; ceil.position.set(half, WALL_H, half); worldGroup.add(ceil);
 
-          var in_match := false
-          var started := false
-          var ended := false
-          var end_t := 0.0
-          var countdown := 3.0
-          var last_count := -1
-          var match_time := 0.0
-          var kills := 0
-          var mode := "1v1"
-          var stats := {"shots": 0, "hits": 0}
-
-          var world: Node3D
-          var cam: Camera3D
-          var cam_first := true
-          var shake := 0.0
-          var player: CharacterBody3D
-          var bots: Array = []
-          var all_chars: Array = []
-          var obstacles: Array = []
-          var drops: Array = []
-          var ammo := {}
-          var owned := {}
-          var weapon_idx := 0
-          var reloading := 0.0
-          var yaw := 0.0
-          var pitch := 0.0
-
-          var joy_id := -1
-          var joy_origin := Vector2.ZERO
-          var joy_vec := Vector2.ZERO
-          var look_id := -1
-          var fire_id := -1
-          var firing := false
-          var fire_edge := false
-
-          var hud: CanvasLayer
-          var overlay: Control
-          var hud_hurt: ColorRect
-          var end_panel: VBoxContainer
-          var end_title: Label
-          var end_sub: Label
-          var msg_text := ""
-          var msg_t := 0.0
-          var feed_items: Array = []
-          var hit_t := 0.0
-          var sb_panel: StyleBoxFlat
-          var sb_slot: StyleBoxFlat
-          var sb_on: StyleBoxFlat
-          var sb_red: StyleBoxFlat
-
-          func _ready() -> void:
-              randomize()
-              _setup_env()
-              _make_sounds()
-              for _i in 12:
-                  var p := AudioStreamPlayer3D.new()
-                  p.unit_size = 8.0
-                  p.max_distance = 140.0
-                  add_child(p)
-                  sfx_pool.append(p)
-              _build_lobby()
-
-          func _process(delta: float) -> void:
-              time_s += delta
-              if not in_match:
-                  _update_lobby(delta)
-                  return
-              if not started:
-                  countdown -= delta
-                  var n := ceili(countdown)
-                  if countdown <= 0.0:
-                      started = true
-                      _msg("¡YA!", 0.8)
-                      _feed("Partida iniciada")
-                  elif n != last_count:
-                      last_count = n
-                      _msg(str(n), 0.9)
-              elif not ended:
-                  match_time += delta
-                  _update_player(delta)
-                  _update_bots(delta)
-                  _update_drops(delta)
-                  if mode != "train":
-                      _check_end(delta)
-              _animate_all(delta)
-              _update_camera(delta)
-              _update_hud(delta)
-              if overlay:
-                  overlay.queue_redraw()
-
-          func _input(e: InputEvent) -> void:
-              if e is InputEventKey:
-                  if in_match and not ended and e.pressed and not e.echo:
-                      match e.keycode:
-                          KEY_1:
-                              _switch_weapon(0)
-                          KEY_2:
-                              _switch_weapon(1)
-                          KEY_3:
-                              _switch_weapon(2)
-                          KEY_R:
-                              _start_reload()
-                          KEY_SPACE:
-                              _jump()
-                          KEY_F:
-                              firing = true
-                              fire_edge = true
-                  elif e.keycode == KEY_F and not e.pressed:
-                      firing = false
-                  return
-              if not in_match or ended:
-                  return
-              if e is InputEventScreenTouch:
-                  _on_touch(e)
-              elif e is InputEventScreenDrag:
-                  _on_drag(e)
-              elif not OS.has_feature("mobile"):
-                  if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT:
-                      firing = e.pressed
-                      if e.pressed:
-                          fire_edge = true
-                  elif e is InputEventMouseMotion and (e.button_mask & MOUSE_BUTTON_MASK_RIGHT) != 0:
-                      _look(e.relative)
-
-          # ================= CONTROLES TÁCTILES =================
-          func _vs() -> Vector2:
-              return get_viewport().get_visible_rect().size
-
-          func _in(p: Vector2, c: Vector2, r: float) -> bool:
-              return p.distance_to(c) <= r
-
-          func _fire_c() -> Vector2:
-              var v := _vs()
-              return Vector2(v.x - 120.0, v.y - 105.0)
-
-          func _jump_c() -> Vector2:
-              var v := _vs()
-              return Vector2(v.x - 252.0, v.y - 112.0)
-
-          func _reload_c() -> Vector2:
-              var v := _vs()
-              return Vector2(v.x - 60.0, v.y - 200.0)
-
-          func _arma_c() -> Vector2:
-              var v := _vs()
-              return Vector2(v.x - 368.0, v.y - 92.0)
-
-          func _exit_rect() -> Rect2:
-              return Rect2(16, 108, 120, 34)
-
-          func _slot_rect(i: int) -> Rect2:
-              var v := _vs()
-              return Rect2(v.x - 350.0 + i * 84.0, v.y - 268.0, 78.0, 42.0)
-
-          func _ammo_rect() -> Rect2:
-              var v := _vs()
-              return Rect2(v.x - 350.0, v.y - 216.0, 250.0, 52.0)
-
-          func _on_touch(e: InputEventScreenTouch) -> void:
-              var p: Vector2 = e.position
-              if e.pressed:
-                  if _in(p, _fire_c(), FIRE_R + 18.0):
-                      fire_id = e.index
-                      firing = true
-                      fire_edge = true
-                      return
-                  if _in(p, _jump_c(), JUMP_R + 12.0):
-                      _jump()
-                      return
-                  if _in(p, _reload_c(), RELOAD_R + 12.0):
-                      _start_reload()
-                      return
-                  if _in(p, _arma_c(), ARMA_R + 12.0):
-                      _cycle_weapon()
-                      return
-                  if _exit_rect().has_point(p):
-                      _back_to_lobby()
-                      return
-                  for i in 3:
-                      if _slot_rect(i).has_point(p):
-                          _switch_weapon(i)
-                          return
-                  if p.x < _vs().x * 0.45 and joy_id == -1:
-                      joy_id = e.index
-                      joy_origin = p
-                      joy_vec = Vector2.ZERO
-                      return
-                  if look_id == -1:
-                      look_id = e.index
-              else:
-                  if e.index == fire_id:
-                      fire_id = -1
-                      firing = false
-                  if e.index == joy_id:
-                      joy_id = -1
-                      joy_vec = Vector2.ZERO
-                  if e.index == look_id:
-                      look_id = -1
-
-          func _on_drag(e: InputEventScreenDrag) -> void:
-              if e.index == joy_id:
-                  var d: Vector2 = e.position - joy_origin
-                  joy_vec = (Vector2(d.x, -d.y) / JOY_R).limit_length(1.0)
-              elif e.index == look_id:
-                  _look(e.relative)
-
-          func _look(rel: Vector2) -> void:
-              yaw -= rel.x * 0.0065
-              pitch = clampf(pitch - rel.y * 0.004, -0.5, 0.5)
-
-          func _aim_dir() -> Vector3:
-              return Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch))
-
-          func _cycle_weapon() -> void:
-              for k in range(1, WEAPON_ORDER.size() + 1):
-                  var i: int = (weapon_idx + k) % WEAPON_ORDER.size()
-                  if owned.get(WEAPON_ORDER[i], false):
-                      _switch_weapon(i)
-                      return
-
-          # ================= SONIDO (sintetizado en código) =================
-          func _setup_env() -> void:
-              var sm := ProceduralSkyMaterial.new()
-              sm.sky_top_color = Color(0.22, 0.45, 0.8)
-              sm.sky_horizon_color = Color(0.74, 0.84, 0.93)
-              sm.ground_horizon_color = Color(0.62, 0.7, 0.68)
-              sm.ground_bottom_color = Color(0.18, 0.24, 0.18)
-              sm.sun_angle_max = 18.0
-              sm.sun_curve = 0.06
-              var sky := Sky.new()
-              sky.sky_material = sm
-              var e := Environment.new()
-              e.background_mode = Environment.BG_SKY
-              e.sky = sky
-              e.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-              e.ambient_light_energy = 0.9
-              e.tonemap_mode = Environment.TONE_MAPPER_ACES
-              e.glow_enabled = false
-              e.fog_enabled = true
-              e.fog_density = 0.0009
-              e.fog_light_color = Color(0.74, 0.84, 0.93)
-              env_node = WorldEnvironment.new()
-              env_node.environment = e
-              add_child(env_node)
-
-          func _nz(i: int) -> float:
-              var x: float = sin(float(i) * 12.9898 + 78.233) * 43758.5453
-              return (x - floorf(x)) * 2.0 - 1.0
-
-          func _lp(i: int) -> float:
-              return (_nz(i) + _nz(i - 1) + _nz(i - 2) + _nz(i - 3)) * 0.25
-
-          func _synth(dur: float, fn: Callable) -> AudioStreamWAV:
-              var n := int(dur * SR)
-              var data := PackedByteArray()
-              data.resize(n * 2)
-              for i in n:
-                  var v: float = clampf(float(fn.call(float(i) / SR, i)), -1.0, 1.0)
-                  data.encode_s16(i * 2, int(v * 30000.0))
-              var w := AudioStreamWAV.new()
-              w.format = AudioStreamWAV.FORMAT_16_BITS
-              w.mix_rate = int(SR)
-              w.stereo = false
-              w.data = data
-              return w
-
-          func _make_sounds() -> void:
-              sounds["pistola"] = _synth(0.16, func(t, i): return (_lp(i) * 0.9 + sin(TAU * 160.0 * t) * 0.4 * exp(-t * 70.0)) * exp(-t * 28.0))
-              sounds["rifle"] = _synth(0.2, func(t, i): return (_lp(i) * 0.8 + sin(TAU * 110.0 * t) * 0.35 * exp(-t * 35.0)) * exp(-t * 20.0))
-              sounds["escopeta"] = _synth(0.4, func(t, i): return (_lp(i) + sin(TAU * 70.0 * t) * 0.5 * exp(-t * 20.0)) * exp(-t * 11.0))
-              sounds["hit"] = _synth(0.12, func(t, i): return sin(TAU * (1200.0 - t * 3000.0) * t) * exp(-t * 35.0) * 0.35)
-              sounds["hurt"] = _synth(0.25, func(t, i): return sin(TAU * 90.0 * t) * exp(-t * 12.0) * 0.6)
-              sounds["reload"] = _synth(0.45, func(t, i): return (exp(-absf(t - 0.05) * 500.0) + 0.7 * exp(-absf(t - 0.33) * 500.0)) * _nz(i) * 0.5)
-              sounds["pickup"] = _synth(0.3, func(t, i): return sin(TAU * (660.0 if t < 0.08 else 990.0) * t) * exp(-t * 9.0) * 0.35)
-
-          func _sfx(n: String, pos: Vector3) -> void:
-              if not sounds.has(n):
-                  return
-              for p in sfx_pool:
-                  if not p.playing:
-                      p.stream = sounds[n]
-                      p.global_position = pos
-                      p.play()
-                      return
-
-          # ================= TEXTURAS Y MATERIALES =================
-          func _tex(n: String) -> Texture2D:
-              if texs.has(n):
-                  return texs[n]
-              var fl := FastNoiseLite.new()
-              fl.frequency = 0.09 if n == "grass" else 0.05
-              var g := Gradient.new()
-              match n:
-                  "grass":
-                      g.set_color(0, Color(0.36, 0.56, 0.26))
-                      g.set_color(1, Color(0.52, 0.72, 0.34))
-                  "camo":
-                      g.set_color(0, Color(0.18, 0.25, 0.12))
-                      g.set_color(1, Color(0.46, 0.42, 0.24))
-                  _:
-                      g.set_color(0, Color(0.8, 0.76, 0.7))
-                      g.set_color(1, Color(0.97, 0.94, 0.88))
-              var nt := NoiseTexture2D.new()
-              nt.noise = fl
-              nt.color_ramp = g
-              nt.width = 256
-              nt.height = 256
-              nt.seamless = true
-              texs[n] = nt
-              return nt
-
-          func _mat(c: Color, rough: float = 0.8, metal: float = 0.0, tex: String = "", uvs: float = 1.0) -> StandardMaterial3D:
-              var key := "%s|%.2f|%.2f|%s|%.1f" % [c.to_html(), rough, metal, tex, uvs]
-              if mats.has(key):
-                  return mats[key]
-              var m := StandardMaterial3D.new()
-              m.albedo_color = c
-              m.roughness = rough
-              m.metallic = metal
-              if tex != "":
-                  m.albedo_texture = _tex(tex)
-                  m.uv1_scale = Vector3(uvs, uvs, 1.0)
-              mats[key] = m
-              return m
-
-          func _glow(c: Color, e: float) -> StandardMaterial3D:
-              var key := "g|%s|%.2f" % [c.to_html(), e]
-              if mats.has(key):
-                  return mats[key]
-              var m := StandardMaterial3D.new()
-              m.albedo_color = Color(0.05, 0.05, 0.05)
-              m.emission_enabled = true
-              m.emission = c
-              m.emission_energy_multiplier = e
-              m.roughness = 0.3
-              mats[key] = m
-              return m
-
-          func _unlit(c: Color) -> StandardMaterial3D:
-              var key := "u|%s" % c.to_html()
-              if mats.has(key):
-                  return mats[key]
-              var m := StandardMaterial3D.new()
-              m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-              m.albedo_color = c
-              mats[key] = m
-              return m
-
-          func _sbox(bg: Color, r: int, border: Color = Color(0, 0, 0, 0), bw: int = 0) -> StyleBoxFlat:
-              var sb := StyleBoxFlat.new()
-              sb.bg_color = bg
-              sb.set_corner_radius_all(r)
-              if bw > 0:
-                  sb.set_border_width_all(bw)
-                  sb.border_color = border
-              return sb
-
-          func _boxm(size: Vector3) -> BoxMesh:
-              var key := "b%s" % size
-              if mcache.has(key):
-                  return mcache[key]
-              var bm := BoxMesh.new()
-              bm.size = size
-              mcache[key] = bm
-              return bm
-
-          func _box(p: Node, size: Vector3, pos: Vector3, m: Material, rot: Vector3 = Vector3.ZERO) -> MeshInstance3D:
-              var mi := MeshInstance3D.new()
-              mi.mesh = _boxm(size)
-              mi.material_override = m
-              mi.position = pos
-              mi.rotation_degrees = rot
-              p.add_child(mi)
-              return mi
-
-          func _sph(p: Node, r: float, pos: Vector3, m: Material, sc: Vector3 = Vector3.ONE) -> MeshInstance3D:
-              var key := "s%.3f" % r
-              var sm: SphereMesh
-              if mcache.has(key):
-                  sm = mcache[key]
-              else:
-                  sm = SphereMesh.new()
-                  sm.radius = r
-                  sm.height = r * 2.0
-                  mcache[key] = sm
-              var mi := MeshInstance3D.new()
-              mi.mesh = sm
-              mi.material_override = m
-              mi.position = pos
-              mi.scale = sc
-              p.add_child(mi)
-              return mi
-
-          # Cápsula entre dos puntos (miembros y torso)
-          func _seg(p: Node, a: Vector3, b: Vector3, r: float, m: Material) -> void:
-              var d := b - a
-              var L := d.length()
-              var dn := d.normalized()
-              var bas := Basis.IDENTITY
-              if absf(dn.y) < 0.999:
-                  bas = Basis(Quaternion(Vector3.UP, dn))
-              var holder := Node3D.new()
-              holder.transform = Transform3D(bas, (a + b) * 0.5)
-              p.add_child(holder)
-              var key := "c%.3f|%.3f" % [r, L + 2.0 * r]
-              var cm: CapsuleMesh
-              if mcache.has(key):
-                  cm = mcache[key]
-              else:
-                  cm = CapsuleMesh.new()
-                  cm.radius = r
-                  cm.height = L + 2.0 * r
-                  mcache[key] = cm
-              var mi := MeshInstance3D.new()
-              mi.mesh = cm
-              mi.material_override = m
-              holder.add_child(mi)
-
-          func _mmi(mesh: Mesh, mat: Material, xs: Array) -> void:
-              if xs.is_empty():
-                  return
-              var mm := MultiMesh.new()
-              mm.transform_format = MultiMesh.TRANSFORM_3D
-              mm.mesh = mesh
-              mm.instance_count = xs.size()
-              for i in xs.size():
-                  mm.set_instance_transform(i, xs[i])
-              var mi := MultiMeshInstance3D.new()
-              mi.multimesh = mm
-              mi.material_override = mat
-              world.add_child(mi)
-
-          func _collider(size: Vector3, pos: Vector3) -> void:
-              var body := StaticBody3D.new()
-              var cs := CollisionShape3D.new()
-              var bs := BoxShape3D.new()
-              bs.size = size
-              cs.shape = bs
-              body.add_child(cs)
-              body.position = pos
-              world.add_child(body)
-
-          # ================= PERSONAJES =================
-          func _skin_col(s: Dictionary) -> Color:
-              if s["kind"] == "animatronic":
-                  return s["body"]
-              return Color(0.86, 0.66, 0.5)
-
-          func _build_char(s: Dictionary, is_bot: bool, team: int) -> CharacterBody3D:
-              var root := CharacterBody3D.new()
-              var cs := CollisionShape3D.new()
-              var cap := CapsuleShape3D.new()
-              cap.radius = 0.38
-              cap.height = 1.9
-              cs.shape = cap
-              cs.position = Vector3(0, 0.95, 0)
-              root.add_child(cs)
-
-              var body := Node3D.new()
-              root.add_child(body)
-              var anim: bool = s["kind"] == "animatronic"
-              var skin_c: Color = _skin_col(s)
-              var cloth_c: Color = skin_c.darkened(0.2) if anim else s["cloth"]
-              var tex := "camo" if s.get("camo", false) else ""
-              var m_skin := _mat(skin_c, 0.45)
-              var m_cloth := _mat(cloth_c, 0.9, 0.0, tex)
-              var m_boot := _mat(Color(0.2, 0.13, 0.07), 0.5)
-              var m_glove := _mat(Color(0.18, 0.13, 0.09), 0.8)
-              var m_mask := _mat(s.get("mask", Color(0.04, 0.04, 0.05)), 0.97)
-              var m_dark := _mat(Color(0.08, 0.08, 0.09), 0.5, 0.4)
-              var m_white := _mat(Color(0.95, 0.95, 0.92), 0.35)
-              var m_bow := _mat(s.get("bow", Color(0.4, 0.15, 0.55)), 0.5)
-              var m_pants: StandardMaterial3D = _mat(Color(0.14, 0.14, 0.15), 0.9) if anim else _mat(s["pants"], 0.9, 0.0, tex)
-              var m_armor: StandardMaterial3D = m_dark if anim else _mat(s["armor"], 0.35, 0.55)
-
-              var legs: Array = []
-              for sx in [-0.16, 0.16]:
-                  var hip := Node3D.new()
-                  hip.position = Vector3(sx, 0.94, 0)
-                  body.add_child(hip)
-                  _seg(hip, Vector3.ZERO, Vector3(0, -0.46, 0), 0.115, m_pants)
-                  var knee := Node3D.new()
-                  knee.position = Vector3(0, -0.46, 0)
-                  hip.add_child(knee)
-                  _sph(knee, 0.12, Vector3.ZERO, m_pants)
-                  if not anim:
-                      _box(knee, Vector3(0.2, 0.16, 0.08), Vector3(0, 0, 0.12), m_armor)
-                  _seg(knee, Vector3.ZERO, Vector3(0, -0.38, 0), 0.105, m_pants)
-                  _box(knee, Vector3(0.2, 0.14, 0.4), Vector3(0, -0.42, 0.06), m_boot)
-                  legs.append(hip)
-
-              _box(body, Vector3(0.44, 0.2, 0.26), Vector3(0, 0.98, 0), m_pants)
-              _box(body, Vector3(0.48, 0.07, 0.3), Vector3(0, 1.08, 0), m_dark)
-
-              if anim:
-                  _seg(body, Vector3(0, 1.02, 0), Vector3(0, 1.6, 0), 0.2, m_skin)
-                  _box(body, Vector3(0.36, 0.26, 0.05), Vector3(0, 1.28, 0.2), m_dark)
-                  _box(body, Vector3(0.14, 0.1, 0.06), Vector3(-0.08, 1.66, 0.2), m_bow)
-                  _box(body, Vector3(0.14, 0.1, 0.06), Vector3(0.08, 1.66, 0.2), m_bow)
-                  _box(body, Vector3(0.05, 0.06, 0.07), Vector3(0, 1.66, 0.21), m_bow)
-              else:
-                  _box(body, Vector3(0.44, 0.12, 0.26), Vector3(0, 1.14, 0), m_cloth)
-                  _box(body, Vector3(0.46, 0.46, 0.28), Vector3(0, 1.42, 0), m_cloth)
-                  _box(body, Vector3(0.5, 0.5, 0.12), Vector3(0, 1.4, 0.19), m_armor)
-                  _box(body, Vector3(0.48, 0.46, 0.1), Vector3(0, 1.4, -0.19), m_armor)
-                  _box(body, Vector3(0.14, 0.18, 0.1), Vector3(-0.27, 0.98, 0.2), _mat(Color(1, 1, 1), 0.7, 0.0, "", 1.0))
-                  _box(body, Vector3(0.06, 0.12, 0.1), Vector3(-0.27, 1.12, 0.2), m_dark)
-                  _box(body, Vector3(0.1, 0.14, 0.2), Vector3(0.26, 0.98, -0.12), m_dark)
-                  _box(body, Vector3(0.42, 0.5, 0.2), Vector3(0, 1.42, -0.27), m_pants)
-                  _box(body, Vector3(0.05, 0.07, 0.95), Vector3(0.12, 1.66, -0.5), m_dark)
-                  _sph(body, 0.12, Vector3(-0.3, 1.6, 0), m_armor, Vector3(1, 0.7, 1))
-                  _sph(body, 0.12, Vector3(0.3, 1.6, 0), m_armor, Vector3(1, 0.7, 1))
-              _seg(body, Vector3(0, 1.66, 0), Vector3(0, 1.74, 0), 0.065, m_skin)
-
-              var sleeve: StandardMaterial3D = m_skin if anim else m_cloth
-              var arm_l := Node3D.new()
-              arm_l.position = Vector3(-0.31, 1.58, 0)
-              body.add_child(arm_l)
-              _seg(arm_l, Vector3.ZERO, Vector3(0, -0.3, 0), 0.085, sleeve)
-              var elbow_l := Node3D.new()
-              elbow_l.position = Vector3(0, -0.3, 0)
-              arm_l.add_child(elbow_l)
-              _seg(elbow_l, Vector3.ZERO, Vector3(0, -0.26, 0), 0.075, m_skin)
-              _box(elbow_l, Vector3(0.12, 0.1, 0.12), Vector3(0, -0.32, 0), m_glove if not anim else m_skin)
-
-              var arm_r := Node3D.new()
-              arm_r.position = Vector3(0.31, 1.58, 0)
-              arm_r.rotation.x = -1.35
-              body.add_child(arm_r)
-              _seg(arm_r, Vector3.ZERO, Vector3(0, -0.3, 0), 0.085, sleeve)
-              var elbow_r := Node3D.new()
-              elbow_r.position = Vector3(0, -0.3, 0)
-              arm_r.add_child(elbow_r)
-              _seg(elbow_r, Vector3.ZERO, Vector3(0, -0.26, 0), 0.075, m_skin)
-              _box(elbow_r, Vector3(0.12, 0.1, 0.12), Vector3(0, -0.32, 0), m_glove if not anim else m_skin)
-              var hold := Node3D.new()
-              hold.position = Vector3(0, -0.34, 0)
-              elbow_r.add_child(hold)
-
-              var head := Node3D.new()
-              head.position = Vector3(0, 1.86, 0)
-              body.add_child(head)
-              if anim:
-                  _sph(head, 0.16, Vector3.ZERO, m_skin, Vector3(1.05, 1.0, 0.95))
-                  _sph(head, 0.09, Vector3(0, -0.06, 0.14), _mat(skin_c.darkened(0.2), 0.5), Vector3(1.3, 0.8, 0.8))
-                  _box(head, Vector3(0.14, 0.1, 0.1), Vector3(0, 0.0, 0.36), m_dark)
-                  _box(head, Vector3(0.5, 0.12, 0.3), Vector3(0, -0.22, 0.3), m_dark)
-                  for i in 5:
-                      _box(head, Vector3(0.05, 0.06, 0.03), Vector3(-0.1 + i * 0.05, -0.12, 0.155), m_white)
-                  for ex in [-0.07, 0.07]:
-                      _sph(head, 0.04, Vector3(ex, 0.04, 0.14), _glow(s["eye"], 2.5))
-                      _box(head, Vector3(0.1, 0.012, 0.012), Vector3(ex, 0.075, 0.165), m_dark)
-                      _box(head, Vector3(0.1, 0.012, 0.012), Vector3(ex, 0.005, 0.165), m_dark)
-                  _box(head, Vector3(0.06, 0.3, 0.03), Vector3(-0.11, 0.27, 0), m_skin, Vector3(0, 0, 10))
-                  _box(head, Vector3(0.06, 0.3, 0.03), Vector3(0.11, 0.27, 0), m_skin, Vector3(0, 0, -10))
-              else:
-                  _sph(head, 0.15, Vector3.ZERO, m_skin, Vector3(0.92, 1.08, 0.95))
-                  _sph(head, 0.165, Vector3(0, 0.005, 0), m_mask, Vector3(0.98, 1.12, 0.98))
-                  if s.get("glow", false):
-                      var lb := Label3D.new()
-                      lb.text = "V"
-                      lb.font_size = 96
-                      lb.pixel_size = 0.0021
-                      lb.modulate = Color(0.7, 0.97, 1.0)
-                      lb.shaded = false
-                      lb.outline_size = 0
-                      lb.position = Vector3(0, 0.03, 0.175)
-                      head.add_child(lb)
-
-              var st := {
-                  "hp": 100.0, "alive": true, "bot": is_bot, "team": team,
-                  "skill": randf_range(0.5, 0.85) if is_bot else 1.0,
-                  "weapon": "", "mag": 0, "res": 0, "cd": 0.0, "aim_t": 0.0,
-                  "strafe": 1.0 if randf() < 0.5 else -1.0, "strafe_t": 0.0,
-                  "yaw": 0.0, "recoil": 0.0, "phase": 0.0, "flash_t": 0.0, "vy": 0.0,
-                  "lf": 0.0, "ls": 0.0, "speed": 0.0, "last": Vector3.ZERO,
-                  "wander": Vector2.ZERO, "wander_t": 0.0,
-                  "body": body, "legs": legs, "arm_l": arm_l, "arm_r": arm_r, "hold": hold,
-                  "gun": null, "flash": null
+            for (let r = 0; r < GRID; r++) for (let c = 0; c < GRID; c++) {
+              if (grid[r][c] === 1) {
+                const w = new THREE.Mesh(wallGeo, wallMat);
+                w.position.set(c * CELL, WALL_H / 2, r * CELL);
+                worldGroup.add(w);
               }
-              root.set_meta("st", st)
-              return root
-
-          func _make_gun(kind: String) -> Node3D:
-              var g := Node3D.new()
-              var metal := _mat(Color(0.16, 0.17, 0.19), 0.4, 0.7)
-              var steel := _mat(Color(0.5, 0.54, 0.58), 0.3, 0.9)
-              var wood := _mat(Color(0.4, 0.25, 0.12), 0.6, 0.0, "", 1.0)
-              var fz := 0.32
-              if kind == "escopeta":
-                  _box(g, Vector3(0.1, 0.1, 0.85), Vector3(0, 0, 0.1), metal)
-                  _box(g, Vector3(0.07, 0.07, 0.6), Vector3(0, 0.02, 0.5), steel)
-                  _box(g, Vector3(0.09, 0.09, 0.25), Vector3(0, -0.02, 0.25), wood)
-                  _box(g, Vector3(0.1, 0.14, 0.4), Vector3(0, -0.02, -0.45), wood)
-                  fz = 0.95
-              elif kind == "rifle":
-                  _box(g, Vector3(0.1, 0.13, 0.5), Vector3(0, 0, 0.1), metal)
-                  _box(g, Vector3(0.05, 0.05, 0.5), Vector3(0, 0.02, 0.7), steel)
-                  _box(g, Vector3(0.07, 0.2, 0.12), Vector3(0, -0.14, 0.15), metal)
-                  _box(g, Vector3(0.09, 0.14, 0.45), Vector3(0, -0.01, -0.4), wood)
-                  fz = 0.97
-              else:
-                  _box(g, Vector3(0.07, 0.1, 0.32), Vector3(0, 0, 0.1), metal)
-                  _box(g, Vector3(0.06, 0.16, 0.09), Vector3(0, -0.12, -0.04), metal)
-              var fl := MeshInstance3D.new()
-              var fs := SphereMesh.new()
-              fs.radius = 0.14
-              fs.height = 0.28
-              fl.mesh = fs
-              fl.material_override = _glow(Color(1.0, 0.8, 0.3), 4.0)
-              fl.position = Vector3(0, 0, fz)
-              fl.visible = false
-              fl.name = "Flash"
-              g.add_child(fl)
-              return g
-
-          func _equip(c: CharacterBody3D, kind: String) -> void:
-              var st: Dictionary = c.get_meta("st")
-              var old = st["gun"]
-              if is_instance_valid(old):
-                  old.queue_free()
-              st["gun"] = null
-              st["flash"] = null
-              st["weapon"] = kind
-              if kind == "":
-                  return
-              var g := _make_gun(kind)
-              g.rotation_degrees = Vector3(90, 0, 0)
-              st["hold"].add_child(g)
-              st["gun"] = g
-              st["flash"] = g.get_node("Flash")
-
-          # Animación omnidireccional: usa la velocidad en el marco del personaje
-          func _pose(c: CharacterBody3D, st: Dictionary, delta: float) -> void:
-              var sp: float = st["speed"]
-              var lf: float = st["lf"]
-              var ls: float = st["ls"]
-              var sw := clampf(sp / 4.0, 0.0, 1.0)
-              st["phase"] = float(st["phase"]) + (lf + absf(ls) * 0.6) * delta * 1.8
-              var ph: float = st["phase"]
-              var side := clampf(ls / 4.0, -1.0, 1.0)
-              var airborne: bool = c.position.y > 0.02
-              var tuck: float = -0.5 if airborne else 0.0
-              var k := minf(1.0, delta * 16.0)
-              var legs: Array = st["legs"]
-              legs[0].rotation.x = lerpf(legs[0].rotation.x, sin(ph) * 0.7 * sw + tuck, k)
-              legs[1].rotation.x = lerpf(legs[1].rotation.x, -sin(ph) * 0.7 * sw + tuck, k)
-              legs[0].rotation.z = lerpf(legs[0].rotation.z, -side * 0.15 + sin(ph) * 0.12 * side * sw, k)
-              legs[1].rotation.z = lerpf(legs[1].rotation.z, -side * 0.15 - sin(ph) * 0.12 * side * sw, k)
-              var body: Node3D = st["body"]
-              body.position.y = lerpf(body.position.y, absf(sin(ph)) * 0.05 * sw, minf(1.0, delta * 14.0))
-              body.rotation.x = lerpf(body.rotation.x, clampf(lf / 4.0, -1.0, 1.0) * 0.07 * sw, k)
-              body.rotation.z = lerpf(body.rotation.z, -side * 0.08, k)
-              var al: Node3D = st["arm_l"]
-              var ar: Node3D = st["arm_r"]
-              al.rotation.x = lerpf(al.rotation.x, -sin(ph) * 0.5 * sw + tuck * 0.4, k)
-              if is_instance_valid(st["gun"]):
-                  ar.rotation.x = lerpf(ar.rotation.x, -1.35 + float(st["recoil"]) * 0.22 + sin(ph) * 0.03 * sw, minf(1.0, delta * 20.0))
-              else:
-                  ar.rotation.x = lerpf(ar.rotation.x, sin(ph) * 0.5 * sw - 0.1, k)
-              st["recoil"] = maxf(0.0, float(st["recoil"]) - delta * 9.0)
-              st["flash_t"] = maxf(0.0, float(st["flash_t"]) - delta)
-              var fl = st["flash"]
-              if is_instance_valid(fl):
-                  fl.visible = float(st["flash_t"]) > 0.0
-
-          func _animate_all(delta: float) -> void:
-              for c in all_chars:
-                  var st: Dictionary = c.get_meta("st")
-                  var v3: Vector3 = (c.position - st["last"]) / maxf(delta, 0.0001)
-                  st["last"] = c.position
-                  if not st["alive"]:
-                      continue
-                  var fw := Vector3(sin(c.rotation.y), 0.0, cos(c.rotation.y))
-                  var rt := Vector3(-cos(c.rotation.y), 0.0, sin(c.rotation.y))
-                  var k := minf(1.0, delta * 10.0)
-                  st["lf"] = lerpf(float(st["lf"]), v3.dot(fw), k)
-                  st["ls"] = lerpf(float(st["ls"]), v3.dot(rt), k)
-                  st["speed"] = Vector2(float(st["lf"]), float(st["ls"])).length()
-                  _pose(c, st, delta)
-
-          # ================= LOBBY =================
-          func _build_lobby() -> void:
-              lobby_root = Node3D.new()
-              add_child(lobby_root)
-              var sun := DirectionalLight3D.new()
-              sun.rotation_degrees = Vector3(-40, 35, 0)
-              lobby_root.add_child(sun)
-              _box(lobby_root, Vector3(8, 0.2, 8), Vector3(0, -0.1, 0), _mat(Color(0.3, 0.33, 0.32), 0.7))
-              var lc := Camera3D.new()
-              lc.fov = 42.0
-              lc.position = Vector3(0, 1.5, 5.2)
-              lobby_root.add_child(lc)
-              lc.current = true
-              lc.look_at(Vector3(0, 1.15, 0), Vector3.UP)
-              lobby_char = _build_char(SKINS[skin_index], false, 0)
-              lobby_root.add_child(lobby_char)
-              _equip(lobby_char, "pistola")
-              _build_lobby_ui()
-
-          func _build_lobby_ui() -> void:
-              lobby_ui = CanvasLayer.new()
-              add_child(lobby_ui)
-              var root := Control.new()
-              root.set_anchors_preset(Control.PRESET_FULL_RECT)
-              root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-              lobby_ui.add_child(root)
-
-              var title := Label.new()
-              title.text = "BATTLE ROYALE"
-              title.position = Vector2(40, 26)
-              title.add_theme_font_size_override("font_size", 52)
-              title.add_theme_color_override("font_outline_color", Color.BLACK)
-              title.add_theme_constant_override("outline_size", 8)
-              root.add_child(title)
-              var sub := Label.new()
-              sub.text = "Isla Libre · Elige modo y skin"
-              sub.position = Vector2(44, 96)
-              sub.add_theme_font_size_override("font_size", 18)
-              sub.add_theme_color_override("font_color", Color(0.8, 0.9, 0.85))
-              root.add_child(sub)
-
-              var pn := PanelContainer.new()
-              pn.anchor_left = 0.62
-              pn.anchor_right = 1.0
-              pn.anchor_bottom = 1.0
-              pn.add_theme_stylebox_override("panel", _sbox(Color(0.02, 0.04, 0.03, 0.78), 0))
-              root.add_child(pn)
-              var mc := MarginContainer.new()
-              for side in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
-                  mc.add_theme_constant_override(side, 22)
-              pn.add_child(mc)
-              var vb := VBoxContainer.new()
-              vb.add_theme_constant_override("separation", 8)
-              mc.add_child(vb)
-
-              var hm := Label.new()
-              hm.text = "MODO"
-              hm.add_theme_font_size_override("font_size", 16)
-              hm.add_theme_color_override("font_color", Color(0.8, 0.95, 0.85))
-              vb.add_child(hm)
-              mode_btns.clear()
-              for i in MODE_NAMES.size():
-                  var mb := Button.new()
-                  mb.text = MODE_NAMES[i]
-                  mb.custom_minimum_size = Vector2(0, 50)
-                  mb.add_theme_font_size_override("font_size", 20)
-                  mb.pressed.connect(_select_mode.bind(i))
-                  vb.add_child(mb)
-                  mode_btns.append(mb)
-
-              var hd := Label.new()
-              hd.text = "SKINS"
-              hd.add_theme_font_size_override("font_size", 16)
-              hd.add_theme_color_override("font_color", Color(0.8, 0.95, 0.85))
-              vb.add_child(hd)
-              lobby_btns.clear()
-              for i in SKINS.size():
-                  var b := Button.new()
-                  b.text = SKINS[i]["name"] + "   ·   " + SKINS[i]["rarity"]
-                  b.custom_minimum_size = Vector2(0, 52)
-                  b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-                  b.add_theme_font_size_override("font_size", 18)
-                  b.pressed.connect(_select_skin.bind(i))
-                  vb.add_child(b)
-                  lobby_btns.append(b)
-
-              var info := Label.new()
-              info.text = "Móvil: joystick a la izquierda, arrastra a la derecha para mirar. PC: WASD, ratón, clic izquierdo para disparar."
-              info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-              info.add_theme_font_size_override("font_size", 13)
-              info.add_theme_color_override("font_color", Color(0.75, 0.8, 0.78))
-              vb.add_child(info)
-
-              var spacer := Control.new()
-              spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-              vb.add_child(spacer)
-
-              var play := Button.new()
-              play.text = "JUGAR"
-              play.custom_minimum_size = Vector2(0, 80)
-              play.add_theme_font_size_override("font_size", 30)
-              play.add_theme_stylebox_override("normal", _sbox(Color(1.0, 0.6, 0.1), 16))
-              play.add_theme_stylebox_override("hover", _sbox(Color(1.0, 0.68, 0.2), 16))
-              play.add_theme_stylebox_override("pressed", _sbox(Color(0.85, 0.45, 0.05), 16))
-              play.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-              play.add_theme_color_override("font_color", Color.BLACK)
-              play.pressed.connect(func(): _start_match(sel_mode))
-              vb.add_child(play)
-              _refresh_lobby()
-
-          func _refresh_lobby() -> void:
-              for i in mode_btns.size():
-                  _style_btn(mode_btns[i], i == MODES.find(sel_mode), Color(1.0, 0.7, 0.1))
-              for i in lobby_btns.size():
-                  var rc: Color = _rarity_col(SKINS[i]["rarity"])
-                  _style_btn(lobby_btns[i], i == skin_index, rc)
-
-          func _style_btn(b: Button, sel: bool, col: Color) -> void:
-              var bg := Color(0.22, 0.16, 0.02, 0.95) if sel else Color(0.07, 0.12, 0.09, 0.9)
-              var border := col if sel else Color(1, 1, 1, 0.12)
-              var bw := 3 if sel else 1
-              b.add_theme_stylebox_override("normal", _sbox(bg, 12, border, bw))
-              b.add_theme_stylebox_override("hover", _sbox(bg.lightened(0.1), 12, border, bw))
-              b.add_theme_stylebox_override("pressed", _sbox(bg.darkened(0.1), 12, border, bw))
-              b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-              b.add_theme_color_override("font_color", Color.WHITE)
-
-          func _rarity_col(r: String) -> Color:
-              if r == "Raro":
-                  return Color(0.3, 0.6, 1.0)
-              if r == "Épico":
-                  return Color(0.7, 0.35, 1.0)
-              if r == "Legendario":
-                  return Color(1.0, 0.75, 0.2)
-              return Color(0.7, 0.7, 0.7)
-
-          func _select_mode(i: int) -> void:
-              sel_mode = MODES[i]
-              _refresh_lobby()
-
-          func _select_skin(i: int) -> void:
-              skin_index = i
-              if lobby_char:
-                  lobby_char.queue_free()
-              lobby_char = _build_char(SKINS[i], false, 0)
-              lobby_root.add_child(lobby_char)
-              _equip(lobby_char, "pistola")
-              _refresh_lobby()
-
-          func _update_lobby(delta: float) -> void:
-              if lobby_char and is_instance_valid(lobby_char):
-                  lobby_char.rotation.y += delta * 0.5
-                  var st: Dictionary = lobby_char.get_meta("st")
-                  st["speed"] = 0.0
-                  st["lf"] = 0.0
-                  st["ls"] = 0.0
-                  _pose(lobby_char, st, delta)
-
-          # ================= PARTIDA =================
-          func _start_match(m: String) -> void:
-              mode = m
-              if lobby_ui:
-                  lobby_ui.queue_free()
-                  lobby_ui = null
-              if lobby_root:
-                  lobby_root.queue_free()
-                  lobby_root = null
-                  lobby_char = null
-              if world:
-                  world.queue_free()
-              world = Node3D.new()
-              add_child(world)
-              _build_map()
-              _spawn_all()
-              _build_hud()
-              cam = Camera3D.new()
-              cam.fov = 68.0
-              world.add_child(cam)
-              cam.current = true
-              cam_first = true
-              shake = 0.0
-              in_match = true
-              started = false
-              ended = false
-              end_t = 0.0
-              countdown = 3.0
-              last_count = -1
-              match_time = 0.0
-              kills = 0
-              stats = {"shots": 0, "hits": 0}
-              reloading = 0.0
-              firing = false
-              fire_edge = false
-              fire_id = -1
-              look_id = -1
-              joy_id = -1
-              joy_vec = Vector2.ZERO
-              weapon_idx = 0
-              feed_items.clear()
-              msg_text = ""
-              msg_t = 0.0
-
-          func _back_to_lobby() -> void:
-              in_match = false
-              started = false
-              ended = false
-              if hud:
-                  hud.queue_free()
-                  hud = null
-                  overlay = null
-              if world:
-                  world.queue_free()
-                  world = null
-              player = null
-              cam = null
-              all_chars.clear()
-              bots.clear()
-              drops.clear()
-              firing = false
-              fire_id = -1
-              look_id = -1
-              joy_id = -1
-              joy_vec = Vector2.ZERO
-              _build_lobby()
-
-          func _spawn_all() -> void:
-              all_chars.clear()
-              bots.clear()
-              ammo = {}
-              for k in WEAPON_ORDER:
-                  ammo[k] = [WEAPONS[k]["mag"], WEAPONS[k]["reserve"]]
-              owned = {"pistola": true, "rifle": mode == "train", "escopeta": mode == "train"}
-
-              if mode == "train":
-                  var tp := _random_free(20.0, 60.0)
-                  player = _build_char(SKINS[skin_index], false, 0)
-                  player.position = Vector3(tp.x, 0, tp.y)
-                  world.add_child(player)
-                  all_chars.append(player)
-                  _equip(player, "pistola")
-                  player.get_meta("st")["last"] = player.position
-                  yaw = randf() * TAU
-                  pitch = 0.0
-                  return
-
-              var per := 1 if mode == "1v1" else 4
-              var base := randf() * TAU
-              for team in 2:
-                  var ang: float = base + (PI if team == 1 else 0.0)
-                  for i in per:
-                      var a: float = ang + (float(i) - (per - 1) * 0.5) * 0.25
-                      var p: Vector2 = _spawn_at(a, randf_range(120.0, 150.0))
-                      var c: CharacterBody3D
-                      if team == 0 and i == 0:
-                          c = _build_char(SKINS[skin_index], false, 0)
-                          player = c
-                          yaw = atan2(-p.x, -p.y)
-                      else:
-                          c = _build_char(SKINS[randi() % SKINS.size()], true, team)
-                          bots.append(c)
-                      c.position = Vector3(p.x, 0, p.y)
-                      world.add_child(c)
-                      all_chars.append(c)
-                      c.get_meta("st")["last"] = c.position
-              _equip(player, "pistola")
-              pitch = 0.0
-
-          func _spawn_at(a: float, r: float) -> Vector2:
-              for _k in 60:
-                  var p := Vector2(cos(a), sin(a)) * (r + randf_range(-20.0, 20.0)) + Vector2(randf_range(-10.0, 10.0), randf_range(-10.0, 10.0))
-                  if _is_free(p, 1.0):
-                      return p
-              return Vector2(cos(a), sin(a)) * r
-
-          # ================= MAPA =================
-          func _build_map() -> void:
-              obstacles.clear()
-              drops.clear()
-              var sun := DirectionalLight3D.new()
-              sun.rotation_degrees = Vector3(-52, 35, 0)
-              sun.light_color = Color(1.0, 0.95, 0.85)
-              sun.light_energy = 1.15
-              sun.shadow_enabled = true
-              sun.directional_shadow_max_distance = 110.0
-              world.add_child(sun)
-
-              var ground := MeshInstance3D.new()
-              var pm := PlaneMesh.new()
-              pm.size = Vector2(800, 800)
-              ground.mesh = pm
-              ground.material_override = _mat(Color(1, 1, 1), 0.95, 0.0, "grass", 80.0)
-              world.add_child(ground)
-              var sea := MeshInstance3D.new()
-              var sp := PlaneMesh.new()
-              sp.size = Vector2(3000, 3000)
-              sea.mesh = sp
-              sea.position.y = -1.0
-              sea.material_override = _mat(Color(0.1, 0.42, 0.6), 0.1, 0.2)
-              world.add_child(sea)
-
-              var walls := [Color(0.92, 0.86, 0.74), Color(0.85, 0.6, 0.42), Color(0.6, 0.78, 0.8), Color(0.8, 0.7, 0.6)]
-              var roofs := [Color(0.5, 0.22, 0.16), Color(0.25, 0.25, 0.33), Color(0.38, 0.28, 0.22)]
-              var glass := _mat(Color(0.12, 0.18, 0.24), 0.1, 0.5)
-              var built := 0
-              for _t in 400:
-                  if built >= 28:
-                      break
-                  var bp := _random_free(40.0, 340.0)
-                  var w := randf_range(7.0, 12.0)
-                  var d := randf_range(7.0, 12.0)
-                  var h := randf_range(4.5, 8.0)
-                  if not _is_free(bp, maxf(w, d) * 0.7):
-                      continue
-                  built += 1
-                  var wc: Color = walls[randi() % walls.size()]
-                  _box(world, Vector3(w, h, d), Vector3(bp.x, h * 0.5, bp.y), _mat(wc, 0.85, 0.0, "plaster"))
-                  var rc: Color = roofs[randi() % roofs.size()]
-                  _box(world, Vector3(w + 0.8, 0.6, d + 0.8), Vector3(bp.x, h + 0.3, bp.y), _mat(rc, 0.7))
-                  for sz in [-1.0, 1.0]:
-                      for sx in [-0.28, 0.28]:
-                          _box(world, Vector3(1.2, 1.1, 0.08), Vector3(bp.x + sx * w, h * 0.55, bp.y + sz * (d * 0.5 + 0.03)), glass)
-                  _collider(Vector3(w, h, d), Vector3(bp.x, h * 0.5, bp.y))
-                  obstacles.append(Rect2(bp.x - w * 0.5 - 0.4, bp.y - d * 0.5 - 0.4, w + 0.8, d + 0.8))
-
-              var trunk_t: Array = []
-              var leaf_t: Array = []
-              for _i in 170:
-                  var p := _random_free(12.0, 370.0)
-                  if not _is_free(p, 1.2):
-                      continue
-                  var s := randf_range(0.8, 1.3)
-                  trunk_t.append(Transform3D(Basis.from_scale(Vector3(s, s, s)), Vector3(p.x, 1.2 * s, p.y)))
-                  leaf_t.append(Transform3D(Basis.from_scale(Vector3(s, s, s)), Vector3(p.x, 3.4 * s, p.y)))
-                  _collider(Vector3(0.5, 2.4, 0.5), Vector3(p.x, 1.2, p.y))
-                  obstacles.append(Rect2(p.x - 0.5, p.y - 0.5, 1.0, 1.0))
-              var trunk_mesh := CylinderMesh.new()
-              trunk_mesh.top_radius = 0.18
-              trunk_mesh.bottom_radius = 0.24
-              trunk_mesh.height = 2.4
-              _mmi(trunk_mesh, _mat(Color(0.36, 0.24, 0.14), 0.95), trunk_t)
-              var leaf_mesh := SphereMesh.new()
-              leaf_mesh.radius = 1.5
-              leaf_mesh.height = 3.0
-              _mmi(leaf_mesh, _mat(Color(0.2, 0.5, 0.22), 0.9), leaf_t)
-
-              var rock_t: Array = []
-              for _i in 70:
-                  var p := _random_free(10.0, 360.0)
-                  if not _is_free(p, 1.0):
-                      continue
-                  var r := randf_range(0.9, 1.5)
-                  rock_t.append(Transform3D(Basis.from_scale(Vector3(r * 1.2, r * 0.75, r * 1.1)), Vector3(p.x, r * 0.5, p.y)))
-                  _collider(Vector3(r * 2.4, r, r * 2.2), Vector3(p.x, r * 0.5, p.y))
-                  obstacles.append(Rect2(p.x - r, p.y - r, r * 2.0, r * 2.0))
-              var rock_mesh := SphereMesh.new()
-              rock_mesh.radius = 1.0
-              rock_mesh.height = 2.0
-              _mmi(rock_mesh, _mat(Color(0.5, 0.53, 0.56), 0.9), rock_t)
-
-              var bush_t: Array = []
-              for _i in 120:
-                  var p := _random_free(8.0, 360.0)
-                  var s := randf_range(0.6, 1.0)
-                  bush_t.append(Transform3D(Basis.from_scale(Vector3(s * 1.2, s * 0.8, s * 1.2)), Vector3(p.x, 0.4, p.y)))
-              var bush_mesh := SphereMesh.new()
-              bush_mesh.radius = 0.7
-              bush_mesh.height = 1.2
-              _mmi(bush_mesh, _mat(Color(0.22, 0.5, 0.2), 0.95), bush_t)
-
-              var kinds := ["pistola", "rifle", "rifle", "escopeta", "escopeta", "pistola"]
-              for _i in 30:
-                  var dp := _random_free(20.0, 350.0)
-                  var kind: String = kinds[randi() % kinds.size()]
-                  var g := Node3D.new()
-                  g.position = Vector3(dp.x, 0.3, dp.y)
-                  world.add_child(g)
-                  _box(g, Vector3(0.6, 0.3, 0.25), Vector3.ZERO, _mat(WEAPONS[kind]["col"], 0.5, 0.6))
-                  var ring := MeshInstance3D.new()
-                  var rc2 := CylinderMesh.new()
-                  rc2.top_radius = 0.8
-                  rc2.bottom_radius = 0.8
-                  rc2.height = 0.02
-                  ring.mesh = rc2
-                  ring.material_override = _glow(Color(1.0, 0.8, 0.3), 1.5)
-                  ring.position.y = -0.25
-                  g.add_child(ring)
-                  drops.append({"kind": kind, "pos": Vector3(dp.x, 0.0, dp.y), "node": g, "taken": false})
-
-          func _update_drops(_delta: float) -> void:
-              for d in drops:
-                  if d["taken"]:
-                      continue
-                  var n: Node3D = d["node"]
-                  var pos: Vector3 = d["pos"]
-                  n.rotation.y += _delta * 1.2
-                  n.position.y = 0.3 + sin(time_s * 3.0 + pos.x) * 0.08
-
-          func _is_free(p: Vector2, r: float) -> bool:
-              if p.length() > MAP_R - r:
-                  return false
-              for o in obstacles:
-                  var rect: Rect2 = o
-                  var cx := clampf(p.x, rect.position.x, rect.end.x)
-                  var cz := clampf(p.y, rect.position.y, rect.end.y)
-                  if Vector2(cx, cz).distance_to(p) < r:
-                      return false
-              return true
-
-          func _random_free(minr: float, maxr: float) -> Vector2:
-              var p := Vector2.ZERO
-              for _i in 80:
-                  var a := randf() * TAU
-                  var r := randf_range(minr, maxr)
-                  p = Vector2(cos(a) * r, sin(a) * r)
-                  if _is_free(p, 1.0):
-                      break
-              return p
-
-          func _move(n: Node3D, v: Vector3) -> void:
-              var p: Vector3 = n.position
-              var tx := Vector2(p.x + v.x, p.z)
-              if _is_free(tx, 0.45):
-                  p.x = tx.x
-              var tz := Vector2(p.x, p.z + v.z)
-              if _is_free(tz, 0.45):
-                  p.z = tz.y
-              n.position = p
-
-          func _steer(n: Node3D, target: Vector3, step: float) -> void:
-              var d := Vector3(target.x - n.position.x, 0.0, target.z - n.position.z)
-              if d.length() < 0.001:
-                  return
-              _move(n, d.normalized() * step)
-
-          func _face(b: CharacterBody3D, st: Dictionary, delta: float) -> void:
-              b.rotation.y = lerp_angle(b.rotation.y, float(st["yaw"]), minf(1.0, delta * 8.0))
-
-          func _gravity(c: CharacterBody3D, st: Dictionary, delta: float) -> void:
-              var vy: float = float(st["vy"]) - 22.0 * delta
-              var py: float = c.position.y + vy * delta
-              if py <= 0.0:
-                  py = 0.0
-                  vy = 0.0
-              st["vy"] = vy
-              c.position.y = py
-
-          # ================= JUGADOR =================
-          func _update_player(delta: float) -> void:
-              var st: Dictionary = player.get_meta("st")
-              if not st["alive"] or not started:
-                  return
-              var mv := joy_vec
-              if Input.is_key_pressed(KEY_D):
-                  mv.x += 1.0
-              if Input.is_key_pressed(KEY_A):
-                  mv.x -= 1.0
-              if Input.is_key_pressed(KEY_W):
-                  mv.y += 1.0
-              if Input.is_key_pressed(KEY_S):
-                  mv.y -= 1.0
-              if Input.is_key_pressed(KEY_LEFT):
-                  yaw += 2.5 * delta
-              if Input.is_key_pressed(KEY_RIGHT):
-                  yaw -= 2.5 * delta
-              mv = mv.limit_length(1.0)
-              var fwd := Vector3(sin(yaw), 0.0, cos(yaw))
-              var right := Vector3(-cos(yaw), 0.0, sin(yaw))
-              var dir := right * mv.x + fwd * mv.y
-              if dir.length() > 0.01:
-                  _move(player, dir * 5.0 * delta)
-              _gravity(player, st, delta)
-              player.rotation.y = yaw
-              _check_player_pickup()
-
-              st["cd"] = maxf(0.0, float(st["cd"]) - delta)
-              if reloading > 0.0:
-                  reloading -= delta
-                  if reloading <= 0.0:
-                      _finish_reload()
-              var wk: String = st["weapon"]
-              if wk == "":
-                  return
-              var w: Dictionary = WEAPONS[wk]
-              var wants: bool = (firing or Input.is_key_pressed(KEY_F)) and (bool(w["auto"]) or fire_edge)
-              if wants and float(st["cd"]) <= 0.0 and reloading <= 0.0:
-                  fire_edge = false
-                  var a: Array = ammo[wk]
-                  if a[0] > 0 or mode == "train":
-                      if mode != "train":
-                          a[0] = int(a[0]) - 1
-                      st["cd"] = float(w["rate"])
-                      stats["shots"] = int(stats["shots"]) + 1
-                      _fire(player, cam.global_position, _aim_dir(), 1.0 + float(st["speed"]) * 0.12)
-                  else:
-                      _start_reload()
-              if not firing and not Input.is_key_pressed(KEY_F):
-                  fire_edge = false
-
-          func _jump() -> void:
-              if not started or not player.get_meta("st")["alive"]:
-                  return
-              var st: Dictionary = player.get_meta("st")
-              if player.position.y <= 0.01:
-                  st["vy"] = 8.5
-
-          func _switch_weapon(i: int) -> void:
-              if not started or i < 0 or i >= WEAPON_ORDER.size():
-                  return
-              if not player.get_meta("st")["alive"]:
-                  return
-              var kind: String = WEAPON_ORDER[i]
-              if not owned.get(kind, false):
-                  return
-              weapon_idx = i
-              reloading = 0.0
-              _equip(player, kind)
-
-          func _start_reload() -> void:
-              if reloading > 0.0 or not started:
-                  return
-              var st: Dictionary = player.get_meta("st")
-              var wk: String = st["weapon"]
-              if wk == "":
-                  return
-              var a: Array = ammo[wk]
-              if int(a[0]) >= int(WEAPONS[wk]["mag"]) or int(a[1]) <= 0:
-                  return
-              reloading = float(WEAPONS[wk]["reload"])
-              _sfx("reload", player.position)
-
-          func _finish_reload() -> void:
-              reloading = 0.0
-              var st: Dictionary = player.get_meta("st")
-              var wk: String = st["weapon"]
-              var a: Array = ammo[wk]
-              var take: int = mini(int(WEAPONS[wk]["mag"]) - int(a[0]), int(a[1]))
-              a[0] = int(a[0]) + take
-              a[1] = int(a[1]) - take
-
-          func _check_player_pickup() -> void:
-              var st: Dictionary = player.get_meta("st")
-              if not st["alive"]:
-                  return
-              for dr in drops:
-                  if dr["taken"]:
-                      continue
-                  if player.position.distance_to(dr["pos"]) < 2.0:
-                      dr["taken"] = true
-                      dr["node"].visible = false
-                      var kind: String = dr["kind"]
-                      owned[kind] = true
-                      var a: Array = ammo[kind]
-                      a[1] = int(a[1]) + int(WEAPONS[kind]["mag"])
-                      _switch_weapon(WEAPON_ORDER.find(kind))
-                      _sfx("pickup", player.position)
-                      _feed("Recogiste " + WEAPONS[kind]["name"])
-
-          # ================= DISPARO Y PROBABILIDAD =================
-          func _fire(sh: CharacterBody3D, origin: Vector3, dir: Vector3, spread_mul: float) -> void:
-              var st: Dictionary = sh.get_meta("st")
-              var wk: String = st["weapon"]
-              var w: Dictionary = WEAPONS[wk]
-              var space := get_world_3d().direct_space_state
-              var sp: float = float(w["spread"]) * spread_mul
-              st["recoil"] = 1.0
-              st["flash_t"] = 0.05
-              _sfx(wk, origin)
-              var any_hit := false
-              for _i in int(w["pellets"]):
-                  var d: Vector3 = (dir + Vector3(randf_range(-sp, sp), randf_range(-sp, sp), randf_range(-sp, sp))).normalized()
-                  var endp: Vector3 = origin + d * float(w["dist"])
-                  var q := PhysicsRayQueryParameters3D.create(origin, endp)
-                  q.exclude = [sh.get_rid()]
-                  var hit: Dictionary = space.intersect_ray(q)
-                  if not hit.is_empty():
-                      endp = hit["position"]
-                      var col = hit["collider"]
-                      if col is CharacterBody3D and col != sh and col.has_meta("st"):
-                          var cs: Dictionary = col.get_meta("st")
-                          if cs["alive"] and int(cs["team"]) != int(st["team"]):
-                              var dist: float = origin.distance_to(endp)
-                              if randf() < _hit_chance(sh, col, dist, w):
-                                  var head: bool = (endp.y - col.position.y) > 1.45
-                                  var dmg: float = float(w["dmg"]) * (1.8 if head else 1.0) * (1.0 - 0.35 * clampf(dist / float(w["dist"]), 0.0, 1.0))
-                                  _damage(col, dmg, sh)
-                                  any_hit = true
-                                  if sh == player:
-                                      hit_t = 0.2
-                                  _sfx("hit", endp)
-                  _tracer(origin, endp, sh == player)
-              if sh == player and any_hit:
-                  stats["hits"] = int(stats["hits"]) + 1
-
-          func _hit_chance(sh: CharacterBody3D, tg: CharacterBody3D, dist: float, w: Dictionary) -> float:
-              var ss: Dictionary = sh.get_meta("st")
-              var ts: Dictionary = tg.get_meta("st")
-              var c: float = float(w["acc"]) * float(ss["skill"])
-              c *= clampf(1.0 - dist / (float(w["dist"]) * 1.1), 0.12, 1.0)
-              if float(ss["speed"]) > 2.5:
-                  c *= 0.55
-              c *= 1.0 - clampf(float(ts["speed"]) / 7.0, 0.0, 0.45)
-              return clampf(c, 0.03, 0.92)
-
-          func _tracer(a: Vector3, b: Vector3, mine: bool) -> void:
-              var mi := MeshInstance3D.new()
-              var im := ImmediateMesh.new()
-              im.surface_begin(Mesh.PRIMITIVE_LINES)
-              im.surface_add_vertex(a)
-              im.surface_add_vertex(b)
-              im.surface_end()
-              mi.mesh = im
-              mi.material_override = _unlit(Color(1.0, 0.9, 0.45) if mine else Color(1.0, 0.45, 0.4))
-              world.add_child(mi)
-              get_tree().create_timer(0.06).timeout.connect(mi.queue_free)
-
-          func _damage(c: CharacterBody3D, amt: float, by) -> void:
-              var st: Dictionary = c.get_meta("st")
-              if not st["alive"]:
-                  return
-              st["hp"] = float(st["hp"]) - amt
-              if c == player:
-                  hud_hurt.color = Color(0.9, 0.05, 0.05, 0.4)
-                  shake = minf(0.4, shake + 0.15)
-              if float(st["hp"]) > 0.0:
-                  return
-              st["hp"] = 0.0
-              st["alive"] = false
-              var t := create_tween()
-              t.tween_property(c, "rotation:x", -PI / 2.0, 0.35).set_trans(Tween.TRANS_QUAD)
-              if c == player:
-                  _feed("Te eliminaron")
-              elif by == player:
-                  kills += 1
-                  _feed("Eliminaste a un enemigo")
-
-          # ================= BOTS =================
-          func _visible(a: CharacterBody3D, c: CharacterBody3D) -> bool:
-              var q := PhysicsRayQueryParameters3D.create(a.position + Vector3(0, 1.5, 0), c.position + Vector3(0, 1.5, 0))
-              q.exclude = [a.get_rid()]
-              var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(q)
-              return hit.is_empty() or hit["collider"] == c
-
-          func _nearest_enemy(b: CharacterBody3D):
-              var st: Dictionary = b.get_meta("st")
-              var best = null
-              var bd := 115.0
-              for c in all_chars:
-                  var cs: Dictionary = c.get_meta("st")
-                  if not cs["alive"] or int(cs["team"]) == int(st["team"]):
-                      continue
-                  var dd: float = b.position.distance_to(c.position)
-                  if dd < bd and _visible(b, c):
-                      bd = dd
-                      best = c
-              return best
-
-          func _nearest_drop(p: Vector3):
-              var best = null
-              var bd := 150.0
-              for d in drops:
-                  if d["taken"]:
-                      continue
-                  var dd: float = p.distance_to(d["pos"])
-                  if dd < bd:
-                      bd = dd
-                      best = d
-              return best
-
-          func _bot_pickup(b: CharacterBody3D, dr: Dictionary) -> void:
-              dr["taken"] = true
-              dr["node"].visible = false
-              var kind: String = dr["kind"]
-              var st: Dictionary = b.get_meta("st")
-              _equip(b, kind)
-              st["mag"] = int(WEAPONS[kind]["mag"])
-              st["res"] = int(WEAPONS[kind]["mag"]) * 2
-              _sfx("pickup", b.position)
-
-          func _bot_reload(b: CharacterBody3D, st: Dictionary) -> void:
-              var wk: String = st["weapon"]
-              var w: Dictionary = WEAPONS[wk]
-              var take: int = mini(int(w["mag"]), int(st["res"]))
-              if take <= 0:
-                  st["mag"] = 0
-                  st["res"] = 0
-                  _equip(b, "")
-                  return
-              st["mag"] = take
-              st["res"] = int(st["res"]) - take
-              st["cd"] = float(w["reload"])
-
-          func _wander(b: CharacterBody3D, st: Dictionary, delta: float, speed: float) -> void:
-              st["wander_t"] = float(st["wander_t"]) - delta
-              var p: Vector3 = b.position
-              var wp: Vector2 = st["wander"]
-              if float(st["wander_t"]) <= 0.0 or Vector2(p.x, p.z).distance_to(wp) < 2.0:
-                  wp = _random_free(20.0, 340.0)
-                  st["wander"] = wp
-                  st["wander_t"] = randf_range(5.0, 10.0)
-              _steer(b, Vector3(wp.x, 0.0, wp.y), speed * delta)
-              st["yaw"] = atan2(wp.x - p.x, wp.y - p.z)
-
-          func _bot_think(b: CharacterBody3D, st: Dictionary, delta: float) -> void:
-              var p: Vector3 = b.position
-              var wk: String = st["weapon"]
-              if wk == "":
-                  var dr = _nearest_drop(p)
-                  if dr != null:
-                      var dp: Vector3 = dr["pos"]
-                      _steer(b, dp, 4.0 * delta)
-                      st["yaw"] = atan2(dp.x - p.x, dp.z - p.z)
-                      if p.distance_to(dp) < 1.6:
-                          _bot_pickup(b, dr)
-                  else:
-                      _wander(b, st, delta, 3.0)
-                  return
-              var foe = _nearest_enemy(b)
-              if foe == null:
-                  st["aim_t"] = 0.0
-                  _wander(b, st, delta, 2.2)
-                  return
-              var fp: Vector3 = foe.position
-              var to := Vector3(fp.x - p.x, 0.0, fp.z - p.z)
-              var dist := to.length()
-              var dirv := to / maxf(dist, 0.01)
-              st["yaw"] = atan2(dirv.x, dirv.z)
-              st["aim_t"] = float(st["aim_t"]) + delta
-              var sk: float = st["skill"]
-              var perp := Vector3(-dirv.z, 0.0, dirv.x)
-              if dist > 25.0:
-                  _steer(b, fp, 3.4 * delta)
-              elif dist < 10.0:
-                  _steer(b, p - dirv * 3.0, 3.0 * delta)
-              else:
-                  _move(b, perp * float(st["strafe"]) * 3.0 * delta)
-              var w: Dictionary = WEAPONS[wk]
-              if float(st["aim_t"]) > 0.4 + (1.0 - sk) * 0.6 and float(st["cd"]) <= 0.0 and dist < float(w["dist"]) * 0.9:
-                  if int(st["mag"]) <= 0:
-                      _bot_reload(b, st)
-                  else:
-                      st["mag"] = int(st["mag"]) - 1
-                      st["cd"] = float(w["rate"]) * randf_range(1.1, 1.5)
-                      var origin: Vector3 = p + Vector3(0, 1.6, 0) + dirv * 0.5
-                      var target: Vector3 = fp + Vector3(0, 1.3, 0)
-                      _fire(b, origin, (target - origin).normalized(), 1.0 + (1.0 - sk) * 2.2)
-
-          func _update_bots(delta: float) -> void:
-              for b in bots:
-                  var st: Dictionary = b.get_meta("st")
-                  if not st["alive"]:
-                      continue
-                  st["cd"] = float(st["cd"]) - delta
-                  st["strafe_t"] = float(st["strafe_t"]) - delta
-                  if float(st["strafe_t"]) <= 0.0:
-                      st["strafe"] = -float(st["strafe"])
-                      st["strafe_t"] = randf_range(1.5, 3.0)
-                  _gravity(b, st, delta)
-                  _bot_think(b, st, delta)
-                  _face(b, st, delta)
-
-          func _team_alive(t: int) -> int:
-              var n := 0
-              for c in all_chars:
-                  var st: Dictionary = c.get_meta("st")
-                  if st["alive"] and int(st["team"]) == t:
-                      n += 1
-              return n
-
-          func _check_end(delta: float) -> void:
-              var a := _team_alive(0)
-              var b := _team_alive(1)
-              if a == 0 or b == 0:
-                  end_t += delta
-                  if end_t > 1.5:
-                      _show_end(a > 0)
-              else:
-                  end_t = 0.0
-
-          func _show_end(win: bool) -> void:
-              if ended:
-                  return
-              ended = true
-              firing = false
-              end_title.text = "VICTORIA" if win else "DERROTA"
-              var s := int(match_time)
-              end_sub.text = "Eliminaciones: %d    Tiempo: %d:%02d" % [kills, s / 60, s % 60]
-              end_panel.visible = true
-
-          # ================= CÁMARA =================
-          func _update_camera(delta: float) -> void:
-              if player == null or cam == null:
-                  return
-              var pivot: Vector3 = player.position + Vector3(0, 1.6, 0)
-              var flat := Vector3(sin(yaw), 0.0, cos(yaw))
-              var right := Vector3(-cos(yaw), 0.0, sin(yaw))
-              var desired: Vector3 = pivot - flat * 4.2 + right * 0.6 + Vector3.UP * (0.7 + pitch * 2.0)
-              var q := PhysicsRayQueryParameters3D.create(pivot, desired)
-              q.exclude = [player.get_rid()]
-              var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(q)
-              if not hit.is_empty():
-                  var hp: Vector3 = hit["position"]
-                  desired = hp + (pivot - hp).normalized() * 0.25
-              if cam_first:
-                  cam.global_position = desired
-                  cam_first = false
-              else:
-                  cam.global_position = cam.global_position.lerp(desired, minf(1.0, delta * 14.0))
-              if shake > 0.0:
-                  cam.global_position += Vector3(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0), 0.0) * shake * 0.15
-                  shake = maxf(0.0, shake - delta * 2.2)
-              cam.look_at(pivot + _aim_dir() * 10.0, Vector3.UP)
-
-          # ================= HUD =================
-          func _build_hud() -> void:
-              var v := _vs()
-              sb_panel = _sbox(Color(0.02, 0.05, 0.04, 0.6), 14, Color(1, 1, 1, 0.1), 1)
-              sb_slot = _sbox(Color(0.02, 0.04, 0.03, 0.65), 10, Color(1, 1, 1, 0.25), 2)
-              sb_on = _sbox(Color(0.12, 0.09, 0.02, 0.75), 10, Color(1.0, 0.7, 0.1), 3)
-              sb_red = _sbox(Color(0.75, 0.15, 0.12, 0.9), 14)
-
-              hud = CanvasLayer.new()
-              add_child(hud)
-              hud_hurt = ColorRect.new()
-              hud_hurt.set_anchors_preset(Control.PRESET_FULL_RECT)
-              hud_hurt.mouse_filter = Control.MOUSE_FILTER_IGNORE
-              hud_hurt.color = Color(0.9, 0.05, 0.05, 0.0)
-              hud.add_child(hud_hurt)
-
-              overlay = Control.new()
-              overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-              overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-              hud.add_child(overlay)
-              overlay.draw.connect(_draw_hud)
-
-              end_panel = VBoxContainer.new()
-              end_panel.position = Vector2(v.x * 0.5 - 200.0, v.y * 0.22)
-              end_panel.custom_minimum_size = Vector2(400, 0)
-              end_panel.add_theme_constant_override("separation", 14)
-              end_panel.visible = false
-              hud.add_child(end_panel)
-              end_title = Label.new()
-              end_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-              end_title.add_theme_font_size_override("font_size", 52)
-              end_panel.add_child(end_title)
-              end_sub = Label.new()
-              end_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-              end_sub.add_theme_font_size_override("font_size", 22)
-              end_panel.add_child(end_sub)
-              var back := Button.new()
-              back.text = "VOLVER AL LOBBY"
-              back.custom_minimum_size = Vector2(340, 70)
-              back.add_theme_font_size_override("font_size", 24)
-              back.add_theme_stylebox_override("normal", _sbox(Color(1.0, 0.6, 0.1), 16))
-              back.add_theme_color_override("font_color", Color.BLACK)
-              back.pressed.connect(_back_to_lobby)
-              end_panel.add_child(back)
-
-          func _txt(pos: Vector2, s: String, fs: int, col: Color, align: HorizontalAlignment = HORIZONTAL_ALIGNMENT_LEFT, w: float = -1.0) -> void:
-              var f := ThemeDB.fallback_font
-              overlay.draw_string(f, pos + Vector2(1.5, 1.5), s, align, w, fs, Color(0, 0, 0, 0.7))
-              overlay.draw_string(f, pos, s, align, w, fs, col)
-
-          func _btn(c: Vector2, r: float, label: String, fs: int, col: Color) -> void:
-              overlay.draw_circle(c, r, col)
-              _sketch_arc(c, r, Color(1, 1, 1, 0.75))
-              _txt(Vector2(c.x - r, c.y + fs * 0.35), label, fs, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, r * 2.0)
-
-          # Trazo doble y ligeramente irregular, para dar aspecto dibujado
-          func _sketch_arc(c: Vector2, r: float, col: Color) -> void:
-              overlay.draw_arc(c + Vector2(0.6, -0.4), r, 0.0, TAU, 40, col, 2.0)
-              overlay.draw_arc(c + Vector2(-0.5, 0.5), r + 0.8, 0.0, TAU, 40, Color(col.r, col.g, col.b, col.a * 0.5), 1.0)
-
-          func _sketch(a: Vector2, b: Vector2, col: Color) -> void:
-              overlay.draw_line(a + Vector2(0.6, -0.4), b + Vector2(-0.5, 0.5), col, 2.0)
-              overlay.draw_line(a, b, Color(col.r, col.g, col.b, col.a * 0.6), 1.0)
-
-          func _update_hud(delta: float) -> void:
-              if msg_t > 0.0:
-                  msg_t -= delta
-                  if msg_t <= 0.0:
-                      msg_text = ""
-              if hit_t > 0.0:
-                  hit_t -= delta
-              var hc: Color = hud_hurt.color
-              hc.a = maxf(0.0, hc.a - delta * 1.4)
-              hud_hurt.color = hc
-              for i in range(feed_items.size() - 1, -1, -1):
-                  feed_items[i]["life"] = float(feed_items[i]["life"]) - delta
-                  if feed_items[i]["life"] <= 0.0:
-                      feed_items.remove_at(i)
-
-          func _msg(t: String, dur: float) -> void:
-              msg_text = t
-              msg_t = dur
-
-          func _feed(t: String) -> void:
-              feed_items.push_front({"t": t, "life": 3.5})
-              while feed_items.size() > 4:
-                  feed_items.pop_back()
-
-          func _draw_hud() -> void:
-              if not in_match or player == null or overlay == null:
-                  return
-              var v := _vs()
-              var st: Dictionary = player.get_meta("st")
-              var hpf: float = clampf(float(st["hp"]) / 100.0, 0.0, 1.0)
-
-              overlay.draw_style_box(sb_panel, Rect2(16, 16, 330, 84))
-              overlay.draw_circle(Vector2(60, 58), 28.0, _skin_col(SKINS[skin_index]))
-              _sketch_arc(Vector2(60, 58), 28.0, Color.WHITE)
-              _txt(Vector2(100, 40), "VIDA", 14, Color(0.8, 0.95, 0.85))
-              overlay.draw_rect(Rect2(100, 46, 236, 16), Color(0, 0, 0, 0.6))
-              var hc := Color(0.35, 1.0, 0.35).lerp(Color(1.0, 0.25, 0.2), 1.0 - hpf)
-              overlay.draw_rect(Rect2(100, 46, 236.0 * hpf, 16), hc)
-              _txt(Vector2(100, 88), str(ceili(float(st["hp"]))), 20, Color.WHITE)
-
-              var er := _exit_rect()
-              overlay.draw_style_box(sb_panel, er)
-              _txt(Vector2(er.position.x, er.position.y + 23), "SALIR", 15, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, er.size.x)
-
-              if mode == "train":
-                  var acc := 0
-                  if int(stats["shots"]) > 0:
-                      acc = int(100.0 * float(stats["hits"]) / float(stats["shots"]))
-                  overlay.draw_style_box(sb_panel, Rect2(v.x * 0.5 - 150.0, 14, 300, 56))
-                  _txt(Vector2(v.x * 0.5 - 150.0, 36), "ENTRENAMIENTO", 14, Color(1, 0.85, 0.4), HORIZONTAL_ALIGNMENT_CENTER, 300.0)
-                  _txt(Vector2(v.x * 0.5 - 150.0, 60), "Precisión %d%%   ·   %d / %d" % [acc, stats["hits"], stats["shots"]], 16, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 300.0)
-              else:
-                  overlay.draw_style_box(sb_panel, Rect2(v.x * 0.5 - 150.0, 14, 300, 40))
-                  _txt(Vector2(v.x * 0.5 - 150.0, 41), "TÚ %d   ·   ENEMIGOS %d" % [_team_alive(0), _team_alive(1)], 20, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 300.0)
-                  _draw_minimap(Vector2(v.x - 92.0, 96.0), 74.0)
-                  var fy := 204.0
-                  for item in feed_items:
-                      var a: float = clampf(float(item["life"]), 0.0, 1.0)
-                      _txt(Vector2(v.x - 326.0, fy), item["t"], 16, Color(1, 1, 1, a), HORIZONTAL_ALIGNMENT_RIGHT, 300.0)
-                      fy += 24.0
-
-              var c := v * 0.5
-              var wk: String = st["weapon"]
-              var gap := 6.0 + (8.0 if (firing and wk != "" and bool(WEAPONS[wk]["auto"])) else 0.0)
-              var wc := Color(1, 1, 1, 0.9)
-              _sketch(c + Vector2(-gap - 9, 0), c + Vector2(-gap, 0), wc)
-              _sketch(c + Vector2(gap, 0), c + Vector2(gap + 9, 0), wc)
-              _sketch(c + Vector2(0, -gap - 9), c + Vector2(0, -gap), wc)
-              _sketch(c + Vector2(0, gap), c + Vector2(0, gap + 9), wc)
-              if hit_t > 0.0:
-                  var hcol := Color(1, 0.25, 0.25, 0.95)
-                  _sketch(c + Vector2(-7, -7), c + Vector2(7, 7), hcol)
-                  _sketch(c + Vector2(7, -7), c + Vector2(-7, 7), hcol)
-
-              if joy_id != -1:
-                  overlay.draw_circle(joy_origin, JOY_R, Color(1, 1, 1, 0.1))
-                  _sketch_arc(joy_origin, JOY_R, Color(1, 1, 1, 0.45))
-                  overlay.draw_circle(joy_origin + Vector2(joy_vec.x, -joy_vec.y) * JOY_R, 26.0, Color(1, 1, 1, 0.6))
-
-              _btn(_fire_c(), FIRE_R, "FUEGO", 20, Color(0.92, 0.3, 0.1, 0.9))
-              _btn(_jump_c(), JUMP_R, "SALTAR", 12, Color(0.08, 0.1, 0.1, 0.75))
-              _btn(_reload_c(), RELOAD_R, "RECARGAR", 10, Color(0.08, 0.1, 0.1, 0.75))
-              _btn(_arma_c(), ARMA_R, "ARMA", 11, Color(0.08, 0.1, 0.1, 0.75))
-
-              var ar := _ammo_rect()
-              overlay.draw_style_box(sb_panel, ar)
-              if wk != "":
-                  var a2: Array = ammo[wk]
-                  var ammo_txt := "∞" if mode == "train" else str(a2[1])
-                  _txt(Vector2(ar.position.x + 14, ar.position.y + 20), WEAPONS[wk]["name"], 14, Color(1, 0.85, 0.4))
-                  _txt(Vector2(ar.position.x + 14, ar.position.y + 46), "%d / %s" % [a2[0], ammo_txt], 26, Color.WHITE)
-                  if reloading > 0.0:
-                      _txt(Vector2(ar.position.x + 150, ar.position.y + 20), "RECARGANDO", 12, Color(1, 0.6, 0.3))
-
-              var short := ["PIST", "RIFLE", "ESC"]
-              for i in 3:
-                  var sr := _slot_rect(i)
-                  var sb: StyleBoxFlat = sb_on if i == weapon_idx else sb_slot
-                  overlay.draw_style_box(sb, sr)
-                  var has: bool = owned.get(WEAPON_ORDER[i], false)
-                  var tcol := Color.WHITE if has else Color(1, 1, 1, 0.35)
-                  _txt(Vector2(sr.position.x + 8, sr.position.y + 17), str(i + 1) + " " + short[i], 12, tcol)
-                  if has:
-                      _txt(Vector2(sr.position.x + 8, sr.position.y + 36), str(ammo[WEAPON_ORDER[i]][0]), 14, Color(1, 0.9, 0.5))
-
-              if msg_t > 0.0 and msg_text != "":
-                  _txt(Vector2(v.x * 0.5 - 300.0, v.y * 0.36), msg_text, 96, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, 600.0)
-
-          func _draw_minimap(c: Vector2, R: float) -> void:
-              var k := R / MAP_R
-              overlay.draw_circle(c, R + 3.0, Color(1, 1, 1, 0.85))
-              overlay.draw_circle(c, R, Color(0.12, 0.3, 0.45, 0.95))
-              overlay.draw_circle(c, 240.0 * k, Color(0.45, 0.7, 0.35, 0.95))
-              for d in drops:
-                  if not d["taken"]:
-                      var dp: Vector3 = d["pos"]
-                      overlay.draw_circle(c + Vector2(dp.x, dp.z) * k, 1.8, Color(1, 0.85, 0.3))
-              for ch in all_chars:
-                  var cs: Dictionary = ch.get_meta("st")
-                  if not cs["alive"]:
-                      continue
-                  var cp: Vector3 = ch.position
-                  var col := Color(0.3, 1.0, 0.4) if int(cs["team"]) == 0 else Color(1, 0.3, 0.3)
-                  overlay.draw_circle(c + Vector2(cp.x, cp.z) * k, 2.5 if ch != player else 3.5, col)
-              var pf := Vector2(sin(yaw), cos(yaw))
-              var pr := Vector2(-pf.y, pf.x)
-              var pc := c + Vector2(player.position.x, player.position.z) * k
-              overlay.draw_colored_polygon(PackedVector2Array([pc + pf * 9.0, pc - pf * 6.0 + pr * 6.0, pc - pf * 6.0 - pr * 6.0]), Color(1, 0.9, 0.3))
-          EOF
-
-      - name: Exportar APK con Godot
-        run: |
-          cd game
-          godot --headless --import || true
-          godot --headless --export-debug "Android" ../battle_royale.apk
-
-      - name: Subir APK
-        uses: actions/upload-artifact@v4
+            }
+
+            exitMesh = new THREE.Mesh(
+              new THREE.BoxGeometry(CELL * 0.7, WALL_H * 0.85, 0.3),
+              new THREE.MeshStandardMaterial({ color: 0x06d6a0, emissive: 0x06d6a0, emissiveIntensity: 0.5 })
+            );
+            exitMesh.position.set(exitCell[0] * CELL, WALL_H * 0.42, exitCell[1] * CELL);
+            worldGroup.add(exitMesh);
+
+            keyMeshes = keys.map(([c, r]) => {
+              const k = new THREE.Mesh(keyGeo, keyMat);
+              k.position.set(c * CELL, 1.1, r * CELL);
+              worldGroup.add(k);
+              return k;
+            });
+          }
+
+          // ---------- Colisiones ----------
+          function isWall(x, z) {
+            const c = Math.round(x / CELL), r = Math.round(z / CELL);
+            if (c < 0 || r < 0 || c >= GRID || r >= GRID) return true;
+            return grid[r][c] === 1;
+          }
+          function blocked(x, z) {
+            return isWall(x - PLAYER_R, z - PLAYER_R) || isWall(x + PLAYER_R, z - PLAYER_R) ||
+                   isWall(x - PLAYER_R, z + PLAYER_R) || isWall(x + PLAYER_R, z + PLAYER_R);
+          }
+
+          // ---------- Partida ----------
+          function newGame() {
+            grid = generateMaze(GRID);
+            exitCell = [GRID - 2, GRID - 2];
+            grid[exitCell[1]][exitCell[0]] = 0;
+            const floors = [];
+            for (let r = 0; r < GRID; r++) for (let c = 0; c < GRID; c++) if (grid[r][c] === 0) floors.push([c, r]);
+            const shuffled = floors.slice().sort(() => Math.random() - 0.5);
+            keys = shuffled.filter(([c, r]) => Math.hypot(c - 1, r - 1) > 6 && !(c === exitCell[0] && r === exitCell[1])).slice(0, 3);
+            keysGot = 0; battery = 100; stamina = 100; elapsed = 0; flashOn = true;
+
+            player.x = CELL; player.z = CELL; player.yaw = 0; player.pitch = 0;
+
+            const far = floors.filter(([c, r]) => Math.hypot(c - 1, r - 1) > GRID * 0.6);
+            const [bc, br] = far[Math.floor(Math.random() * far.length)];
+            bonnie.x = bc * CELL; bonnie.z = br * CELL; bonnie.path = []; bonnie.timer = 0;
+            bonnie.active = false; bonnie.delay = DIFF[diff].delay; bonnie.stun = 0;
+
+            buildWorld();
+          }
+
+          function startGame() {
+            initAudio();
+            newGame();
+            show(null);
+            $('hud').style.display = 'block';
+            $('vig').style.display = 'block';
+            $('flash').style.opacity = 0;
+            state = 'playing';
+            $('c').requestPointerLock();
+            say('Encuentra 3 llaves y escapa por la puerta verde.', 4000);
+          }
+
+          function pause() { state = 'paused'; show('pause'); document.exitPointerLock(); }
+          function resume() { state = 'playing'; show(null); $('c').requestPointerLock(); }
+          function toMenu() {
+            state = 'menu'; show('menu');
+            $('hud').style.display = 'none'; $('vig').style.display = 'none';
+            newGame();
+          }
+          function endGame(type) {
+            state = type;
+            document.exitPointerLock();
+            $('hud').style.display = 'none';
+            if (type === 'won') { $('winStats').textContent = `Tiempo: ${fmt(elapsed)} · Llaves: 3/3`; show('win'); }
+            else { $('goStats').textContent = `Sobreviviste ${fmt(elapsed)} · Llaves: ${keysGot}/3`; show('gameover'); }
+          }
+
+          function show(id) {
+            ['menu', 'help', 'pause', 'gameover', 'win'].forEach(s => $(s).classList.toggle('hidden', s !== id));
+          }
+
+          let msgTO = null;
+          function say(t, ms = 2600) {
+            const m = $('msg'); m.textContent = t; m.style.opacity = 1;
+            clearTimeout(msgTO); msgTO = setTimeout(() => m.style.opacity = 0, ms);
+          }
+          const fmt = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+          // ---------- Movimiento del jugador ----------
+          function movePlayer(dt) {
+            const w = input.KeyW || input.ArrowUp, s = input.KeyS || input.ArrowDown;
+            const a = input.KeyA || input.ArrowLeft, d = input.KeyD || input.ArrowRight;
+            const fwd = (w ? 1 : 0) - (s ? 1 : 0), strafe = (d ? 1 : 0) - (a ? 1 : 0);
+            const moving = fwd !== 0 || strafe !== 0;
+            const sprint = (input.ShiftLeft || input.ShiftRight) && moving && stamina > 0;
+            if (sprint) stamina = Math.max(0, stamina - 24 * dt);
+            else stamina = Math.min(100, stamina + 15 * dt);
+            if (!moving) return;
+
+            let fx = -Math.sin(player.yaw) * fwd + Math.cos(player.yaw) * strafe;
+            let fz = -Math.cos(player.yaw) * fwd - Math.sin(player.yaw) * strafe;
+            const len = Math.hypot(fx, fz) || 1; fx /= len; fz /= len;
+            const step = (sprint ? 4.4 : 2.7) * dt;
+
+            const nx = player.x + fx * step; if (!blocked(nx, player.z)) player.x = nx;
+            const nz = player.z + fz * step; if (!blocked(player.x, nz)) player.z = nz;
+          }
+
+          // ---------- Bonnie (IA) ----------
+          function bfsPath(sc, sr, tc, tr) {
+            const key = (c, r) => r * GRID + c;
+            const prev = new Map(); prev.set(key(sc, sr), null);
+            const q = [[sc, sr]];
+            while (q.length) {
+              const [c, r] = q.shift();
+              if (c === tc && r === tr) break;
+              for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                const nc = c + dc, nr = r + dr;
+                if (nc < 0 || nr < 0 || nc >= GRID || nr >= GRID || grid[nr][nc] === 1 || prev.has(key(nc, nr))) continue;
+                prev.set(key(nc, nr), [c, r]);
+                q.push([nc, nr]);
+              }
+            }
+            if (!prev.has(key(tc, tr))) return null;
+            const path = []; let cur = [tc, tr];
+            while (cur && !(cur[0] === sc && cur[1] === sr)) { path.push(cur); cur = prev.get(key(cur[0], cur[1])); }
+            return path.reverse();
+          }
+
+          function bonnieUpdate(dt) {
+            if (!bonnie.ready) return;
+            bonnie.delay -= dt;
+            if (bonnie.delay > 0) return;
+            if (!bonnie.active) { bonnie.active = true; say('Algo te está buscando. Corre.', 3500); }
+
+            bonnie.timer -= dt;
+            if (bonnie.timer <= 0) {
+              bonnie.timer = 0.4;
+              const bc = Math.round(bonnie.x / CELL), br = Math.round(bonnie.z / CELL);
+              const pc = Math.round(player.x / CELL), pr = Math.round(player.z / CELL);
+              bonnie.path = bfsPath(bc, br, pc, pr) || [];
+            }
+
+            // la linterna la aturda si la iluminas de frente
+            bonnie.stun = Math.max(0, bonnie.stun - dt);
+            if (flashOn && battery > 0) {
+              const dx = bonnie.x - player.x, dz = bonnie.z - player.z, d = Math.hypot(dx, dz);
+              if (d < 14 && d > 0.01) {
+                const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
+                const dot = (-dx * fx - dz * fz) / d;
+                if (dot > 0.92) bonnie.stun = 0.35;
+              }
+            }
+            let speed = DIFF[diff].speed;
+            if (bonnie.stun > 0) speed *= 0.25;
+
+            let tx = player.x, tz = player.z;
+            if (bonnie.path.length) { const [c, r] = bonnie.path[0]; tx = c * CELL; tz = r * CELL; }
+            const dx = tx - bonnie.x, dz = tz - bonnie.z, dist = Math.hypot(dx, dz);
+            if (dist < 0.2 && bonnie.path.length) bonnie.path.shift();
+            else if (dist > 0.001) {
+              const s = Math.min(speed * dt, dist);
+              bonnie.x += dx / dist * s; bonnie.z += dz / dist * s;
+              bonnie.heading = Math.atan2(dx, dz) + FACE_OFFSET;
+            }
+
+            if (Math.hypot(player.x - bonnie.x, player.z - bonnie.z) < 1.0) caught();
+          }
+
+          function caught() {
+            state = 'caught';
+            sfxScare();
+            $('flash').style.opacity = 1;
+            const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
+            bonnie.x = player.x + fx * 0.9; bonnie.z = player.z + fz * 0.9;
+            bonnie.heading = Math.atan2(-fx, -fz) + FACE_OFFSET;
+            setTimeout(() => endGame('gameover'), 1600);
+          }
+
+          // ---------- Audio (WebAudio, sin archivos) ----------
+          let actx = null, noiseBuf = null;
+          function initAudio() {
+            if (actx) { if (actx.state === 'suspended') actx.resume(); return; }
+            actx = new (window.AudioContext || window.webkitAudioContext)();
+            const d = actx.createOscillator(); d.type = 'sawtooth'; d.frequency.value = 41;
+            const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 160;
+            const g = actx.createGain(); g.gain.value = 0.06;
+            d.connect(lp); lp.connect(g); g.connect(actx.destination); d.start();
+            noiseBuf = actx.createBuffer(1, actx.sampleRate, actx.sampleRate);
+            const data = noiseBuf.getChannelData(0);
+            for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+          }
+          function tone(freq, vol, dur, type = 'sine') {
+            if (!actx) return;
+            const o = actx.createOscillator(), g = actx.createGain();
+            o.type = type; o.frequency.value = freq;
+            g.gain.setValueAtTime(vol, actx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + dur);
+            o.connect(g); g.connect(actx.destination);
+            o.start(); o.stop(actx.currentTime + dur + 0.05);
+          }
+          function heartbeat() { tone(55, 0.5, 0.18); setTimeout(() => tone(48, 0.35, 0.15), 220); }
+          function sfxKey() { tone(880, 0.2, 0.3); setTimeout(() => tone(1320, 0.15, 0.3), 90); }
+          function sfxScare() {
+            if (!actx) return;
+            const s = actx.createBufferSource(); s.buffer = noiseBuf;
+            const g = actx.createGain();
+            g.gain.setValueAtTime(1, actx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + 1.2);
+            s.connect(g); g.connect(actx.destination); s.start(); s.stop(actx.currentTime + 1.2);
+            tone(90, 0.8, 1, 'sawtooth');
+          }
+
+          // ---------- Entrada ----------
+          addEventListener('keydown', e => {
+            input[e.code] = true;
+            if (e.repeat) return;
+            if (e.code === 'KeyF' && state === 'playing') {
+              flashOn = !flashOn;
+              torch.visible = flashOn && battery > 0;
+            }
+            if (e.code === 'Escape' && state === 'paused') resume();
+          });
+          addEventListener('keyup', e => input[e.code] = false);
+          document.addEventListener('mousemove', e => {
+            if (state !== 'playing' || document.pointerLockElement !== $('c')) return;
+            player.yaw -= e.movementX * 0.0022;
+            player.pitch -= e.movementY * 0.0022;
+            player.pitch = Math.max(-1.45, Math.min(1.45, player.pitch));
+          });
+          $('c').addEventListener('click', () => {
+            if (state === 'playing' && !document.pointerLockElement) $('c').requestPointerLock();
+          });
+          document.addEventListener('pointerlockchange', () => {
+            if (!document.pointerLockElement && state === 'playing') pause();
+          });
+
+          $('playBtn').onclick = startGame;
+          $('helpBtn').onclick = () => show('help');
+          $('helpBack').onclick = () => show('menu');
+          document.querySelectorAll('[data-d]').forEach(b => b.onclick = () => {
+            diff = b.dataset.d;
+            document.querySelectorAll('[data-d]').forEach(x => x.classList.toggle('sel', x === b));
+          });
+          $('resumeBtn').onclick = resume;
+          $('pauseRestart').onclick = startGame;
+          $('pauseMenu').onclick = toMenu;
+          $('retryBtn').onclick = startGame;
+          $('goMenu').onclick = toMenu;
+          $('winAgain').onclick = startGame;
+          $('winMenu').onclick = toMenu;
+
+          // ---------- Modelo de Bonnie ----------
+          function fitModel(m) {
+            m.scale.setScalar(1);
+            m.updateMatrixWorld(true);
+            let box = new THREE.Box3().setFromObject(m);
+            const size = box.getSize(new THREE.Vector3());
+            m.scale.setScalar(2.3 / Math.max(size.y, 0.001));
+            m.updateMatrixWorld(true);
+            box = new THREE.Box3().setFromObject(m);
+            const c = box.getCenter(new THREE.Vector3());
+            m.position.set(-c.x, -box.min.y, -c.z);
+          }
+
+          function makeFallbackBonnie() {
+            const g = new THREE.Group();
+            const mat = new THREE.MeshStandardMaterial({ color: 0x5b3aa8, roughness: 0.6 });
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.5, 1.5, 12), mat);
+            body.position.y = 0.9; g.add(body);
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.45, 16, 12), mat);
+            head.position.y = 1.9; g.add(head);
+            for (const x of [-0.2, 0.2]) {
+              const ear = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1, 0.12), mat);
+              ear.position.set(x, 2.9, 0); g.add(ear);
+            }
+            const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff2244 });
+            for (const x of [-0.16, 0.16]) {
+              const eye = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), eyeMat);
+              eye.position.set(x, 1.95, 0.42); g.add(eye);
+            }
+            return g;
+          }
+
+          function bonnieReady() {
+            bonnie.ready = true;
+            $('playBtn').disabled = false;
+            $('loadTxt').textContent = 'Listo';
+          }
+
+          new GLTFLoader().load(
+            'assets/fnaf_ar_toy_bonnie.glb',
+            gltf => {
+              const m = gltf.scene;
+              m.traverse(o => { if (o.isMesh) { o.frustumCulled = false; } });
+              fitModel(m);
+              bonnie.group.add(m);
+              bonnieReady();
+            },
+            undefined,
+            () => {
+              bonnie.group.add(makeFallbackBonnie());
+              $('loadTxt').textContent = 'Modelo no encontrado: usando versión de respaldo';
+              bonnieReady();
+            }
+          );
+
+          // ---------- Bucle principal ----------
+          function update(dt) {
+            const t = performance.now() / 1000;
+
+            flickerT -= dt;
+            if (flickerT <= 0) { lamp.intensity = Math.random() < 0.15 ? 0 : 4; flickerT = 0.05 + Math.random() * 0.5; }
+
+            if (state === 'menu') player.yaw += dt * 0.08;
+
+            if (state === 'playing') {
+              elapsed += dt;
+              movePlayer(dt);
+              bonnieUpdate(dt);
+
+              if (battery > 0 && flashOn) battery = Math.max(0, battery - 1.6 * dt);
+              torch.visible = flashOn && battery > 0;
+
+              for (let i = 0; i < keys.length; i++) {
+                if (keyMeshes[i].visible && Math.hypot(player.x - keys[i][0] * CELL, player.z - keys[i][1] * CELL) < 1.8) {
+                  keyMeshes[i].visible = false; keysGot++; sfxKey();
+                  say(`Llave ${keysGot}/3 encontrada`);
+                }
+              }
+
+              const ex = exitCell[0] * CELL, ez = exitCell[1] * CELL;
+              if (Math.hypot(player.x - ex, player.z - ez) < 2) {
+                if (keysGot >= 3) { endGame('won'); }
+                else say('La puerta está cerrada. Necesitas 3 llaves.', 1800);
+              }
+
+              const dist = Math.hypot(player.x - bonnie.x, player.z - bonnie.z);
+              if (bonnie.active && dist < 12 && actx) {
+                heartT -= dt;
+                if (heartT <= 0) { heartbeat(); heartT = Math.max(0.4, dist / 22); }
+              }
+
+              $('keysTxt').textContent = `LLAVES ${keysGot}/3`;
+              $('timer').textContent = fmt(elapsed);
+              $('batBar').style.width = battery + '%';
+              $('batPct').textContent = Math.round(battery) + '%';
+              $('stBar').style.width = stamina + '%';
+              $('stBar').style.background = stamina < 25 ? '#ef476f' : '#06d6a0';
+              $('danger').style.opacity = bonnie.active ? Math.max(0, 1 - dist / 9) * 0.9 : 0;
+            }
+
+            if (state === 'caught') {
+              camera.position.x += (Math.random() - 0.5) * 0.25;
+              camera.position.y += (Math.random() - 0.5) * 0.25;
+            }
+
+            if (state !== 'caught') {
+              camera.position.set(player.x, EYE, player.z);
+            }
+            camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+
+            lamp.position.set(player.x, 2.6, player.z);
+            bonnie.group.position.set(bonnie.x, 0, bonnie.z);
+            bonnie.group.rotation.y = bonnie.heading;
+            bonnieLight.position.set(bonnie.x, 1.8, bonnie.z);
+            bonnieLight.intensity = bonnie.active ? 6 + Math.sin(t * 6) * 1.5 : 1.5;
+
+            keyMeshes.forEach(k => { if (k.visible) k.rotation.y += dt * 2; });
+            if (exitMesh) exitMesh.material.emissiveIntensity = 0.4 + 0.3 * Math.sin(t * 3);
+          }
+
+          addEventListener('resize', () => {
+            camera.aspect = innerWidth / innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(innerWidth, innerHeight);
+          });
+
+          const clock = new THREE.Clock();
+          function loop() {
+            const dt = Math.min(clock.getDelta(), 0.05);
+            update(dt);
+            renderer.render(scene, camera);
+            requestAnimationFrame(loop);
+          }
+
+          newGame();
+          loop();
+          </script>
+          </body>
+          </html>
+          HTML_EOF
+
+      - name: Subir artefacto de GitHub Pages
+        uses: actions/upload-pages-artifact@v3
         with:
-          name: battle-royale-godot-apk
-          path: battle_royale.apk
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Desplegar en GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

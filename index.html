@@ -45,7 +45,7 @@
   .lbl{font-size:13px;letter-spacing:4px;opacity:.75;margin-bottom:6px}
 
   /* ---------- Botones de metal ---------- */
-  .btn{position:relative;font-family:var(--cond);font-weight:800;text-transform:uppercase;letter-spacing:4px;font-size:18px;color:var(--ink);
+  .btn{position:relative;touch-action:manipulation;font-family:var(--cond);font-weight:800;text-transform:uppercase;letter-spacing:4px;font-size:18px;color:var(--ink);
     min-width:280px;padding:14px 38px;margin:7px;border:2px solid #0b0b0d;border-radius:6px;cursor:pointer;
     background:repeating-linear-gradient(90deg,rgba(255,255,255,.045) 0 1px,transparent 1px 3px),linear-gradient(180deg,#8d9096 0%,#5d6066 7%,#3d3f44 48%,#2a2b2f 92%,#1b1c1f 100%);
     box-shadow:inset 0 1px 0 rgba(255,255,255,.45),inset 0 -3px 6px rgba(0,0,0,.6),0 4px 10px rgba(0,0,0,.85),0 0 0 2px #17171a;
@@ -57,6 +57,7 @@
   .btn:active:not(:disabled){transform:translateY(2px);filter:brightness(.88)}
   .btn:disabled{opacity:.4;cursor:not-allowed}
   .btn.sec{min-width:240px;font-size:15px;padding:11px 30px}
+  @media (max-width:700px){.btn{min-height:54px}.btn.sec{min-height:48px}}
   .btn.sel{color:var(--amber);text-shadow:0 0 8px rgba(255,194,61,.7),0 -1px 0 #000}
   .btn.sel::before{background:radial-gradient(circle at 35% 30%,#ff9a9a,#ff2a3a 55%,#5a0710);box-shadow:0 0 10px 2px rgba(255,42,58,.9)}
   .diffs .btn{min-width:150px;font-size:15px;padding:12px 26px}
@@ -78,7 +79,7 @@
   .seg::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 10px,#0b0b0d 10px 12px)}
   #cam{position:absolute;top:14px;left:50%;transform:translateX(-50%);font-size:14px;letter-spacing:4px;text-transform:uppercase;white-space:nowrap;text-shadow:0 0 6px rgba(0,0,0,.9)}
   #cam i{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--red);margin-right:8px;box-shadow:0 0 8px var(--red);animation:blink 1s steps(2) infinite}
-  #cameraHudBtn{position:fixed;top:14px;right:calc(16px + env(safe-area-inset-right,0px));pointer-events:auto;z-index:8;padding:10px 14px;border:1px solid #6b7078;border-radius:4px;color:#d8e7d6;background:linear-gradient(#343940,#101216);font:700 12px var(--mono);letter-spacing:2px;box-shadow:0 0 12px #000;cursor:pointer}
+  #cameraHudBtn{position:fixed;top:14px;right:calc(16px + env(safe-area-inset-right,0px));pointer-events:auto;touch-action:manipulation;z-index:8;padding:10px 14px;border:1px solid #6b7078;border-radius:4px;color:#d8e7d6;background:linear-gradient(#343940,#101216);font:700 12px var(--mono);letter-spacing:2px;box-shadow:0 0 12px #000;cursor:pointer}
   #cameraHudBtn::before{content:'● ';color:#ff3747;animation:blink 1s steps(2) infinite}
   #cctv.screen{z-index:60;padding:12px;background:rgba(0,0,0,.16);justify-content:flex-start;overflow:hidden;}
   #cctvPanel{position:relative;width:100%;height:100%;max-height:none;overflow:visible;padding:0;border:0;background:transparent;box-shadow:none;pointer-events:none;}
@@ -88,7 +89,7 @@
   #cctvMonitor{position:absolute;inset:0;border:8px solid rgba(20,26,22,.84);outline:1px solid #78847a;background:transparent;box-shadow:inset 0 0 40px #000;overflow:hidden;pointer-events:none}
   #cctvMonitor::after{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(0,0,0,.22) 3px 4px);box-shadow:inset 0 0 65px rgba(0,0,0,.72)}
   #cctvStatus{position:absolute;z-index:2;left:18px;top:18px;color:#b8d0b6;font:700 12px var(--mono);letter-spacing:2px;text-shadow:0 1px 4px #000;pointer-events:none}
-  #cctvControls{position:absolute;left:50%;bottom:48px;transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:7px;width:min(760px,96%);padding:10px;background:rgba(4,7,5,.78);border:1px solid rgba(155,185,160,.45);pointer-events:auto;}
+  #cctvControls{position:absolute;left:50%;bottom:48px;transform:translateX(-50%);display:flex;flex-wrap:wrap;justify-content:center;gap:7px;width:min(760px,96%);padding:10px;background:rgba(4,7,5,.78);border:1px solid rgba(155,185,160,.45);pointer-events:auto;touch-action:manipulation;}
   .feedBtn{min-width:0!important;margin:0!important;padding:9px 12px!important;font-size:12px!important;letter-spacing:1px!important}
   .feedBtn.sel{border-color:#69e99a;color:#8dffb4;box-shadow:0 0 12px rgba(70,255,150,.35)}
   #cctvHint{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);width:max-content;max-width:90%;font-size:11px;opacity:.78;letter-spacing:1px;margin:0;color:#e0eadf;text-shadow:0 1px 6px #000;pointer-events:none;}
@@ -112,14 +113,15 @@
   @media (max-width:700px){#msg{white-space:normal;width:80%;text-align:center}.credits{gap:6px;padding:7px 5px;margin-top:12px}.credit{gap:4px}.credit img{width:44px;height:44px}.credit-name{letter-spacing:.3px}.game-logo{width:105px;height:105px}}
 
   /* ---------- Controles táctiles ---------- */
-  #tc{position:fixed;inset:0;z-index:7;display:none;touch-action:none}
-  #lookZone{position:absolute;top:0;bottom:0;left:40%;right:0;touch-action:none}
-  #joyZone{position:absolute;left:0;bottom:0;width:40%;height:62%;touch-action:none}
+  #tc{position:fixed;inset:0;z-index:7;display:none;touch-action:none;pointer-events:none}
+  #tc #joyZone,#tc #lookZone,#tc .tbtn{touch-action:none;-webkit-user-select:none;user-select:none}
+  #lookZone{position:absolute;top:0;bottom:0;left:43%;right:0;touch-action:none;pointer-events:auto}
+  #joyZone{position:absolute;left:0;bottom:0;width:43%;height:72%;touch-action:none;pointer-events:auto}
   #joyBase{position:absolute;left:calc(40px + env(safe-area-inset-left,0px));bottom:36px;width:130px;height:130px;border-radius:50%;pointer-events:none;
     background:radial-gradient(circle at 50% 50%,#101012 0 52%,#3b3d42 54%,#17181b 62%,#6a6d73 64%,#2a2b2f 72%,#0d0d0f 100%);box-shadow:0 4px 12px rgba(0,0,0,.8)}
   #knob{position:absolute;left:35px;top:35px;width:60px;height:60px;border-radius:50%;pointer-events:none;
     background:radial-gradient(circle at 35% 30%,#ff8a8a,#d4141f 55%,#4a0710);box-shadow:0 0 14px rgba(255,42,58,.7),inset 0 -3px 5px rgba(0,0,0,.5)}
-  .tbtn{position:absolute;width:78px;height:78px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  .tbtn{position:absolute;z-index:2;pointer-events:auto;width:78px;height:78px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
     font-family:var(--cond);font-weight:800;font-size:10px;letter-spacing:2px;color:var(--ink);touch-action:none;border:3px solid #0b0b0d;
     background:radial-gradient(circle at 35% 28%,#a2a5ab,#55575d 52%,#232428);box-shadow:inset 0 2px 0 rgba(255,255,255,.4),inset 0 -4px 8px rgba(0,0,0,.55),0 4px 10px rgba(0,0,0,.8),0 0 0 2px #17171a}
   .tbtn svg{width:30px;height:30px}
@@ -129,6 +131,7 @@
   #btnFlash{right:calc(28px + env(safe-area-inset-right,0px));bottom:118px}
   #btnPause{right:calc(16px + env(safe-area-inset-right,0px));top:14px;width:50px;height:50px}
   #btnPause svg{width:22px;height:22px}
+  @media (max-height:480px){#joyZone{height:78%}#joyBase{width:112px;height:112px;left:calc(28px + env(safe-area-inset-left,0px));bottom:22px}#knob{left:26px;top:26px;width:60px;height:60px} .tbtn{width:66px;height:66px}#btnFlash{bottom:94px}#btnRun{bottom:20px}}
 </style>
 </head>
 <body>
@@ -256,6 +259,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const $ = id => document.getElementById(id);
 const CELL = 2, WALL_H = 3.2, GW = 40, GH = 28, EYE = 1.55, PLAYER_R = 0.3;
@@ -341,11 +345,14 @@ const bonnie = { x: 0, z: 0, heading: 0, path: [], timer: 0, active: false, read
 const keyIcons = [...document.querySelectorAll('#keysRow .kico')];
 
 function lock() { if (!IS_TOUCH) $('c').requestPointerLock(); }
-function setTC(on) { $('tc').style.display = (IS_TOUCH && on) ? 'block' : 'none'; }
+function setTC(on) { $('tc').style.display = (IS_TOUCH && on) ? 'block' : 'none'; if (!on) resetTouchState(); }
 
 // ---------- Animaciones de Bonnie ----------
 let mixer = null, curAnim = null;
 const clips = {};
+const bonnieRig = { root: null, bones: {}, list: [], legs: [] };
+let proceduralClock = 0;
+const springDisplay = { group: null, root: null, bones: {}, list: [], jaw: null, head: null, baseY: 0.63, time: 0 };
 function playAnim(name) {
   if (!mixer || curAnim === name || !clips[name]) return;
   const next = mixer.clipAction(clips[name]);
@@ -355,6 +362,65 @@ function playAnim(name) {
   if (curAnim) mixer.clipAction(clips[curAnim]).fadeOut(0.25);
   next.fadeIn(0.25).play();
   curAnim = name;
+}
+function restoreProceduralPose() {
+  for (const bone of bonnieRig.list) if (bone.userData.btRestQuat) bone.quaternion.copy(bone.userData.btRestQuat);
+}
+function solveTwoBoneIK(upper, lower, end, targetWorld, weight) {
+  if (!upper || !lower || !end || weight <= 0) return;
+  const target = targetWorld;
+  const bones = [lower, upper];
+  const qWorld = new THREE.Quaternion(), qParent = new THREE.Quaternion(), qLocal = new THREE.Quaternion(), delta = new THREE.Quaternion();
+  const jointPos = new THREE.Vector3(), endPos = new THREE.Vector3(), toEnd = new THREE.Vector3(), toTarget = new THREE.Vector3();
+  for (let iter = 0; iter < 2; iter++) {
+    bonnieRig.root.updateMatrixWorld(true);
+    for (const joint of bones) {
+      joint.getWorldPosition(jointPos); end.getWorldPosition(endPos);
+      toEnd.subVectors(endPos, jointPos); toTarget.subVectors(target, jointPos);
+      if (toEnd.lengthSq() < 1e-8 || toTarget.lengthSq() < 1e-8) continue;
+      delta.setFromUnitVectors(toEnd.normalize(), toTarget.normalize());
+      joint.getWorldQuaternion(qWorld); qWorld.premultiply(delta);
+      if (joint.parent) joint.parent.getWorldQuaternion(qParent); else qParent.identity();
+      qLocal.copy(qParent.invert()).multiply(qWorld);
+      joint.quaternion.slerp(qLocal, Math.min(0.42, weight * 0.42));
+    }
+  }
+}
+function applyProceduralRobot(dt) {
+  if (!bonnieRig.root || !bonnieRig.list.length) return;
+  const active = state === 'playing' && bonnie.active;
+  const weight = active ? (bonnie.stun > 0 ? 0.22 : 0.76) : (state === 'playing' ? 0.15 : 0);
+  if (weight <= 0) return;
+  proceduralClock += dt;
+  const t = proceduralClock, freq = active ? 7.4 : 1.8;
+  // Servo-like head, torso and arm offsets layered on top of the authored GLB clips.
+  const offsets = [
+    ['Spine_Bn_09', 0.025 * Math.sin(t * freq), 0.018 * Math.sin(t * freq * 0.61), 0],
+    ['Neck_Bn_021', 0.035 * Math.sin(t * freq * 0.71 + 1), 0.055 * Math.sin(t * 0.8), 0],
+    ['Head_Bn_022', 0.045 * Math.sin(t * 1.3), 0.10 * Math.sin(t * 0.65), 0],
+    ['L_Arm_01_Bn_011', 0.025 * Math.sin(t * freq + 0.7), 0, 0.045 * Math.sin(t * freq)],
+    ['R_Arm_01_Bn_040', 0.025 * Math.sin(t * freq + Math.PI + 0.7), 0, 0.045 * Math.sin(t * freq + Math.PI)]
+  ];
+  for (const [name, rx, ry, rz] of offsets) {
+    const bone = bonnieRig.bones[name]; if (!bone) continue;
+    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(rx * weight, ry * weight, rz * weight, 'XYZ'));
+    bone.quaternion.multiply(q);
+  }
+  // Two-bone leg IK softly plants alternating feet; targets are relative to the actual imported rig.
+  if (active) {
+    const phase = t * freq;
+    for (let i = 0; i < bonnieRig.legs.length; i++) {
+      const leg = bonnieRig.legs[i];
+      if (!leg.upper || !leg.lower || !leg.end) continue;
+      leg.end.getWorldPosition(leg.originWorld);
+      leg.targetLocal.copy(leg.originWorld).applyMatrix4(bonnieRig.inverseRoot);
+      const p = phase + (i ? Math.PI : 0), swing = Math.sin(p);
+      leg.targetLocal.z += swing * 0.085;
+      leg.targetLocal.y += Math.max(0, Math.cos(p)) * 0.09;
+      leg.targetWorld.copy(leg.targetLocal).applyMatrix4(bonnieRig.root.matrixWorld);
+      solveTwoBoneIK(leg.upper, leg.lower, leg.end, leg.targetWorld, weight);
+    }
+  }
 }
 
 // ---------- Renderer / escena ----------
@@ -590,48 +656,77 @@ function buildWorld() {
     }
   });
 
-  // Carteles de créditos y referencias, montados en el muro sur del pasillo.
-  const creditsLoader = new THREE.TextureLoader();
-  function addCreditPoster(file, x, title, color) {
-    const backing = new THREE.Mesh(new THREE.BoxGeometry(3.35, 3.02, 0.10), new THREE.MeshStandardMaterial({ color: 0x111318, roughness: 0.92, metalness: 0.15 }));
-    backing.position.set(x, 1.72, 36.94); worldGroup.add(backing);
-    const frame = new THREE.Mesh(new THREE.BoxGeometry(3.18, 2.84, 0.05), new THREE.MeshBasicMaterial({ color }));
-    frame.position.set(x, 1.72, 36.87); worldGroup.add(frame);
-    const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
-    const poster = new THREE.Mesh(new THREE.PlaneGeometry(3.06, 2.72), mat);
-    poster.position.set(x, 1.72, 36.835); worldGroup.add(poster);
-    creditsLoader.load('assets/' + file, tex => {
-      tex.colorSpace = THREE.SRGBColorSpace;
-      mat.map = tex; mat.needsUpdate = true;
-    });
-    const plaque = new THREE.Mesh(new THREE.PlaneGeometry(3.15, 0.34), new THREE.MeshBasicMaterial({ map: signTex(title, 640, 80, color, '#090a0c', 'bold 38px Arial') }));
-    plaque.position.set(x, 0.16, 36.82); worldGroup.add(plaque);
-  }
-  addCreditPoster('amyr-animations.jpg', 27, 'AMYR ANIMATIONS', '#ff414b');
-  addCreditPoster('volumi3d.jpg', 55, 'CREADOR · VOLUMI3D', '#42c5ff');
+  // Los créditos quedan en el menú; el muro del pasillo usa solo letras LED pegadas a la pared.
+  // Homenaje a AMYR: Spring Bonnie en el escenario central.
+  const amyrStageGroup = new THREE.Group();
+  amyrStageGroup.position.set(27, 0.63, 3 * CELL);
+  worldGroup.add(amyrStageGroup);
+  springDisplay.group = amyrStageGroup; springDisplay.baseY = 0.63;
+  new GLTFLoader().load('assets/springbonnie_v2.o.glb', gltf => {
+    const actor = gltf.scene;
+    // Este archivo trae una malla de suelo auxiliar enorme, no parte del personaje.
+    actor.traverse(o => { if (o.isMesh && o.name === 'Cube.011_0' && o.parent) { o.parent.remove(o); o.geometry.dispose(); } });
+    actor.traverse(o => { if (o.isMesh && o.material) o.material.side = THREE.DoubleSide; });
+    const mergedMeshes=mergeSpringStaticMeshes(actor);
+    console.log('AMYR Spring Bonnie: geometrías estáticas agrupadas',mergedMeshes);
+    fitModel(actor, 2.3);
+    amyrStageGroup.add(actor); springDisplay.root = actor; springDisplay.bones = {}; springDisplay.list = [];
+    actor.traverse(o => { if (o.isBone) { springDisplay.bones[o.name] = o; springDisplay.list.push(o); o.userData.springBase = o.quaternion.clone(); } });
+    springDisplay.head = springDisplay.bones['Bone.005_Armature'] || springDisplay.bones['Bone.007_Armature'];
+    springDisplay.jaw = springDisplay.bones['Bone.008_Armature'];
+    // Lentes rectangulares negros con reflejo tenue, anclados al hueso de la cabeza.
+    const glasses = new THREE.Group();
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0x111820, metalness: 0.78, roughness: 0.24, emissive: 0x071323, emissiveIntensity: 0.22 });
+    const lensMat = new THREE.MeshBasicMaterial({ color: 0x56d7ff, transparent: true, opacity: 0.15, side: THREE.DoubleSide, depthWrite: false });
+    function frameBar(w,h,d,x,y,z) { const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),frameMat); o.position.set(x,y,z); glasses.add(o); }
+    const lensW=0.62, lensH=0.39, bar=0.055, gap=0.13, lensZ=0.035;
+    for (const side of [-1,1]) {
+      const cx=side*(lensW/2+gap/2);
+      frameBar(lensW+bar*2,bar,0.045,cx,lensH/2,lensZ);
+      frameBar(lensW+bar*2,bar,0.045,cx,-lensH/2,lensZ);
+      frameBar(bar,lensH,0.045,cx-lensW/2,0,lensZ);
+      frameBar(bar,lensH,0.045,cx+lensW/2,0,lensZ);
+      const pane=new THREE.Mesh(new THREE.PlaneGeometry(lensW,lensH),lensMat); pane.position.set(cx,0,lensZ+0.026); glasses.add(pane);
+    }
+    frameBar(gap+bar,bar,0.045,0,0,lensZ);
+    frameBar(0.32,bar,0.045,-(lensW+gap)/2-0.19,0,lensZ);
+    frameBar(0.32,bar,0.045,(lensW+gap)/2+0.19,0,lensZ);
+    actor.updateMatrixWorld(true);
+    const head=springDisplay.head;
+    if (head) {
+      const anchorWorld=actor.localToWorld(new THREE.Vector3(0.77,9.45,3.88));
+      head.worldToLocal(anchorWorld); glasses.position.copy(anchorWorld);
+      const actorQ=new THREE.Quaternion(),headQ=new THREE.Quaternion();
+      actor.getWorldQuaternion(actorQ); head.getWorldQuaternion(headQ);
+      glasses.quaternion.copy(headQ.invert().multiply(actorQ)); head.add(glasses);
+    } else { glasses.position.set(0.05,1.89,0.43); actor.add(glasses); }
+    springDisplay.time = Math.random() * 6;
+  }, undefined, err => { console.warn('Spring Bonnie de AMYR no cargó:', err); });
 
-  // Placa social sobre la pared del pasillo: YouTube y Discord con sus @.
-  const socialCanvas = mkCanvas(1200, 190), sx = socialCanvas.getContext('2d');
-  sx.fillStyle = '#090b0e'; sx.fillRect(0, 0, 1200, 190);
-  sx.strokeStyle = '#697078'; sx.lineWidth = 6; sx.strokeRect(5, 5, 1190, 180);
-  // YouTube: botón rojo y triángulo blanco.
-  sx.fillStyle = '#ff0033'; sx.beginPath(); sx.moveTo(64,44); sx.lineTo(138,44); sx.quadraticCurveTo(160,44,160,66); sx.lineTo(160,104); sx.quadraticCurveTo(160,126,138,126); sx.lineTo(64,126); sx.quadraticCurveTo(42,126,42,104); sx.lineTo(42,66); sx.quadraticCurveTo(42,44,64,44); sx.fill();
-  sx.fillStyle = '#fff'; sx.beginPath(); sx.moveTo(90, 62); sx.lineTo(90, 108); sx.lineTo(127, 85); sx.closePath(); sx.fill();
-  sx.fillStyle = '#f2f2f2'; sx.font = 'bold 43px Arial'; sx.textBaseline = 'middle'; sx.fillText('YouTube', 185, 84);
-  sx.fillStyle = '#ff6b79'; sx.font = 'bold 38px Arial'; sx.fillText('@AMYR ANIMATIONS', 385, 84);
-  // Separador central.
-  sx.fillStyle = '#4a4e55'; sx.fillRect(648, 30, 3, 130);
-  // Discord: burbuja violeta con glifo de mando estilizado y dos ojos.
-  sx.fillStyle = '#5865f2'; sx.beginPath(); sx.moveTo(726,43); sx.lineTo(794,43); sx.quadraticCurveTo(820,43,820,69); sx.lineTo(820,101); sx.quadraticCurveTo(820,127,794,127); sx.lineTo(726,127); sx.quadraticCurveTo(700,127,700,101); sx.lineTo(700,69); sx.quadraticCurveTo(700,43,726,43); sx.fill();
-  sx.fillStyle = '#fff'; sx.beginPath(); sx.arc(737, 84, 7, 0, Math.PI * 2); sx.arc(783, 84, 7, 0, Math.PI * 2); sx.fill();
-  sx.strokeStyle = '#fff'; sx.lineWidth = 6; sx.lineCap = 'round'; sx.beginPath(); sx.moveTo(732, 59); sx.quadraticCurveTo(758, 46, 788, 59); sx.stroke();
-  sx.fillStyle = '#f2f2f2'; sx.font = 'bold 43px Arial'; sx.fillText('Discord', 842, 84);
-  sx.fillStyle = '#91a0ff'; sx.font = 'bold 38px Arial'; sx.fillText('@VOLUMI3D', 1014, 84);
-  const socialTex = new THREE.CanvasTexture(socialCanvas); socialTex.colorSpace = THREE.SRGBColorSpace;
-  const socialBacking = new THREE.Mesh(new THREE.BoxGeometry(9.7, 1.65, 0.12), new THREE.MeshStandardMaterial({ color: 0x141619, roughness: 0.88, metalness: 0.12 }));
-  socialBacking.position.set(41, 1.10, 36.88); worldGroup.add(socialBacking);
-  const socialPanel = new THREE.Mesh(new THREE.PlaneGeometry(9.5, 1.48), new THREE.MeshBasicMaterial({ map: socialTex, side: THREE.DoubleSide }));
-  socialPanel.position.set(41, 1.10, 36.80); worldGroup.add(socialPanel);
+  // Marcas LED sin placa: YouTube + @AMYR ANIMATIONS y Discord + @VOLUMI3D.
+  // La textura es transparente y el plano mira hacia el interior del pasillo.
+  const ledCanvas = mkCanvas(1800, 260), led = ledCanvas.getContext('2d');
+  function ledText(text, x, y, color, font) {
+    led.save(); led.font = font; led.textBaseline = 'middle'; led.textAlign = 'left';
+    led.shadowColor = color; led.shadowBlur = 24; led.fillStyle = color; led.fillText(text, x, y);
+    led.shadowBlur = 0; led.fillStyle = '#fff8ef'; led.fillText(text, x, y); led.restore();
+  }
+  // YouTube LED glyph (rounded screen + play triangle).
+  led.save(); led.shadowColor = '#ff0033'; led.shadowBlur = 24; led.fillStyle = '#ff0033';
+  led.beginPath(); led.moveTo(88,62); led.lineTo(184,62); led.quadraticCurveTo(211,62,211,89); led.lineTo(211,171); led.quadraticCurveTo(211,198,184,198); led.lineTo(88,198); led.quadraticCurveTo(61,198,61,171); led.lineTo(61,89); led.quadraticCurveTo(61,62,88,62); led.fill();
+  led.shadowBlur = 0; led.fillStyle = '#fff'; led.beginPath(); led.moveTo(119,91); led.lineTo(119,169); led.lineTo(174,130); led.closePath(); led.fill(); led.restore();
+  ledText('@AMYR ANIMATIONS', 245, 132, '#ff344f', 'bold 58px Arial');
+  // Thin glow separator, not a backing panel.
+  led.save(); led.fillStyle = '#a9b4ff'; led.shadowColor = '#5865f2'; led.shadowBlur = 18; led.fillRect(870,60,3,140); led.restore();
+  // Discord controller mark, drawn as a clean vector-like path.
+  led.save(); led.shadowColor = '#5865f2'; led.shadowBlur = 22; led.fillStyle = '#5865f2';
+  led.beginPath(); led.moveTo(1039,79); led.quadraticCurveTo(1091,48,1145,78); led.quadraticCurveTo(1175,124,1183,174); led.quadraticCurveTo(1153,199,1124,203); led.lineTo(1109,183); led.quadraticCurveTo(1083,191,1056,183); led.lineTo(1040,203); led.quadraticCurveTo(1004,194,987,174); led.quadraticCurveTo(995,119,1039,79); led.fill();
+  led.shadowBlur = 0; led.fillStyle = '#fff'; led.beginPath(); led.ellipse(1051,137,10,14,0,0,Math.PI*2); led.ellipse(1119,137,10,14,0,0,Math.PI*2); led.fill(); led.restore();
+  ledText('@VOLUMI3D', 1210, 132, '#9aa8ff', 'bold 58px Arial');
+  const ledTex = new THREE.CanvasTexture(ledCanvas); ledTex.colorSpace = THREE.SRGBColorSpace;
+  const ledMaterial = new THREE.MeshBasicMaterial({ map: ledTex, transparent: true, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
+  const ledNames = new THREE.Mesh(new THREE.PlaneGeometry(14.0, 2.02), ledMaterial);
+  ledNames.position.set(41, 2.22, 37.04); ledNames.rotation.y = Math.PI; ledNames.scale.x = -1; worldGroup.add(ledNames);
 
   // puerta de salida
   const door = new THREE.Mesh(new THREE.BoxGeometry(0.3, 2.8, 3.2), new THREE.MeshStandardMaterial({ color: 0x0b6a40, emissive: 0x0a8f55, emissiveIntensity: 0.6 }));
@@ -730,6 +825,7 @@ function clearLine(x0, z0, x1, z1, R) {
 
 // ---------- Partida ----------
 function newGame() {
+  resetTouchState();
   selectedCCTV = -1; $('cctv').classList.add('hidden');
   keys = KEY_SPOTS.slice().sort(() => Math.random() - 0.5).slice(0, 3);
   keysGot = 0; battery = 100; stamina = 100; elapsed = 0; flashOn = true; curRoom = -1; voiceT = 12; caughtTime = 0;
@@ -798,15 +894,17 @@ function startGame() {
   say('Encuentra 3 llaves y escapa por la puerta verde.', 4000);
 }
 
-function pause() { selectedCCTV = -1; $('cctv').classList.add('hidden'); state = 'paused'; setTC(false); show('pause'); document.exitPointerLock(); duckAmb(true); }
+function pause() { resetTouchState(); selectedCCTV = -1; $('cctv').classList.add('hidden'); state = 'paused'; setTC(false); show('pause'); document.exitPointerLock(); duckAmb(true); }
 function resume() { state = 'playing'; show(null); setTC(true); lock(); duckAmb(false); }
 function toMenu() {
+  resetTouchState();
   selectedCCTV = -1; $('cctv').classList.add('hidden');
   state = 'menu'; show('menu'); setTC(false); stopAmb();
   $('hud').style.display = 'none'; $('vig').style.display = 'none';
   newGame();
 }
 function endGame(type) {
+  resetTouchState();
   selectedCCTV = -1; $('cctv').classList.add('hidden');
   state = type;
   setTC(false); stopAmb();
@@ -1041,6 +1139,7 @@ addEventListener('keydown', e => {
   else if (e.code === 'Escape' && state === 'paused') resume();
 });
 addEventListener('keyup', e => input[e.code] = false);
+addEventListener('blur', () => { resetTouchState(); for (const k in input) input[k] = false; });
 document.addEventListener('mousemove', e => {
   if (state !== 'playing' || document.pointerLockElement !== $('c')) return;
   player.yaw -= e.movementX * 0.0022;
@@ -1055,64 +1154,109 @@ document.addEventListener('pointerlockchange', () => {
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'playing') pause(); });
 
-// ---------- Entrada: táctil ----------
+// ---------- Entrada móvil: Pointer Events + captura para no perder el joystick ----------
 const JR = 45;
-let jId = null, jcx = 0, jcy = 0;
-function jset(t) {
-  let dx = t.clientX - jcx, dy = t.clientY - jcy;
+let jId = null, jcx = 0, jcy = 0, lId = null, lx = 0, ly = 0;
+function resetTouchState() {
+  jId = null; lId = null; joy.x = 0; joy.y = 0; runHeld = false;
+  const knob = $('knob'); if (knob) knob.style.transform = 'translate(0,0)';
+}
+function jset(clientX, clientY) {
+  let dx = clientX - jcx, dy = clientY - jcy;
   const d = Math.hypot(dx, dy);
   if (d > JR) { dx = dx / d * JR; dy = dy / d * JR; }
   joy.x = dx / JR; joy.y = dy / JR;
   $('knob').style.transform = `translate(${dx}px,${dy}px)`;
 }
-function jend() { jId = null; joy.x = 0; joy.y = 0; $('knob').style.transform = 'translate(0,0)'; }
-const jz = $('joyZone');
-jz.addEventListener('touchstart', e => {
-  e.preventDefault();
-  if (jId !== null) return;
-  const t = e.changedTouches[0]; jId = t.identifier;
-  const r = $('joyBase').getBoundingClientRect();
-  jcx = r.left + r.width / 2; jcy = r.top + r.height / 2;
-  jset(t);
-}, { passive: false });
-jz.addEventListener('touchmove', e => {
-  e.preventDefault();
-  for (const t of e.changedTouches) if (t.identifier === jId) jset(t);
-}, { passive: false });
-['touchend', 'touchcancel'].forEach(n => jz.addEventListener(n, e => {
-  for (const t of e.changedTouches) if (t.identifier === jId) jend();
-}));
-
-let lId = null, lx = 0, ly = 0;
-const lz = $('lookZone');
-lz.addEventListener('touchstart', e => {
-  e.preventDefault();
-  if (lId !== null) return;
-  const t = e.changedTouches[0]; lId = t.identifier; lx = t.clientX; ly = t.clientY;
-}, { passive: false });
-lz.addEventListener('touchmove', e => {
-  e.preventDefault();
-  for (const t of e.changedTouches) if (t.identifier === lId) {
-    if (state === 'playing') {
-      player.yaw -= (t.clientX - lx) * 0.0055;
-      player.pitch -= (t.clientY - ly) * 0.0055;
-      player.pitch = Math.max(-1.45, Math.min(1.45, player.pitch));
+const jz = $('joyZone'), lz = $('lookZone');
+if (window.PointerEvent) {
+  jz.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault(); if (jId !== null) return;
+    jId = e.pointerId;
+    const r = $('joyBase').getBoundingClientRect(); jcx = r.left + r.width / 2; jcy = r.top + r.height / 2;
+    try { jz.setPointerCapture(e.pointerId); } catch (_) {}
+    jset(e.clientX, e.clientY);
+  });
+  jz.addEventListener('pointermove', e => { if (e.pointerId === jId) { e.preventDefault(); jset(e.clientX, e.clientY); } });
+  const finishJoy = e => { if (e.pointerId === jId) { e.preventDefault(); jId = null; joy.x = 0; joy.y = 0; $('knob').style.transform = 'translate(0,0)'; } };
+  ['pointerup','pointercancel','lostpointercapture'].forEach(n => jz.addEventListener(n, finishJoy));
+  lz.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault(); if (lId !== null) return;
+    lId = e.pointerId; lx = e.clientX; ly = e.clientY;
+    try { lz.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+  lz.addEventListener('pointermove', e => {
+    if (e.pointerId !== lId) return; e.preventDefault();
+    if (state === 'playing' && selectedCCTV < 0) {
+      player.yaw -= (e.clientX - lx) * 0.0055;
+      player.pitch = Math.max(-1.45, Math.min(1.45, player.pitch - (e.clientY - ly) * 0.0055));
     }
-    lx = t.clientX; ly = t.clientY;
-  }
-}, { passive: false });
-['touchend', 'touchcancel'].forEach(n => lz.addEventListener(n, e => {
-  for (const t of e.changedTouches) if (t.identifier === lId) lId = null;
-}));
-
-function bindBtn(id, down, up) {
-  const el = $(id);
-  el.addEventListener('touchstart', e => { e.preventDefault(); down(); }, { passive: false });
-  ['touchend', 'touchcancel'].forEach(n => el.addEventListener(n, e => { e.preventDefault(); if (up) up(); }, { passive: false }));
+    lx = e.clientX; ly = e.clientY;
+  });
+  const finishLook = e => { if (e.pointerId === lId) { e.preventDefault(); lId = null; } };
+  ['pointerup','pointercancel','lostpointercapture'].forEach(n => lz.addEventListener(n, finishLook));
+} else {
+  // Fallback para WebViews antiguas que todavía no exponen Pointer Events.
+  jz.addEventListener('touchstart', e => { e.preventDefault(); if (jId !== null) return; const t=e.changedTouches[0]; jId=t.identifier; const r=$('joyBase').getBoundingClientRect(); jcx=r.left+r.width/2; jcy=r.top+r.height/2; jset(t.clientX,t.clientY); }, {passive:false});
+  jz.addEventListener('touchmove', e => { e.preventDefault(); for (const t of e.changedTouches) if (t.identifier===jId) jset(t.clientX,t.clientY); }, {passive:false});
+  ['touchend','touchcancel'].forEach(n=>jz.addEventListener(n,e=>{for(const t of e.changedTouches)if(t.identifier===jId){jId=null;joy.x=0;joy.y=0;$('knob').style.transform='translate(0,0)';}}));
+  lz.addEventListener('touchstart', e => { e.preventDefault(); if(lId!==null)return; const t=e.changedTouches[0];lId=t.identifier;lx=t.clientX;ly=t.clientY; }, {passive:false});
+  lz.addEventListener('touchmove', e => { e.preventDefault(); for(const t of e.changedTouches)if(t.identifier===lId){if(state==='playing'&&selectedCCTV<0){player.yaw-=(t.clientX-lx)*0.0055;player.pitch=Math.max(-1.45,Math.min(1.45,player.pitch-(t.clientY-ly)*0.0055));}lx=t.clientX;ly=t.clientY;} }, {passive:false});
+  ['touchend','touchcancel'].forEach(n=>lz.addEventListener(n,e=>{for(const t of e.changedTouches)if(t.identifier===lId)lId=null;}));
 }
-bindBtn('btnRun', () => { runHeld = true; }, () => { runHeld = false; });
-bindBtn('btnFlash', toggleFlash);
-bindBtn('btnPause', () => { if (state === 'playing') pause(); });
+
+// Unifica Pointer, Touch y click. Deduplica eventos sintéticos para que cada toque active una vez.
+function bindTap(el, action) {
+  let lastAction = 0;
+  const fire = e => {
+    const now = Date.now(); if (now - lastAction < 450) return;
+    lastAction = now; if (e && e.preventDefault) e.preventDefault(); action(e);
+  };
+  if (window.PointerEvent) {
+    el.addEventListener('pointerdown', e => {
+      if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+      e.preventDefault();
+      try { el.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    el.addEventListener('pointerup', e => { if (e.pointerType === 'touch' || e.pointerType === 'pen') fire(e); });
+    el.addEventListener('pointercancel', e => { if (e.pointerType === 'touch' || e.pointerType === 'pen') { lastAction=Date.now(); } });
+  }
+  el.addEventListener('touchend', e => { if(e.changedTouches && e.changedTouches.length) fire(e); }, {passive:false});
+  el.addEventListener('click', e => {
+    if (e.detail === 0 || Date.now() - lastAction > 450) fire(e);
+  });
+}
+function bindHold(el, down, up) {
+  let activePointer = null, activeTouch = null, held = false;
+  const begin = () => { if (!held) { held=true; down(); } };
+  const finish = () => { if (held) { held=false; up && up(); } activePointer=null; activeTouch=null; };
+  if (window.PointerEvent) {
+    el.addEventListener('pointerdown', e => {
+      if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+      e.preventDefault(); activePointer=e.pointerId;
+      try { el.setPointerCapture(e.pointerId); } catch (_) {}
+      begin();
+    });
+    ['pointerup','pointercancel','lostpointercapture'].forEach(n => el.addEventListener(n, e => {
+      if (activePointer === e.pointerId) finish();
+    }));
+  }
+  el.addEventListener('touchstart', e => {
+    if (!e.changedTouches || !e.changedTouches.length) return;
+    e.preventDefault(); activeTouch=e.changedTouches[0].identifier; begin();
+  }, {passive:false});
+  ['touchend','touchcancel'].forEach(n => el.addEventListener(n, e => {
+    if (!e.changedTouches) return;
+    for (const t of e.changedTouches) if (t.identifier === activeTouch) finish();
+  }, {passive:false}));
+  el.addEventListener('mousedown', e => { if (e.button===0) begin(); });
+  ['mouseup','mouseleave'].forEach(n => el.addEventListener(n, finish));
+}
+bindHold($('btnRun'), () => { runHeld = true; }, () => { runHeld = false; });
+bindTap($('btnFlash'), toggleFlash);
+bindTap($('btnPause'), () => { if (state === 'playing') pause(); });
 
 // ---------- Cámaras de seguridad ----------
 const cctvButtons = [];
@@ -1122,7 +1266,7 @@ CCTV_FEEDS.forEach((feed, i) => {
   b.textContent = `CAM ${String(i + 1).padStart(2, '0')}`;
   b.setAttribute('aria-label', feed.name);
   b.title = feed.name;
-  b.addEventListener('click', () => selectCCTV(i));
+  bindTap(b, () => selectCCTV(i));
   $('cctvControls').appendChild(b); cctvButtons.push(b);
 });
 function selectCCTV(i) {
@@ -1140,32 +1284,70 @@ function closeCCTV() {
   $('cctv').classList.add('hidden'); selectedCCTV = -1;
   if (state === 'playing') { setTC(true); if (!IS_TOUCH) lock(); }
 }
-$('cameraHudBtn').onclick = openCCTV;
-$('cctvClose').onclick = closeCCTV;
+bindTap($('cameraHudBtn'), openCCTV);
+bindTap($('cctvClose'), closeCCTV);
 
 // ---------- Menús ----------
-$('playBtn').onclick = startGame;
-$('helpBtn').onclick = () => show('help');
-$('helpBack').onclick = () => show('menu');
-document.querySelectorAll('[data-d]').forEach(b => b.onclick = () => {
+bindTap($('playBtn'), startGame);
+bindTap($('helpBtn'), () => show('help'));
+bindTap($('helpBack'), () => show('menu'));
+document.querySelectorAll('[data-d]').forEach(b => bindTap(b, () => {
   diff = b.dataset.d;
   document.querySelectorAll('[data-d]').forEach(x => x.classList.toggle('sel', x === b));
-});
-$('resumeBtn').onclick = resume;
-$('pauseRestart').onclick = startGame;
-$('pauseMenu').onclick = toMenu;
-$('retryBtn').onclick = startGame;
-$('goMenu').onclick = toMenu;
-$('winAgain').onclick = startGame;
-$('winMenu').onclick = toMenu;
+}));
+bindTap($('resumeBtn'), resume);
+bindTap($('pauseRestart'), startGame);
+bindTap($('pauseMenu'), toMenu);
+bindTap($('retryBtn'), startGame);
+bindTap($('goMenu'), toMenu);
+bindTap($('winAgain'), startGame);
+bindTap($('winMenu'), toMenu);
 
 // ---------- Modelo de Bonnie ----------
-function fitModel(m) {
+function mergeSpringStaticMeshes(root) {
+  root.updateMatrixWorld(true);
+  const buckets = new Map();
+  root.traverse(obj => {
+    if (!obj.isMesh || obj.isSkinnedMesh || !obj.geometry || Array.isArray(obj.material) || Object.keys(obj.geometry.morphAttributes || {}).length) return;
+    let owner = obj.parent;
+    while (owner && owner !== root && !owner.isBone) owner = owner.parent;
+    if (!owner || (owner !== root && !owner.isBone)) owner = root;
+    const attrs = Object.keys(obj.geometry.attributes).sort().map(k => {
+      const a=obj.geometry.attributes[k]; return k+':'+a.itemSize+':'+a.normalized+':'+a.array.constructor.name;
+    }).join('|');
+    const indexSig = obj.geometry.index ? obj.geometry.index.array.constructor.name : 'nonindexed';
+    const key = owner.uuid+'|'+obj.material.uuid+'|'+indexSig+'|'+attrs;
+    let bucket=buckets.get(key);
+    if (!bucket) { bucket={owner,material:obj.material,geometries:[],sources:[]}; buckets.set(key,bucket); }
+    const geo=obj.geometry.clone();
+    const relative=new THREE.Matrix4().copy(owner.matrixWorld).invert().multiply(obj.matrixWorld);
+    geo.applyMatrix4(relative);
+    geo.computeBoundingBox(); geo.computeBoundingSphere();
+    bucket.geometries.push(geo); bucket.sources.push(obj);
+  });
+  let mergedCount=0;
+  for (const bucket of buckets.values()) {
+    if (bucket.geometries.length<2) { bucket.geometries.forEach(g=>g.dispose()); continue; }
+    let merged=null;
+    try { merged=mergeGeometries(bucket.geometries,false); } catch (err) { console.warn('No se pudieron agrupar algunas piezas de Spring Bonnie',err); }
+    if (!merged) { bucket.geometries.forEach(g=>g.dispose()); continue; }
+    merged.computeBoundingBox(); merged.computeBoundingSphere();
+    const mesh=new THREE.Mesh(merged,bucket.material);
+    mesh.name='AMYR_SpringBonnie_Merged'; mesh.castShadow=false; mesh.receiveShadow=false;
+    bucket.owner.add(mesh);
+    for (const source of bucket.sources) source.parent.remove(source);
+    bucket.geometries.forEach(g=>g.dispose()); mergedCount+=bucket.sources.length-1;
+  }
+  root.updateMatrixWorld(true);
+  return mergedCount;
+}
+
+function fitModel(m, targetHeight = 1.75) {
   m.scale.setScalar(1);
   m.updateMatrixWorld(true);
   let box = new THREE.Box3().setFromObject(m);
   const size = box.getSize(new THREE.Vector3());
-  m.scale.setScalar(1.75 / Math.max(size.y, 0.001));
+  m.scale.setScalar(targetHeight / Math.max(size.y, 0.001));
   m.updateMatrixWorld(true);
   box = new THREE.Box3().setFromObject(m);
   const c = box.getCenter(new THREE.Vector3());
@@ -1216,6 +1398,13 @@ new GLTFLoader().load(
     const m = gltf.scene;
     m.traverse(o => { if (o.isMesh) { o.frustumCulled = false; } });
     fitModel(m);
+    bonnieRig.root = m; bonnieRig.bones = {}; bonnieRig.list = []; bonnieRig.legs = [];
+    m.traverse(o => { if (o.isBone) { bonnieRig.bones[o.name] = o; bonnieRig.list.push(o); o.userData.btRestQuat = o.quaternion.clone(); } });
+    bonnieRig.legs = [
+      { upper: bonnieRig.bones.L_Leg_01_Bn_03, lower: bonnieRig.bones.L_Leg_02_Bn_04, end: bonnieRig.bones.L_Leg_03_Bn_05 },
+      { upper: bonnieRig.bones.R_Leg_01_Bn_06, lower: bonnieRig.bones.R_Leg_02_Bn_07, end: bonnieRig.bones.R_Leg_03_Bn_08 }
+    ].map(x => Object.assign(x, { originWorld: new THREE.Vector3(), targetLocal: new THREE.Vector3(), targetWorld: new THREE.Vector3() }));
+    m.updateMatrixWorld(true);
     // Sustituir respaldo por el modelo real sin tocar el estado de la partida.
     if (fallbackBonnie) { bonnie.group.remove(fallbackBonnie); fallbackBonnie = null; }
     bonnie.group.add(m);
@@ -1236,6 +1425,22 @@ new GLTFLoader().load(
   }
 );
 
+function updateSpringDisplay(dt) {
+  if (!springDisplay.root) return;
+  springDisplay.time += dt;
+  const t = springDisplay.time;
+  springDisplay.group.position.y = springDisplay.baseY + Math.sin(t * 1.35) * 0.018;
+  springDisplay.group.rotation.y = Math.sin(t * 0.42) * 0.04;
+  // A very restrained servo idle layered on the file's genuine 63-bone rig.
+  for (const bone of springDisplay.list) if (bone.userData.springBase) bone.quaternion.copy(bone.userData.springBase);
+  if (springDisplay.head) springDisplay.head.rotation.y += Math.sin(t * 0.73) * 0.045;
+  if (springDisplay.jaw) springDisplay.jaw.rotation.x += 0.035 + Math.max(0, Math.sin(t * 1.7)) * 0.055;
+  const left = springDisplay.bones['Bone.003_L.001_Armature'];
+  const right = springDisplay.bones['Bone.003_R.001_Armature'];
+  if (left) left.rotation.z += Math.sin(t * 1.1) * 0.025;
+  if (right) right.rotation.z -= Math.sin(t * 1.1 + 0.35) * 0.025;
+}
+
 // ---------- Estática de televisión ----------
 const statC = $('stat'), sctx = statC.getContext('2d');
 statC.width = 160; statC.height = 90;
@@ -1253,12 +1458,14 @@ function drawStatic(dt) {
 const HRS = ['12', '1', '2', '3', '4', '5', '6'];
 function update(dt) {
   const t = performance.now() / 1000;
+  updateSpringDisplay(dt);
   updateLights(dt);
   drawStatic(dt);
 
   if (state === 'menu') player.yaw += dt * 0.08;
 
   if (mixer) {
+    restoreProceduralPose();
     let want = 'Idle';
     if (state === 'caught' || state === 'gameover') want = clips.Jumpscare ? 'Jumpscare' : 'JumpscareFinalPose';
     else if (state === 'playing' && bonnie.active) {
@@ -1292,6 +1499,9 @@ function update(dt) {
     if (!clips[want]) want = clips.Charge && bonnie.active ? 'Charge' : 'Idle';
     playAnim(want);
     mixer.update(dt);
+    bonnieRig.root.updateMatrixWorld(true);
+    bonnieRig.inverseRoot = bonnieRig.root.matrixWorld.clone().invert();
+    applyProceduralRobot(dt);
   }
 
   let statOp = (state === 'menu' || state === 'gameover' || state === 'win' || state === 'paused') ? 0.16 : 0.06;

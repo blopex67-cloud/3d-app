@@ -1,421 +1,590 @@
-name: Build Unity APK Battle Royale
+name: Build Godot APK Battle Royale
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
-env:
-  UNITY_VERSION: 2022.3.20f1
-  PROJECT_PATH: unity-game
-
 jobs:
   build:
-    name: Construir APK
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+    env:
+      GODOT_VERSION: "4.3-stable"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
         with:
-          lfs: true
+          distribution: temurin
+          java-version: '17'
 
-      - name: Crear proyecto Unity (scripts y escena)
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Descargar Godot y plantillas
         run: |
-          mkdir -p ${PROJECT_PATH}/Assets/Scripts ${PROJECT_PATH}/Assets/Editor ${PROJECT_PATH}/ProjectSettings
+          set -e
+          mkdir -p /tmp/godot && cd /tmp/godot
+          curl -fsSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          unzip -q godot.zip
+          sudo mv Godot_v${GODOT_VERSION}_linux.x86_64 /usr/local/bin/godot
+          sudo chmod +x /usr/local/bin/godot
+          curl -fsSL -o templates.tpz "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_export_templates.tpz"
+          mkdir -p ~/.local/share/godot/export_templates/${GODOT_VERSION/-stable/.stable}
+          unzip -q templates.tpz -d tpl
+          mv tpl/templates/* ~/.local/share/godot/export_templates/${GODOT_VERSION/-stable/.stable}/
 
-          cat > ${PROJECT_PATH}/ProjectSettings/ProjectVersion.txt << 'EOF'
-          m_EditorVersion: 2022.3.20f1
-          m_EditorVersionWithRevision: 2022.3.20f1 (c3fb0c8b0a4b)
-          EOF
-
-          cat > ${PROJECT_PATH}/Assets/Editor/BuildScript.cs << 'EOF'
-          using UnityEditor;
-          using UnityEngine;
-
-          public static class BuildScript
-          {
-              public static void BuildAndroid()
-              {
-                  PlayerSettings.companyName = "EjemploBR";
-                  PlayerSettings.productName = "Battle Royale";
-                  PlayerSettings.applicationIdentifier = "com.ejemplo.battleroyale";
-                  PlayerSettings.defaultInterfaceOrientation = UIOrientation.LandscapeLeft;
-                  PlayerSettings.allowedAutorotateToPortrait = false;
-                  PlayerSettings.allowedAutorotateToPortraitUpsideDown = false;
-                  PlayerSettings.allowedAutorotateToLandscapeLeft = true;
-                  PlayerSettings.allowedAutorotateToLandscapeRight = true;
-                  PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
-                  PlayerSettings.SetScriptingBackend(BuildTargetGroup.Android, ScriptingImplementation.IL2CPP);
-                  PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel24;
-                  EditorUserBuildSettings.buildAppBundle = false;
-                  EditorUserBuildSettings.androidBuildSystem = AndroidBuildSystem.Gradle;
-                  EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Android, BuildTarget.Android);
-
-                  string[] scenes = { "Assets/Scenes/Main.unity" };
-                  BuildPipeline.BuildPlayer(scenes, "Build/BattleRoyale.apk", BuildTarget.Android, BuildOptions.None);
-              }
-          }
-          EOF
-
-          cat > ${PROJECT_PATH}/Assets/Scripts/GameManager.cs << 'EOF'
-          using UnityEngine;
-          using UnityEngine.UI;
-          using System.Collections.Generic;
-
-          public class GameManager : MonoBehaviour
-          {
-              public const int NumBots = 19;
-              public static readonly float[][] ZonePhases = {
-                  new float[]{50f, 85f}, new float[]{110f, 45f}, new float[]{170f, 20f}, new float[]{230f, 6f}
-              };
-
-              float matchTime, zoneRadius = 130f, zoneTarget = 130f;
-              int zonePhase, kills;
-              bool running, ready;
-              float countdown = 3.5f;
-              Transform zone;
-              readonly List<Character> bots = new List<Character>();
-              Character player;
-              Text hud, msg;
-
-              void Start()
-              {
-                  BuildEnvironment();
-                  SpawnPlayer();
-                  SpawnBots();
-                  BuildHud();
-                  running = true;
-              }
-
-              void Update()
-              {
-                  if (!running) return;
-                  if (!ready)
-                  {
-                      countdown -= Time.deltaTime;
-                      if (countdown <= 0f) { ready = true; msg.text = ""; }
-                      else msg.text = Mathf.CeilToInt(countdown).ToString();
-                      return;
-                  }
-                  matchTime += Time.deltaTime;
-                  UpdateZone();
-                  hud.text = "Vivos: " + (1 + bots.FindAll(b => b.alive).Count) + "   Eliminaciones: " + kills + "   Zona: " + Mathf.RoundToInt(zoneRadius) + " m";
-              }
-
-              void BuildEnvironment()
-              {
-                  var sun = new GameObject("Sun").AddComponent<Light>();
-                  sun.type = LightType.Directional;
-                  sun.transform.rotation = Quaternion.Euler(55, 30, 0);
-                  sun.shadows = LightShadows.Soft;
-
-                  var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
-                  ground.name = "Ground";
-                  ground.transform.localScale = new Vector3(26f, 1f, 26f);
-                  ground.GetComponent<Renderer>().material.color = new Color(0.42f, 0.72f, 0.35f);
-
-                  var water = GameObject.CreatePrimitive(PrimitiveType.Plane);
-                  water.name = "Water";
-                  water.transform.position = new Vector3(0, -0.8f, 0);
-                  water.transform.localScale = new Vector3(90f, 1f, 90f);
-                  water.GetComponent<Renderer>().material.color = new Color(0.23f, 0.65f, 0.91f);
-
-                  for (int i = 0; i < 16; i++)
-                  {
-                      var p = RandomFree(24f, 105f);
-                      float w = Random.Range(6f, 11f), d = Random.Range(6f, 11f), h = Random.Range(4f, 7f);
-                      var b = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                      b.transform.localScale = new Vector3(w, h, d);
-                      b.transform.position = new Vector3(p.x, h * 0.5f, p.y);
-                      b.GetComponent<Renderer>().material.color = new Color(0.95f, 0.88f, 0.75f);
-                      var roof = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                      roof.transform.localScale = new Vector3(w + 0.8f, 0.6f, d + 0.8f);
-                      roof.transform.position = new Vector3(p.x, h + 0.3f, p.y);
-                      roof.GetComponent<Renderer>().material.color = new Color(0.55f, 0.24f, 0.17f);
-                  }
-
-                  for (int i = 0; i < 90; i++)
-                  {
-                      var p = RandomFree(10f, 118f);
-                      var trunk = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                      trunk.transform.localScale = new Vector3(0.5f, 2.4f, 0.5f);
-                      trunk.transform.position = new Vector3(p.x, 1.2f, p.y);
-                      trunk.GetComponent<Renderer>().material.color = new Color(0.42f, 0.27f, 0.14f);
-                      var leaves = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                      float r = Random.Range(1.4f, 2f);
-                      leaves.transform.localScale = Vector3.one * r * 2f;
-                      leaves.transform.position = new Vector3(p.x, 3.4f, p.y);
-                      leaves.GetComponent<Renderer>().material.color = new Color(0.18f, 0.55f, 0.22f);
-                  }
-
-                  for (int i = 0; i < 40; i++)
-                  {
-                      var p = RandomFree(10f, 112f);
-                      var rock = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                      float r = Random.Range(0.9f, 1.5f);
-                      rock.transform.localScale = new Vector3(r * 2f, r * 1.6f, r * 2f);
-                      rock.transform.position = new Vector3(p.x, 0.6f, p.y);
-                      rock.GetComponent<Renderer>().material.color = new Color(0.5f, 0.53f, 0.56f);
-                  }
-
-                  zone = GameObject.CreatePrimitive(PrimitiveType.Cylinder).transform;
-                  zone.name = "Zone";
-                  zone.localScale = new Vector3(zoneRadius * 2f, 7f, zoneRadius * 2f);
-                  zone.position = new Vector3(0, 7f, 0);
-                  Destroy(zone.GetComponent<Collider>());
-                  var zm = zone.GetComponent<Renderer>().material;
-                  zm.color = new Color(1f, 0.17f, 0.23f, 0.35f);
-              }
-
-              void SpawnPlayer()
-              {
-                  var p = RandomFree(30f, 80f);
-                  player = Character.Build("Player", SkinData.Current(), p, true);
-                  var cam = Camera.main;
-                  cam.transform.SetParent(player.transform);
-                  cam.transform.localPosition = new Vector3(0, 3.5f, -6f);
-                  cam.transform.LookAt(player.transform.position + Vector3.up * 2f);
-              }
-
-              void SpawnBots()
-              {
-                  for (int i = 0; i < NumBots; i++)
-                  {
-                      var p = RandomFree(20f, 105f);
-                      bots.Add(Character.Build("Bot" + i, SkinData.Random(), p, false));
-                  }
-              }
-
-              void BuildHud()
-              {
-                  var canvas = new GameObject("HUD", typeof(Canvas), typeof(CanvasScaler)).GetComponent<Canvas>();
-                  canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-                  hud = MakeText(canvas.transform, new Vector2(20, -20), 24, TextAnchor.UpperLeft);
-                  msg = MakeText(canvas.transform, Vector2.zero, 96, TextAnchor.MiddleCenter);
-              }
-
-              Text MakeText(Transform parent, Vector2 pos, int size, TextAnchor anchor)
-              {
-                  var go = new GameObject("Text", typeof(Text));
-                  go.transform.SetParent(parent, false);
-                  var t = go.GetComponent<Text>();
-                  t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-                  t.fontSize = size;
-                  t.alignment = anchor;
-                  t.color = Color.white;
-                  var rt = go.GetComponent<RectTransform>();
-                  rt.anchorMin = rt.anchorMax = new Vector2(anchor == TextAnchor.UpperLeft ? 0 : 0.5f, anchor == TextAnchor.UpperLeft ? 1 : 0.5f);
-                  rt.anchoredPosition = pos;
-                  rt.sizeDelta = new Vector2(1200, 200);
-                  return t;
-              }
-
-              void UpdateZone()
-              {
-                  if (zonePhase < ZonePhases.Length && matchTime >= ZonePhases[zonePhase][0])
-                  {
-                      zoneTarget = ZonePhases[zonePhase][1];
-                      zonePhase++;
-                  }
-                  zoneRadius += (zoneTarget - zoneRadius) * Mathf.Min(1f, Time.deltaTime * 0.35f);
-                  zone.localScale = new Vector3(zoneRadius * 2f, 7f, zoneRadius * 2f);
-                  if (player.alive && new Vector2(player.transform.position.x, player.transform.position.z).magnitude > zoneRadius)
-                      player.Damage(3f * Time.deltaTime, null);
-                  foreach (var b in bots)
-                      if (b.alive && new Vector2(b.transform.position.x, b.transform.position.z).magnitude > zoneRadius)
-                          b.Damage(4f * Time.deltaTime, null);
-              }
-
-              public void RegisterKill(Character by, Character victim)
-              {
-                  if (by == player) kills++;
-              }
-
-              public static Vector2 RandomFree(float minR, float maxR)
-              {
-                  float a = Random.value * Mathf.PI * 2f, r = Random.Range(minR, maxR);
-                  return new Vector2(Mathf.Cos(a) * r, Mathf.Sin(a) * r);
-              }
-          }
-          EOF
-
-          cat > ${PROJECT_PATH}/Assets/Scripts/Character.cs << 'EOF'
-          using UnityEngine;
-
-          public class Character : MonoBehaviour
-          {
-              public bool alive = true;
-              public float hp = 100f;
-              public bool isPlayer;
-              float cd;
-
-              public static Character Build(string name, SkinData skin, Vector2 pos, bool player)
-              {
-                  var go = new GameObject(name);
-                  go.transform.position = new Vector3(pos.x, 0, pos.y);
-                  var c = go.AddComponent<Character>();
-                  c.isPlayer = player;
-                  var col = go.AddComponent<CapsuleCollider>();
-                  col.height = 2.3f; col.radius = 0.45f; col.center = new Vector3(0, 1.15f, 0);
-                  var rb = go.AddComponent<Rigidbody>();
-                  rb.freezeRotation = true;
-                  c.BuildBody(skin);
-                  return c;
-              }
-
-              void BuildBody(SkinData s)
-              {
-                  bool anim = s.isAnimatronic;
-                  Color skinCol = anim ? s.bodyColor : new Color(0.94f, 0.72f, 0.55f);
-                  Color vestCol = anim ? s.bodyColor * 0.75f : new Color(0.56f, 0.58f, 0.61f);
-                  Color pantsCol = anim ? new Color(0.16f, 0.16f, 0.16f) : new Color(0.23f, 0.24f, 0.27f);
-                  Color bootCol = new Color(0.35f, 0.23f, 0.12f);
-                  Color dark = new Color(0.1f, 0.1f, 0.1f);
-
-                  var body = new GameObject("Body").transform;
-                  body.SetParent(transform, false);
-                  Box(body, new Vector3(0.3f, 0.95f, 0.32f), new Vector3(-0.2f, 0.48f, 0), pantsCol);
-                  Box(body, new Vector3(0.3f, 0.95f, 0.32f), new Vector3(0.2f, 0.48f, 0), pantsCol);
-                  Box(body, new Vector3(0.36f, 0.22f, 0.46f), new Vector3(-0.2f, 0.11f, 0.05f), bootCol);
-                  Box(body, new Vector3(0.36f, 0.22f, 0.46f), new Vector3(0.2f, 0.11f, 0.05f), bootCol);
-                  Box(body, new Vector3(0.9f, 0.14f, 0.52f), new Vector3(0, 0.98f, 0), dark);
-                  Box(body, new Vector3(0.9f, 1.0f, 0.5f), new Vector3(0, 1.45f, 0), vestCol);
-                  Box(body, new Vector3(0.5f, 0.5f, 0.5f), new Vector3(0, 2.0f, 0), skinCol);
-                  if (anim)
-                  {
-                      Box(body, new Vector3(0.5f, 0.12f, 0.3f), new Vector3(0, 1.72f, 0.2f), dark);
-                      Box(body, new Vector3(0.2f, 0.9f, 0.12f), new Vector3(-0.2f, 2.7f, 0), skinCol);
-                      Box(body, new Vector3(0.2f, 0.9f, 0.12f), new Vector3(0.2f, 2.7f, 0), skinCol);
-                      for (int i = -1; i <= 1; i += 2)
-                          Box(body, new Vector3(0.2f, 0.2f, 0.05f), new Vector3(i * 0.15f, 2.12f, 0.27f), s.eyeColor);
-                  }
-                  else
-                  {
-                      Box(body, new Vector3(0.52f, 0.28f, 0.52f), new Vector3(0, 1.84f, 0), dark);
-                      Box(body, new Vector3(0.54f, 0.12f, 0.54f), new Vector3(0, 2.27f, 0), new Color(0.16f, 0.11f, 0.08f));
-                      Box(body, new Vector3(0.62f, 0.78f, 0.26f), new Vector3(0, 1.42f, -0.38f), new Color(0.18f, 0.2f, 0.23f));
-                      Box(body, new Vector3(0.12f, 0.16f, 1.0f), new Vector3(0.2f, 1.9f, -0.55f), new Color(0.1f, 0.1f, 0.1f));
-                      Box(body, new Vector3(0.2f, 0.7f, 0.04f), new Vector3(0.33f, 1.42f, -0.38f), new Color(1f, 0.8f, 0f));
-                      Box(body, new Vector3(0.06f, 0.28f, 0.1f), new Vector3(0.5f, 0.98f, 0.22f), dark);
-                      Box(body, new Vector3(0.03f, 0.32f, 0.06f), new Vector3(0.5f, 0.7f, 0.22f), new Color(0.85f, 0.87f, 0.9f));
-                  }
-                  var armR = new GameObject("ArmR").transform;
-                  armR.SetParent(body, false);
-                  armR.localPosition = new Vector3(0.63f, 1.8f, 0);
-                  armR.localRotation = Quaternion.Euler(-77f, 0, 0);
-                  Box(armR, new Vector3(0.3f, 0.6f, 0.3f), new Vector3(0, -0.3f, 0), vestCol);
-                  Box(armR, new Vector3(0.26f, 0.5f, 0.26f), new Vector3(0, -0.85f, 0), skinCol);
-                  var gun = new GameObject("Gun").transform;
-                  gun.SetParent(armR, false);
-                  gun.localPosition = new Vector3(0, -1.1f, 0.05f);
-                  Box(gun, new Vector3(0.1f, 0.15f, 0.9f), Vector3.zero, new Color(0.16f, 0.17f, 0.2f));
-                  Box(gun, new Vector3(0.09f, 0.14f, 0.42f), new Vector3(0, 0, -0.45f), new Color(0.48f, 0.29f, 0.13f));
-              }
-
-              static void Box(Transform parent, Vector3 size, Vector3 pos, Color c)
-              {
-                  var b = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                  b.transform.SetParent(parent, false);
-                  b.transform.localScale = size;
-                  b.transform.localPosition = pos;
-                  b.GetComponent<Renderer>().material.color = c;
-                  Destroy(b.GetComponent<Collider>());
-              }
-
-              public void Damage(float amt, Character by)
-              {
-                  if (!alive) return;
-                  hp -= amt;
-                  if (hp <= 0f)
-                  {
-                      alive = false;
-                      transform.rotation = Quaternion.Euler(-90, transform.eulerAngles.y, 0);
-                  }
-              }
-          }
-          EOF
-
-          cat > ${PROJECT_PATH}/Assets/Scripts/SkinData.cs << 'EOF'
-          using UnityEngine;
-
-          public class SkinData
-          {
-              public string name;
-              public bool isAnimatronic;
-              public Color bodyColor = new Color(0.72f, 0.74f, 0.76f);
-              public Color eyeColor = Color.green;
-
-              public static readonly SkinData[] All = {
-                  new SkinData { name = "Operador" },
-                  new SkinData { name = "Springtrap", isAnimatronic = true, bodyColor = new Color(0.85f, 0.8f, 0.17f), eyeColor = new Color(0.22f, 1f, 0.42f) },
-                  new SkinData { name = "Freddy", isAnimatronic = true, bodyColor = new Color(0.48f, 0.29f, 0.16f), eyeColor = new Color(0.31f, 0.76f, 1f) }
-              };
-
-              public static int selected = 0;
-              public static SkinData Current() => All[selected];
-              public static SkinData Random() => All[UnityEngine.Random.Range(0, All.Length)];
-          }
-          EOF
-
-          cat > ${PROJECT_PATH}/Assets/Scripts/PlayerController.cs << 'EOF'
-          using UnityEngine;
-
-          public class PlayerController : MonoBehaviour
-          {
-              public float speed = 6f;
-
-              void Update()
-              {
-                  float h = Input.GetAxis("Horizontal"), v = Input.GetAxis("Vertical");
-                  Vector3 dir = (transform.forward * v + transform.right * h).normalized;
-                  transform.position += dir * speed * Time.deltaTime;
-                  transform.Rotate(0, Input.GetAxis("Mouse X") * 2f, 0);
-              }
-          }
-          EOF
-
-      - name: Crear escena inicial
+      - name: Crear proyecto Godot
         run: |
-          mkdir -p ${PROJECT_PATH}/Assets/Scenes
-          cat > ${PROJECT_PATH}/Assets/Editor/SceneSetup.cs << 'EOF'
-          using UnityEditor;
-          using UnityEditor.SceneManagement;
-          using UnityEngine;
+          mkdir -p game/scripts game/scenes
+          cd game
 
-          public static class SceneSetup
-          {
-              public static void Create()
-              {
-                  var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
-                  var gm = new GameObject("GameManager");
-                  gm.AddComponent<GameManagerBootstrap>();
-                  EditorSceneManager.SaveScene(scene, "Assets/Scenes/Main.unity");
-              }
-          }
+          cat > project.godot << 'EOF'
+          config_version=5
 
-          public class GameManagerBootstrap : MonoBehaviour
-          {
-              void Awake() { gameObject.AddComponent<GameManager>(); }
-          }
+          [application]
+          config/name="Battle Royale"
+          run/main_scene="res://scenes/main.tscn"
+          config/features=PackedStringArray("4.3", "Mobile")
+
+          [display]
+          window/size/viewport_width=1280
+          window/size/viewport_height=720
+          window/handheld/orientation=6
+          window/stretch/mode="canvas_items"
+          window/stretch/aspect="expand"
+
+          [rendering]
+          renderer/rendering_method="mobile"
+          textures/vram_compression/import_etc2_astc=true
           EOF
 
-      - name: Activar Unity y compilar APK
-        uses: game-ci/unity-builder@v4
-        env:
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-        with:
-          projectPath: ${{ env.PROJECT_PATH }}
-          unityVersion: ${{ env.UNITY_VERSION }}
-          targetPlatform: Android
-          buildMethod: BuildScript.BuildAndroid
-          buildName: BattleRoyale
-          androidExportType: androidPackage
-          versioning: None
+          cat > export_presets.cfg << 'EOF'
+          [preset.0]
+          name="Android"
+          platform="Android"
+          runnable=true
+          export_path="../battle_royale.apk"
+          script_export_mode=2
+
+          [preset.0.options]
+          custom_template/debug=""
+          custom_template/release=""
+          gradle_build/use_gradle_build=false
+          architectures/armeabi-v7a=false
+          architectures/arm64-v8a=true
+          architectures/x86=false
+          architectures/x86_64=false
+          package/unique_name="com.ejemplo.battleroyale"
+          package/name="Battle Royale"
+          package/signed=true
+          package/app_category=3
+          screen/orientation=6
+          screen/immersive_mode=true
+          keystore/debug="/tmp/debug.keystore"
+          keystore/debug_user="androiddebugkey"
+          keystore/debug_password="android"
+          EOF
+
+          cat > scripts/game.gd << 'EOF'
+          extends Node3D
+
+          # ============ CONSTANTES ============
+          const MAP_RADIUS := 110.0
+          const NUM_BOTS := 19
+          const ZONE_PHASES := [[50.0, 85.0], [110.0, 45.0], [170.0, 20.0], [230.0, 6.0]]
+
+          var player: CharacterBody3D
+          var bots: Array = []
+          var match_time := 0.0
+          var zone_radius := 130.0
+          var zone_target := 130.0
+          var zone_phase := 0
+          var kills := 0
+          var running := false
+          var countdown := 3.5
+          var ready_go := false
+          var zone_mesh: MeshInstance3D
+          var hud_label: Label
+          var hud_hp: ProgressBar
+          var hud_info: Label
+          var feed_label: Label
+          var msg_label: Label
+          var weapon_label: Label
+          var mini_map: Control
+
+          var weapons := {
+            "pistola": {"dmg": 18, "rate": 0.22, "mag": 12, "reserve": 48, "auto": false, "range": 120.0, "spread": 0.012, "pellets": 1},
+            "rifle": {"dmg": 14, "rate": 0.10, "mag": 30, "reserve": 90, "auto": true, "range": 150.0, "spread": 0.02, "pellets": 1},
+            "escopeta": {"dmg": 11, "rate": 0.75, "mag": 6, "reserve": 12, "auto": false, "range": 45.0, "spread": 0.07, "pellets": 6}
+          }
+
+          var skins := [
+            {"name": "Operador", "type": "soldier", "rarity": "Común"},
+            {"name": "Springtrap", "type": "animatronic", "rarity": "Legendario", "color": Color(0.85, 0.80, 0.17), "eye": Color(0.22, 1.0, 0.42)},
+            {"name": "Freddy", "type": "animatronic", "rarity": "Épico", "color": Color(0.48, 0.29, 0.16), "eye": Color(0.31, 0.76, 1.0)}
+          ]
+          var skin_index := 0
+
+          func _ready() -> void:
+              randomize()
+              _build_lobby()
+
+          func _process(delta: float) -> void:
+              if not running:
+                  return
+              if not ready_go:
+                  countdown -= delta
+                  if countdown <= 0.0:
+                      ready_go = true
+                      _feed("¡Partida iniciada!")
+                  else:
+                      msg_label.text = str(ceil(countdown))
+                  return
+              msg_label.text = ""
+              match_time += delta
+              _update_zone(delta)
+              _update_hud()
+
+          func _build_lobby() -> void:
+              var cam := Camera3D.new()
+              cam.position = Vector3(0, 2.2, 5.5)
+              add_child(cam)
+              cam.look_at(Vector3(0, 1.2, 0))
+              var env := WorldEnvironment.new()
+              var e := Environment.new()
+              e.background_mode = Environment.BG_COLOR
+              e.background_color = Color(0.1, 0.25, 0.18)
+              e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+              e.ambient_light_color = Color(0.7, 0.75, 0.7)
+              env.environment = e
+              add_child(env)
+              var sun := DirectionalLight3D.new()
+              sun.rotation_degrees = Vector3(-45, 30, 0)
+              add_child(sun)
+              var show := build_character(skins[skin_index], 0)
+              show.name = "LobbyShow"
+              show.position = Vector3(0, 0, 0)
+              add_child(show)
+              var ui := CanvasLayer.new()
+              add_child(ui)
+              var title := Label.new()
+              title.text = "BATTLE ROYALE"
+              title.position = Vector2(30, 20)
+              title.add_theme_font_size_override("font_size", 40)
+              ui.add_child(title)
+              var skin_label := Label.new()
+              skin_label.name = "SkinLabel"
+              skin_label.text = skins[skin_index].name + " (" + skins[skin_index].rarity + ")"
+              skin_label.position = Vector2(30, 80)
+              skin_label.add_theme_font_size_override("font_size", 24)
+              ui.add_child(skin_label)
+              var next_btn := Button.new()
+              next_btn.text = "CAMBIAR SKIN"
+              next_btn.position = Vector2(30, 140)
+              next_btn.custom_minimum_size = Vector2(240, 60)
+              next_btn.pressed.connect(_cycle_skin)
+              ui.add_child(next_btn)
+              var play_btn := Button.new()
+              play_btn.text = "JUGAR"
+              play_btn.position = Vector2(30, 220)
+              play_btn.custom_minimum_size = Vector2(240, 80)
+              play_btn.add_theme_font_size_override("font_size", 32)
+              play_btn.pressed.connect(_start_match)
+              ui.add_child(play_btn)
+
+          func _cycle_skin() -> void:
+              skin_index = (skin_index + 1) % skins.size()
+              var old := get_node_or_null("LobbyShow")
+              if old:
+                  old.queue_free()
+              var show := build_character(skins[skin_index], 0)
+              show.name = "LobbyShow"
+              add_child(show)
+              var ui := get_child(get_child_count() - 1)
+              ui.get_node("SkinLabel").text = skins[skin_index].name + " (" + skins[skin_index].rarity + ")"
+
+          func _start_match() -> void:
+              for c in get_children():
+                  if c is CanvasLayer or c.name == "LobbyShow" or c is WorldEnvironment or c is Camera3D or c is DirectionalLight3D:
+                      c.queue_free()
+              await get_tree().process_frame
+              _build_world()
+              _spawn_player()
+              _spawn_bots()
+              _build_hud()
+              running = true
+              ready_go = false
+              countdown = 3.5
+              match_time = 0.0
+              kills = 0
+              zone_radius = 130.0
+              zone_target = 130.0
+              zone_phase = 0
+
+          func _build_world() -> void:
+              var env := WorldEnvironment.new()
+              var e := Environment.new()
+              e.background_mode = Environment.BG_SKY
+              e.sky = Sky.new()
+              e.sky.sky_material = ProceduralSkyMaterial.new()
+              e.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+              e.fog_enabled = true
+              e.fog_density = 0.004
+              env.environment = e
+              add_child(env)
+              var sun := DirectionalLight3D.new()
+              sun.rotation_degrees = Vector3(-55, 30, 0)
+              sun.shadow_enabled = true
+              add_child(sun)
+              var ground := MeshInstance3D.new()
+              var plane := PlaneMesh.new()
+              plane.size = Vector2(260, 260)
+              ground.mesh = plane
+              ground.material_override = _mat(Color(0.42, 0.72, 0.35))
+              add_child(ground)
+              var water := MeshInstance3D.new()
+              var wp := PlaneMesh.new()
+              wp.size = Vector2(900, 900)
+              water.mesh = wp
+              water.position.y = -0.8
+              water.material_override = _mat(Color(0.23, 0.65, 0.91))
+              add_child(water)
+              for i in 16:
+                  var p := _random_free(24.0, 105.0)
+                  var w := randf_range(6.0, 11.0)
+                  var d := randf_range(6.0, 11.0)
+                  var h := randf_range(4.0, 7.0)
+                  var b := _box(Vector3(w, h, d), Vector3(p.x, h * 0.5, p.y), Color(0.95, 0.88, 0.75))
+                  var roof := _box(Vector3(w + 0.8, 0.6, d + 0.8), Vector3(p.x, h + 0.3, p.y), Color(0.55, 0.24, 0.17))
+                  b.add_to_group("solid")
+                  roof.add_to_group("solid")
+                  _add_collider(Vector3(w, h, d), Vector3(p.x, h * 0.5, p.y))
+              for i in 90:
+                  var p := _random_free(10.0, 118.0)
+                  var trunk := _box(Vector3(0.5, 2.4, 0.5), Vector3(p.x, 1.2, p.y), Color(0.42, 0.27, 0.14))
+                  var leaves := MeshInstance3D.new()
+                  var sph := SphereMesh.new()
+                  sph.radius = randf_range(1.4, 2.0)
+                  sph.height = sph.radius * 2.0
+                  leaves.mesh = sph
+                  leaves.material_override = _mat(Color(0.18, 0.55, 0.22).lerp(Color(0.3, 0.7, 0.3), randf()))
+                  leaves.position = Vector3(p.x, 3.4, p.y)
+                  add_child(leaves)
+                  _add_collider(Vector3(0.5, 2.4, 0.5), Vector3(p.x, 1.2, p.y))
+              for i in 40:
+                  var p := _random_free(10.0, 112.0)
+                  var rock := MeshInstance3D.new()
+                  var rm := SphereMesh.new()
+                  rm.radius = randf_range(0.9, 1.5)
+                  rm.height = rm.radius * 1.6
+                  rock.mesh = rm
+                  rock.material_override = _mat(Color(0.5, 0.53, 0.56))
+                  rock.position = Vector3(p.x, 0.6, p.y)
+                  add_child(rock)
+                  _add_collider(Vector3(1.6, 1.2, 1.6), Vector3(p.x, 0.6, p.y))
+              zone_mesh = MeshInstance3D.new()
+              var cyl := CylinderMesh.new()
+              cyl.top_radius = 1.0
+              cyl.bottom_radius = 1.0
+              cyl.height = 14.0
+              zone_mesh.mesh = cyl
+              var zm := _mat(Color(1, 0.17, 0.23, 0.35))
+              zm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+              zone_mesh.material_override = zm
+              zone_mesh.position.y = 7.0
+              add_child(zone_mesh)
+
+          func _spawn_player() -> void:
+              player = build_character(skins[skin_index], 1)
+              player.name = "Player"
+              var p := _random_free(30.0, 80.0)
+              player.position = Vector3(p.x, 0, p.y)
+              add_child(player)
+              var cam := Camera3D.new()
+              cam.name = "PlayerCam"
+              cam.position = Vector3(0, 3.5, 6)
+              player.add_child(cam)
+              cam.current = true
+              player.set_meta("ammo", "pistola")
+              player.set_meta("mag", 12)
+              player.set_meta("reserve", 48)
+              player.set_meta("hp", 100.0)
+              player.set_meta("cd", 0.0)
+              player.set_meta("reload", 0.0)
+              player.set_meta("alive", true)
+              player.set_meta("yaw", 0.0)
+              player.set_meta("pitch", 0.0)
+
+          func _spawn_bots() -> void:
+              bots.clear()
+              for i in NUM_BOTS:
+                  var b := build_character(skins[randi() % skins.size()], 2)
+                  b.name = "Bot" + str(i)
+                  var p := _random_free(20.0, 105.0)
+                  b.position = Vector3(p.x, 0, p.y)
+                  b.set_meta("hp", 100.0)
+                  b.set_meta("alive", true)
+                  b.set_meta("cd", randf_range(0.5, 1.5))
+                  b.set_meta("target", p)
+                  b.set_meta("wander", 0.0)
+                  add_child(b)
+                  bots.append(b)
+
+          func _build_hud() -> void:
+              var ui := CanvasLayer.new()
+              ui.name = "HUD"
+              add_child(ui)
+              hud_hp = ProgressBar.new()
+              hud_hp.position = Vector2(20, 20)
+              hud_hp.custom_minimum_size = Vector2(260, 22)
+              ui.add_child(hud_hp)
+              hud_info = Label.new()
+              hud_info.position = Vector2(20, 50)
+              hud_info.add_theme_font_size_override("font_size", 20)
+              ui.add_child(hud_info)
+              hud_label = Label.new()
+              hud_label.position = Vector2(560, 20)
+              hud_label.add_theme_font_size_override("font_size", 26)
+              ui.add_child(hud_label)
+              weapon_label = Label.new()
+              weapon_label.position = Vector2(900, 620)
+              weapon_label.add_theme_font_size_override("font_size", 28)
+              ui.add_child(weapon_label)
+              feed_label = Label.new()
+              feed_label.position = Vector2(900, 80)
+              ui.add_child(feed_label)
+              msg_label = Label.new()
+              msg_label.position = Vector2(600, 260)
+              msg_label.add_theme_font_size_override("font_size", 96)
+              ui.add_child(msg_label)
+
+          func _update_hud() -> void:
+              var alive := 1 + bots.filter(func(b): return b.get_meta("alive")).size()
+              hud_hp.value = player.get_meta("hp")
+              hud_label.text = "Vivos: " + str(alive) + "  Eliminaciones: " + str(kills)
+              hud_info.text = "Zona: " + str(int(zone_radius)) + " m"
+              weapon_label.text = "%s %d / %d" % [player.get_meta("ammo").to_upper(), player.get_meta("mag"), player.get_meta("reserve")]
+
+          func _feed(t: String) -> void:
+              if feed_label:
+                  feed_label.text = t
+
+          func _update_zone(delta: float) -> void:
+              if zone_phase < ZONE_PHASES.size() and match_time >= ZONE_PHASES[zone_phase][0]:
+                  zone_target = ZONE_PHASES[zone_phase][1]
+                  zone_phase += 1
+                  _feed("La zona se reduce")
+              zone_radius += (zone_target - zone_radius) * min(1.0, delta * 0.35)
+              zone_mesh.scale = Vector3(zone_radius, 1, zone_radius)
+              if player.get_meta("alive") and Vector2(player.position.x, player.position.z).length() > zone_radius:
+                  _damage(player, 3.0 * delta, null)
+              for b in bots:
+                  if b.get_meta("alive") and Vector2(b.position.x, b.position.z).length() > zone_radius:
+                      _damage(b, 4.0 * delta, null)
+
+          func _damage(e: Node3D, amt: float, by) -> void:
+              if not e.get_meta("alive"):
+                  return
+              e.set_meta("hp", e.get_meta("hp") - amt)
+              if e.get_meta("hp") <= 0.0:
+                  e.set_meta("alive", false)
+                  e.set_meta("hp", 0.0)
+                  var t := create_tween()
+                  t.tween_property(e, "rotation_degrees:x", -90.0, 0.35).set_trans(Tween.TRANS_QUAD)
+                  if e == player:
+                      _feed("Has sido eliminado")
+                      running = false
+                      await get_tree().create_timer(1.5).timeout
+                      _show_end(false)
+                  elif by == player:
+                      kills += 1
+                      _feed("Eliminaste a un enemigo")
+
+          func _show_end(win: bool) -> void:
+              msg_label.text = "¡VICTORIA!" if win else "ELIMINADO"
+              msg_label.add_theme_font_size_override("font_size", 64)
+
+          func shoot(shooter: Node3D, wid: String, origin: Vector3, dir: Vector3, targets: Array) -> void:
+              var w: Dictionary = weapons[wid]
+              for i in w.pellets:
+                  var d := dir + Vector3(randf_range(-w.spread, w.spread), randf_range(-w.spread, w.spread), randf_range(-w.spread, w.spread))
+                  d = d.normalized()
+                  var space := get_world_3d().direct_space_state
+                  var q := PhysicsRayQueryParameters3D.create(origin, origin + d * w.range)
+                  q.exclude = [shooter]
+                  var hit := space.intersect_ray(q)
+                  var end := origin + d * w.range
+                  if hit:
+                      end = hit.position
+                      var node: Node = hit.collider
+                      if node.has_meta("entity") and node.get_meta("entity") != shooter:
+                          _damage(node.get_meta("entity"), w.dmg, shooter)
+                  _tracer(origin, end)
+
+          func _tracer(a: Vector3, b: Vector3) -> void:
+              var m := MeshInstance3D.new()
+              var im := ImmediateMesh.new()
+              im.surface_begin(Mesh.PRIMITIVE_LINES)
+              im.surface_add_vertex(a)
+              im.surface_add_vertex(b)
+              im.surface_end()
+              m.mesh = im
+              m.material_override = _mat(Color(1, 0.9, 0.4))
+              add_child(m)
+              get_tree().create_timer(0.08).timeout.connect(m.queue_free)
+
+          func _box(size: Vector3, pos: Vector3, col: Color) -> MeshInstance3D:
+              var m := MeshInstance3D.new()
+              var bm := BoxMesh.new()
+              bm.size = size
+              m.mesh = bm
+              m.material_override = _mat(col)
+              m.position = pos
+              add_child(m)
+              return m
+
+          func _add_collider(size: Vector3, pos: Vector3) -> void:
+              var body := StaticBody3D.new()
+              var cs := CollisionShape3D.new()
+              var bs := BoxShape3D.new()
+              bs.size = size
+              cs.shape = bs
+              body.add_child(cs)
+              body.position = pos
+              add_child(body)
+
+          func _mat(c: Color) -> StandardMaterial3D:
+              var m := StandardMaterial3D.new()
+              m.albedo_color = c
+              m.roughness = 0.8
+              return m
+
+          func _random_free(minr: float, maxr: float) -> Vector2:
+              var a := randf() * TAU
+              var r := randf_range(minr, maxr)
+              return Vector2(cos(a) * r, sin(a) * r)
+
+          # ============ PERSONAJE ============
+          func build_character(skin: Dictionary, role: int) -> CharacterBody3D:
+              var root := CharacterBody3D.new()
+              root.set_meta("entity", root)
+              var body := Node3D.new()
+              body.name = "Body"
+              root.add_child(body)
+              var is_anim: bool = skin.get("type", "soldier") == "animatronic"
+              var col_main: Color = skin.get("color", Color(0.72, 0.74, 0.76))
+              var skin_col := Color(0.94, 0.72, 0.55)
+              var mask_col := Color(0.07, 0.07, 0.07)
+              var vest_col := Color(0.56, 0.58, 0.61)
+              var pants_col := Color(0.23, 0.24, 0.27)
+              var boots_col := Color(0.35, 0.23, 0.12)
+              if is_anim:
+                  skin_col = col_main
+                  vest_col = col_main.darkened(0.25)
+                  pants_col = Color(0.16, 0.16, 0.16)
+              var cs := CollisionShape3D.new()
+              var cap := CapsuleShape3D.new()
+              cap.radius = 0.45
+              cap.height = 2.3
+              cs.shape = cap
+              cs.position = Vector3(0, 1.15, 0)
+              root.add_child(cs)
+
+              var legs: Array = []
+              for x in [-0.2, 0.2]:
+                  var hip := Node3D.new()
+                  hip.position = Vector3(x, 0.96, 0)
+                  body.add_child(hip)
+                  _part(hip, Vector3(0.3, 0.95, 0.32), Vector3(0, -0.475, 0), pants_col)
+                  _part(hip, Vector3(0.36, 0.22, 0.46), Vector3(0, -0.85, 0.05), boots_col)
+                  legs.append(hip)
+              _part(body, Vector3(0.9, 0.14, 0.52), Vector3(0, 0.98, 0), Color(0.12, 0.12, 0.12))
+              _part(body, Vector3(0.9, 1.0, 0.5), Vector3(0, 1.45, 0), vest_col if not is_anim else col_main)
+              var arm_l := Node3D.new(); arm_l.position = Vector3(-0.63, 1.8, 0); body.add_child(arm_l)
+              _part(arm_l, Vector3(0.3, 0.7, 0.3), Vector3(0, -0.35, 0), vest_col)
+              _part(arm_l, Vector3(0.26, 0.55, 0.26), Vector3(0, -0.97, 0), skin_col)
+              _part(arm_l, Vector3(0.28, 0.2, 0.28), Vector3(0, -1.2, 0), Color(0.22, 0.17, 0.12))
+              var arm_r := Node3D.new(); arm_r.position = Vector3(0.63, 1.8, 0); body.add_child(arm_r)
+              _part(arm_r, Vector3(0.3, 0.6, 0.3), Vector3(0, -0.3, 0), vest_col)
+              _part(arm_r, Vector3(0.26, 0.5, 0.26), Vector3(0, -0.85, 0), skin_col)
+              _part(arm_r, Vector3(0.28, 0.24, 0.28), Vector3(0, -1.1, 0), Color(0.22, 0.17, 0.12))
+              arm_r.rotation.x = -1.35
+              var head := Node3D.new(); head.position = Vector3(0, 2.0, 0); body.add_child(head)
+              if is_anim:
+                  _part(head, Vector3(0.7, 0.62, 0.56), Vector3.ZERO, skin_col)
+                  _part(head, Vector3(0.3, 0.3, 0.1), Vector3(0, -0.1, 0.32), skin_col.darkened(0.2))
+                  for x in [-0.15, 0.15]:
+                      _part(head, Vector3(0.2, 0.2, 0.05), Vector3(x, 0.12, 0.3), Color(0.1, 0.1, 0.1))
+                      _part(head, Vector3(0.1, 0.1, 0.06), Vector3(x, 0.12, 0.33), skin.get("eye", Color.GREEN))
+                  for i in 5:
+                      _part(head, Vector3(0.08, 0.1, 0.04), Vector3(-0.2 + i * 0.1, -0.2, 0.31), Color(0.95, 0.95, 0.95))
+                  _part(head, Vector3(0.14, 0.1, 0.1), Vector3(0, 0.0, 0.36), Color(0.1, 0.1, 0.1))
+                  var ear_l := _part(head, Vector3(0.2, 0.9, 0.12), Vector3(-0.2, 0.7, 0), skin_col)
+                  ear_l.rotation.z = 0.12
+                  var ear_r := _part(head, Vector3(0.2, 0.9, 0.12), Vector3(0.2, 0.7, 0), skin_col)
+                  ear_r.rotation.z = -0.12
+              else:
+                  _part(head, Vector3(0.5, 0.5, 0.5), Vector3.ZERO, skin_col)
+                  _part(head, Vector3(0.52, 0.28, 0.52), Vector3(0, -0.16, 0), mask_col)
+                  _part(head, Vector3(0.54, 0.12, 0.54), Vector3(0, 0.27, 0), Color(0.16, 0.11, 0.08))
+                  _part(head, Vector3(0.12, 0.05, 0.02), Vector3(-0.12, 0.05, 0.26), Color(0.95, 0.95, 0.95))
+                  _part(head, Vector3(0.12, 0.05, 0.02), Vector3(0.12, 0.05, 0.26), Color(0.95, 0.95, 0.95))
+                  _part(body, Vector3(0.62, 0.78, 0.26), Vector3(0, 1.42, -0.38), Color(0.18, 0.2, 0.23))
+                  _part(body, Vector3(0.12, 0.16, 1.0), Vector3(0.2, 1.9, -0.55), Color(0.1, 0.1, 0.1))
+                  _part(body, Vector3(0.2, 0.7, 0.04), Vector3(0.33, 1.42, -0.38), Color(1, 0.8, 0))
+                  _part(body, Vector3(0.06, 0.28, 0.1), Vector3(0.5, 0.98, 0.22), Color(0.13, 0.13, 0.13))
+                  _part(body, Vector3(0.03, 0.32, 0.06), Vector3(0.5, 0.7, 0.22), Color(0.85, 0.87, 0.9))
+              var hold := Node3D.new(); hold.name = "Hold"; hold.position = Vector3(0, -1.1, 0.05); arm_r.add_child(hold)
+              var gun := _gun()
+              hold.add_child(gun)
+              root.set_meta("body", body)
+              root.set_meta("legs", legs)
+              root.set_meta("arm_r", arm_r)
+              root.set_meta("arm_l", arm_l)
+              root.set_meta("hold", hold)
+              root.set_meta("gun", gun)
+              root.set_meta("phase", 0.0)
+              root.set_meta("role", role)
+              return root
+
+          func _part(parent: Node3D, size: Vector3, pos: Vector3, col: Color) -> MeshInstance3D:
+              var m := MeshInstance3D.new()
+              var bm := BoxMesh.new()
+              bm.size = size
+              m.mesh = bm
+              m.material_override = _mat(col)
+              m.position = pos
+              parent.add_child(m)
+              return m
+
+          func _gun() -> Node3D:
+              var g := Node3D.new()
+              _part(g, Vector3(0.1, 0.15, 0.9), Vector3(0, 0, 0.05), Color(0.16, 0.17, 0.2))
+              _part(g, Vector3(0.04, 0.05, 0.4), Vector3(0, 0.02, 0.6), Color(0.6, 0.64, 0.68))
+              _part(g, Vector3(0.09, 0.14, 0.42), Vector3(0, 0, -0.45), Color(0.48, 0.29, 0.13))
+              return g
+          EOF
+
+          cat > scenes/main.tscn << 'EOF'
+          [gd_scene load_steps=2 format=3]
+
+          [ext_resource type="Script" path="res://scripts/game.gd" id="1"]
+
+          [node name="Main" type="Node3D"]
+          script = ExtResource("1")
+          EOF
+
+      - name: Exportar APK con Godot
+        run: |
+          cd game
+          godot --headless --import || true
+          godot --headless --export-debug "Android" ../battle_royale.apk
 
       - name: Subir APK
         uses: actions/upload-artifact@v4
         with:
-          name: battle-royale-unity-apk
-          path: ${{ env.PROJECT_PATH }}/build/Android
+          name: battle-royale-godot-apk
+          path: battle_royale.apk

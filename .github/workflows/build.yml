@@ -202,6 +202,20 @@ jobs:
           const player = { x: CELL, z: CELL, yaw: 0, pitch: 0 };
           const bonnie = { x: 0, z: 0, heading: 0, path: [], timer: 0, active: false, ready: false, delay: 8, stun: 0, group: new THREE.Group() };
 
+          // ---------- Animaciones de Bonnie ----------
+          let mixer = null, curAnim = null;
+          const clips = {};
+          function playAnim(name) {
+            if (!mixer || curAnim === name || !clips[name]) return;
+            const next = mixer.clipAction(clips[name]);
+            next.reset();
+            if (name === 'Jumpscare') { next.setLoop(THREE.LoopOnce, 1); next.clampWhenFinished = true; }
+            else next.setLoop(THREE.LoopRepeat, Infinity);
+            if (curAnim) mixer.clipAction(clips[curAnim]).fadeOut(0.25);
+            next.fadeIn(0.25).play();
+            curAnim = name;
+          }
+
           function lock() { if (!IS_TOUCH) $('c').requestPointerLock(); }
           function setTC(on) { $('tc').style.display = (IS_TOUCH && on) ? 'block' : 'none'; }
 
@@ -639,6 +653,9 @@ jobs:
               m.traverse(o => { if (o.isMesh) { o.frustumCulled = false; } });
               fitModel(m);
               bonnie.group.add(m);
+              mixer = new THREE.AnimationMixer(m);
+              gltf.animations.forEach(a => { clips[a.name.replace(/^.*--/, '')] = a; });
+              playAnim('Idle');
               bonnieReady();
             },
             undefined,
@@ -657,6 +674,14 @@ jobs:
             if (flickerT <= 0) { lamp.intensity = Math.random() < 0.15 ? 0 : 4; flickerT = 0.05 + Math.random() * 0.5; }
 
             if (state === 'menu') player.yaw += dt * 0.08;
+
+            if (mixer) {
+              let want = 'Idle';
+              if (state === 'caught' || state === 'gameover') want = 'Jumpscare';
+              else if (state === 'playing' && bonnie.active) want = bonnie.stun > 0 ? 'Shocked' : 'Charge';
+              playAnim(want);
+              mixer.update(dt);
+            }
 
             if (state === 'playing') {
               elapsed += dt;

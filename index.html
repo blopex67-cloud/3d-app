@@ -268,7 +268,7 @@
   <h2>CÓMO JUGAR</h2>
   <div class="help">
     Estás atrapado en la pizzería de noche. Encuentra <b>3 llaves</b> repartidas por las salas y llega a la <b>puerta verde de SALIDA</b>, al fondo del pasillo. También puedes buscar los <b>5 diplomas</b> con mensajes especiales; son opcionales.<br><br>
-    Springtrap te persigue. Escucha sus pasos: a corta distancia corre y ataca. La radio junto al conejo amarillo puede alterar el sonido de la mansión. Busca las baterías de repuesto y usa E junto a la oficina para abrir o cerrar sus puertas. Si te alcanza, es el final.<br><br>
+    Toy Bonnie, Mimic y Springtrap tomarán turnos de 72 segundos. Cada uno regresa al escenario al terminar; Springtrap es el último y el más peligroso. La radio junto al conejo amarillo puede alterar el sonido de la mansión. Busca las baterías de repuesto y usa E junto a la oficina para abrir o cerrar sus puertas. Si te alcanza, es el final.<br><br>
     La <b>linterna</b> puede congelar a Bonnie: mantenla apuntada de frente medio segundo para detenerlo <b>4.5 segundos</b>; después tarda 6 segundos en recuperarse. La linterna consume batería. También puedes <b>correr</b>, aunque la energía se agota.<br><br>
     <b>Móvil:</b> joystick a la izquierda, desliza a la derecha para mirar, botones LUZ, CORRER y CÁMARAS para vigilar las salas.<br>
     <b>PC:</b> WASD, ratón, Shift y F.<br><br>
@@ -395,6 +395,12 @@ const DIPLOMA_SPOTS=[[4,8],[23,10],[29,7],[42,11],[16,6]]; // El nuevo diploma A
 const FREEZE_SECONDS=4.5, FREEZE_CHARGE=0.45, FREEZE_COOLDOWN=6.0; // carga continua al apuntar, duración congelado y recarga
 const bonnie = { x: 0, z: 0, heading: 0, path: [], timer: 0, active: false, ready: false, delay: 8, stun: 0, beamCharge: 0, freezeCooldown: 0, freezeDone: false, group: new THREE.Group() };
 const killerAnim = {actions:{},current:null, radioGroup:null, radioMixer:null, radioHeld:false, radioPlaying:null, radioFilter:null, radioGain:null, radioPan:null, radioDist:999, glitchTimer:0, radioReverb:null};
+const animatronicRoster={activeId:null,lastPhase:-1,phaseStart:0,phaseEnd:0,actors:{
+  toy:{id:'toy',name:'Toy Bonnie',asset:'assets/toy-bonnie-optimized.glb',home:[20,.65,6],entry:[20,0,10],speed:2.05,duration:72,anger:0},
+  mimic:{id:'mimic',name:'Mimic',asset:'assets/mimic-optimized.glb',home:[34,.65,6],entry:[34,0,10],speed:2.35,duration:72,anger:0},
+  springtrap:{id:'springtrap',name:'Springtrap',home:[23,.65,6],entry:[24,0,10],speed:3.0,duration:72,anger:0}
+}};
+let strongestScareBuf=null, rosterT=0;
 const keyIcons = [...document.querySelectorAll('#keysRow .kico')];
 
 function lock() { if (!IS_TOUCH) $('c').requestPointerLock(); }
@@ -668,6 +674,10 @@ function buildWorld() {
       new GLTFLoader().parse(bytes.buffer,'',gltf=>{const actor=gltf.scene;actor.traverse(o=>{if(o.isMesh){o.frustumCulled=true;if(o.material){const mats=Array.isArray(o.material)?o.material:[o.material];mats.forEach(m=>m.side=THREE.DoubleSide);}}});fitModel(actor,2.3);amyrStageGroup.add(actor);springDisplay.root=actor;springDisplay.head=null;},err=>console.error('No se pudo procesar el nuevo Spring Bonnie:',err));
     }).catch(err=>console.error('No se pudo cargar el nuevo Spring Bonnie:',err));
 
+  // Los tres perseguidores empiezan en el escenario junto al Spring Bonnie amarillo.
+  loadRosterActor('toy');
+  loadRosterActor('mimic');
+
   // Radio cercana al Spring Bonnie del escenario; música se filtra como radio vieja y se oye espacialmente.
   new GLTFLoader().load('assets/radio_transistor.glb',gltf=>{
     const rg=new THREE.Group();rg.add(gltf.scene);fitModel(gltf.scene,.72);rg.position.set(29.8,.05,10.2);rg.rotation.y=-.45;rg.scale.setScalar(.8);worldGroup.add(rg);killerAnim.radioGroup=rg;
@@ -914,13 +924,14 @@ function newGame() {
   bonnie.active = false; bonnie.delay = DIFF[diff].delay; bonnie.stun = 0; bonnie.beamCharge=0; bonnie.freezeCooldown=0; bonnie.freezeDone=false;
 
   buildKeys(); buildDiplomas();
+  loadRosterState();
 }
 
 function startGame() {
   initAudio(); newGame(); show(null);
   $('hud').style.display='block'; $('vig').style.display='block'; $('flash').style.opacity=0; $('cameraOpenBtn').style.display='block';
   state='playing'; setTC(true); lock(); stopAmb(); startAmb();
-  say('Encuentra 3 llaves y escapa por la puerta verde.',4000);
+  say('Tres animatrónicos saldrán por turnos desde el escenario. Encuentra las llaves y escapa.',4500);
 }
 
 function pause() { $('cameraOpenBtn').style.display='none'; resetTouchState(); state = 'paused'; setTC(false); show('pause'); document.exitPointerLock(); duckAmb(true); }
@@ -1148,14 +1159,108 @@ function bonnieUpdate(dt) {
 
   // voces a lo lejos
   voiceT -= dt;
-  if (voiceT <= 0 && actx) {
+  if (animatronicRoster.activeId==='springtrap'&&voiceT <= 0 && actx) {
     voiceT = 16 + Math.random() * 18;
     const n = ['hello', 'hi', 'laugh'][Math.floor(Math.random() * 3)];
     const d = Math.hypot(bonnie.x - player.x, bonnie.z - player.z);
     playSnd(n, Math.max(0.2, 1 - d / 40), panTo(bonnie.x, bonnie.z));
   }
 
-  if (Math.hypot(player.x - bonnie.x, player.z - bonnie.z) < 1.0) caught();
+  if (Math.hypot(player.x - bonnie.x, player.z - bonnie.z) < 1.0 && clearLine(bonnie.x,bonnie.z,player.x,player.z,0.05)) caught();
+}
+
+function rosterAnim(actor,key,loop=true){
+  if(!actor||!actor.actions)return;
+  const action=actor.actions[key]||actor.actions.idle;
+  if(!action)return;
+  if(actor.current!==action){if(actor.current)actor.current.fadeOut(.18);action.reset();action.setLoop(loop?THREE.LoopRepeat:THREE.LoopOnce,loop?Infinity:1);action.clampWhenFinished=!loop;action.fadeIn(.2).play();actor.current=action;}
+}
+function loadRosterActor(id){
+  const actor=animatronicRoster.actors[id];if(!actor)return;
+  actor.group=new THREE.Group();actor.group.position.set(...actor.home);actor.group.rotation.y=Math.PI;
+  actor.group.visible=true;worldGroup.add(actor.group);
+  new GLTFLoader().load(actor.asset,gltf=>{
+    const model=gltf.scene;model.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false;if(o.material){const mats=Array.isArray(o.material)?o.material:[o.material];for(const mat of mats){mat.side=THREE.DoubleSide;if(mat.map)mat.map.anisotropy=1;}}}});
+    fitModel(model,1.85);actor.group.add(model);actor.model=model;actor.mixer=new THREE.AnimationMixer(model);actor.actions={};
+    const names= id==='toy'?{idle:/Toy_Bonnie--Idle$/,walk:/Toy_Bonnie--Haywire$/,run:/Toy_Bonnie--Charge$/,attack:/Toy_Bonnie--Jumpscare$/}:{idle:/A_DLC_OldEndo_IdleA$/,walk:/A_DLC_OldEndo_Walk$/,run:/A_DLC_OldEndo_RunA$/,attack:/A_DLC_OldEndo_JumpscareFrontA$/};
+    for(const [key,re] of Object.entries(names)){const clip=gltf.animations.find(a=>re.test(a.name));if(clip)actor.actions[key]=actor.mixer.clipAction(clip);}
+    rosterAnim(actor,'idle');
+  },undefined,err=>console.error('No se pudo cargar '+actor.name+':',err));
+}
+function loadRosterState(){
+  animatronicRoster.activeId=null;animatronicRoster.step='wait';animatronicRoster.turn=0;animatronicRoster.wait=8;animatronicRoster.time=0;
+  for(const a of Object.values(animatronicRoster.actors)){
+    a.path=[];a.timer=0;a.progress=0;a.anger=0;
+    if(a.id!=='springtrap'&&a.group){a.group.position.set(...a.home);a.group.visible=true;rosterAnim(a,'idle');}
+  }
+  bonnie.active=false;bonnie.path=[];bonnie.stun=0;
+}
+function actorGroup(a){return a.id==='springtrap'?bonnie.group:a.group;}
+function beginRosterTurn(a){
+  animatronicRoster.activeId=a.id;animatronicRoster.step='depart';animatronicRoster.time=0;
+  a.progress=0;a.path=[];a.timer=0;a.anger=0;
+  bonnie.active=false;bonnie.path=[];bonnie.stun=0;bonnie.beamCharge=0;
+  say(`${a.name} deja el escenario.`,2500);
+}
+function moveRosterToward(a,target,dt){
+  const g=actorGroup(a);if(!g)return false;
+  let x=a.id==='springtrap'?bonnie.x:a.x,z=a.id==='springtrap'?bonnie.z:a.z;
+  const distance=Math.hypot(target[0]-x,target[2]-z);
+  if(distance<.38)return true;
+  a.timer=(a.timer||0)-dt;
+  if(a.timer<=0){a.timer=.35;a.path=bfsPath(Math.round(x/CELL),Math.round(z/CELL),Math.round(target[0]/CELL),Math.round(target[2]/CELL))||[];}
+  let tx=target[0],tz=target[2];
+  if(!clearLine(x,z,tx,tz,.35)){
+    if(!a.path.length)return false;
+    while(a.path.length>1&&clearLine(x,z,a.path[1][0]*CELL,a.path[1][1]*CELL,.35))a.path.shift();
+    tx=a.path[0][0]*CELL;tz=a.path[0][1]*CELL;
+    if(Math.hypot(tx-x,tz-z)<.25&&a.path.length>1){a.path.shift();tx=a.path[0][0]*CELL;tz=a.path[0][1]*CELL;}
+  }
+  const dx=tx-x,dz=tz-z,d=Math.hypot(dx,dz);if(d<.01)return false;
+  const step=Math.min((a.speed||2.2)*dt,d),nx=x+dx/d*step,nz=z+dz/d*step;
+  if(!blockedR(nx,nz,.25)){x=nx;z=nz;}else a.timer=0;
+  if(a.id==='springtrap'){bonnie.x=x;bonnie.z=z;bonnie.heading=Math.atan2(dx,dz)+FACE_OFFSET;}
+  else {a.x=x;a.z=z;g.rotation.y=Math.atan2(dx,dz)+Math.PI;}
+  g.position.set(x,0,z);
+  return false;
+}
+function rosterPhaseUpdate(dt){
+  if(state!=='playing'||diplomaOpen||cameraOpen)return;
+  if(animatronicRoster.step==='wait'){
+    animatronicRoster.wait-=dt;
+    if(animatronicRoster.wait<=0){const ids=['toy','mimic','springtrap'];beginRosterTurn(animatronicRoster.actors[ids[animatronicRoster.turn%ids.length]]);}
+  }else{
+    const a=animatronicRoster.actors[animatronicRoster.activeId],g=actorGroup(a);
+    if(a&&g){
+      if(a.id!=='springtrap'&&!a.model)return;
+      if(animatronicRoster.step==='depart'){
+        a.progress=Math.min(1,a.progress+dt/2.3);const t=a.progress;
+        g.position.set(a.home[0]+(a.entry[0]-a.home[0])*t,a.home[1]*(1-t),a.home[2]+(a.entry[2]-a.home[2])*t);
+        if(t>=1){a.x=a.entry[0];a.z=a.entry[2];if(a.id==='springtrap'){bonnie.x=a.x;bonnie.z=a.z;bonnie.active=true;bonnie.delay=0;bonnie.ready=true;bonnie.path=[];bonnie.timer=0;}animatronicRoster.step='chase';animatronicRoster.time=0;}
+      }else if(animatronicRoster.step==='chase'){
+        animatronicRoster.time+=dt;
+        if(a.id==='springtrap')bonnieUpdate(dt);else updateRosterChaser(a,dt);
+        if(state==='playing'&&animatronicRoster.time>=a.duration){animatronicRoster.step='return';a.path=[];a.timer=0;bonnie.active=false;bonnie.path=[];say(`${a.name} regresa al escenario.`,2200);}
+      }else if(animatronicRoster.step==='return'){
+        if(moveRosterToward(a,a.entry,dt)){animatronicRoster.step='ascend';a.progress=0;}
+      }else if(animatronicRoster.step==='ascend'){
+        a.progress=Math.min(1,a.progress+dt/2.3);const t=a.progress;
+        g.position.set(a.entry[0]+(a.home[0]-a.entry[0])*t,a.home[1]*t,a.entry[2]+(a.home[2]-a.entry[2])*t);
+        if(t>=1){g.position.set(...a.home);g.rotation.y=Math.PI;animatronicRoster.activeId=null;animatronicRoster.turn++;animatronicRoster.step='wait';animatronicRoster.wait=5;}
+      }
+    }
+  }
+  if(state!=='playing')return;
+  for(const a of Object.values(animatronicRoster.actors))if(a.mixer){
+    const walking=a.id===animatronicRoster.activeId&&['depart','chase','return','ascend'].includes(animatronicRoster.step);
+    rosterAnim(a,walking?(a.anger>0?'run':'walk'):'idle');a.mixer.update(dt);
+  }
+}
+function updateRosterChaser(actor,dt){
+  if(!actor||!actor.group||!actor.model)return;
+  const d=Math.hypot(actor.x-player.x,actor.z-player.z);actor.anger=d<9?1:0;
+  moveRosterToward(actor,[player.x,0,player.z],dt);
+  if(d<1.05&&clearLine(actor.x,actor.z,player.x,player.z,.05)){animatronicRoster.activeId=actor.id;caught();}
 }
 
 function caught() {
@@ -1163,23 +1268,25 @@ function caught() {
   state = 'caught'; caughtTime = 0;
   setTC(false);
   stopAmb();
+  const strongest=animatronicRoster.activeId==='springtrap';
+  const attacker=animatronicRoster.actors[animatronicRoster.activeId];
+  if(attacker&&attacker.id!=='springtrap'&&attacker.group){const fx=-Math.sin(player.yaw),fz=-Math.cos(player.yaw);attacker.x=player.x+fx*.78;attacker.z=player.z+fz*.78;attacker.group.position.set(attacker.x,0,attacker.z);attacker.group.rotation.y=Math.atan2(player.x-attacker.x,player.z-attacker.z)+Math.PI;rosterAnim(attacker,'attack',false);}
+  if(strongest&&strongestScareBuf&&actx){const hit=actx.createBufferSource();hit.buffer=strongestScareBuf;hit.connect(master);hit.start();}
+  else playSnd('scream',1);
   sfxScare();
-  playSnd('scream', 1);
   $('jumpscareFX').className = 'on';
   $('bloodOverlay').classList.remove('on');
   void $('bloodOverlay').offsetWidth;
   $('bloodOverlay').classList.add('on');
   $('flash').style.opacity = 0.62;
-  const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
-  bonnie.x = player.x + fx * 0.78; bonnie.z = player.z + fz * 0.78;
-  bonnie.heading = Math.atan2(-fx, -fz) + FACE_OFFSET;
+  if(strongest){const fx=-Math.sin(player.yaw),fz=-Math.cos(player.yaw);bonnie.x=player.x+fx*.78;bonnie.z=player.z+fz*.78;bonnie.heading=Math.atan2(-fx,-fz)+FACE_OFFSET;}
   camera.fov = 58; camera.updateProjectionMatrix();
 }
 
 // ---------- Audio ----------
 let actx = null, noiseBuf = null, master = null, ambSrc = null, ambGain = null, wantAmb = false;
 const SND = {};
-const SND_FILES = { scream: 'scream', amb: 'ambience', hello: 'hello', hi: 'hi', laugh: 'laugh', mask: 'mask', radioMusic:'radio_song' };
+const SND_FILES = { scream: 'scream', killerScare:'springtrap_jumpscare', amb: 'ambience', hello: 'hello', hi: 'hi', laugh: 'laugh', mask: 'mask', radioMusic:'radio_song' };
 function initAudio() {
   if (actx) { if (actx.state === 'suspended') actx.resume(); return; }
   actx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1201,6 +1308,7 @@ async function loadSounds() {
       SND[k] = await actx.decodeAudioData(await r.arrayBuffer());
     } catch (e) { /* sonido opcional */ }
   }
+  if(SND.killerScare)strongestScareBuf=SND.killerScare;
   if(wantAmb)startAmb();
   if(SND.radioMusic)startRadioMusic();
 }
@@ -1252,7 +1360,7 @@ function grabRadio(){
 }
 function updateKillerAnimation(dist=99){
   if(!enemyMixer||!killerAnim.actions)return;
-  if(state==='caught'){
+  if(state==='caught'&&animatronicRoster.activeId==='springtrap'){
     const attack=killerAnim.actions.attack;if(attack&&killerAnim.current!==attack){if(killerAnim.current)killerAnim.current.fadeOut(.12);attack.reset().setLoop(THREE.LoopOnce,1);attack.clampWhenFinished=true;attack.fadeIn(.12).play();killerAnim.current=attack;}return;
   }
   let name='walk';
@@ -1548,7 +1656,7 @@ function bonnieReady(message){bonnie.ready=true;$('playBtn').disabled=false;$('l
 // El perseguidor ahora es Springtrap optimizado: cinco animaciones guardadas, texturas reducidas y pistas resampleadas.
 fallbackBonnie=makeFallbackBonnie();bonnie.group.add(fallbackBonnie);bonnieReady('LISTO · CARGANDO SPRINGTRAP');
 glbLoadTimer=setTimeout(()=>{if(!glbLoaded)$('loadTxt').textContent='LISTO · CARGANDO ASESINO';},9000);
-new GLTFLoader().load('assets/springtrap-optimized.glb',gltf=>{
+new GLTFLoader().load('assets/springtrap-roster.glb',gltf=>{
   glbLoaded=true;clearTimeout(glbLoadTimer);const m=gltf.scene;
   m.traverse(o=>{if(o.isMesh){o.frustumCulled=false;if(o.material){const arr=Array.isArray(o.material)?o.material:[o.material];arr.forEach(mat=>{mat.side=THREE.DoubleSide;if(mat.map)mat.map.anisotropy=2;});}}});
   fitModel(m,2.7);enemyRig.root=m;m.updateMatrixWorld(true);
@@ -1560,8 +1668,8 @@ new GLTFLoader().load('assets/springtrap-optimized.glb',gltf=>{
   killerFacing.rotation.y = Math.PI;
   killerFacing.add(m);
   bonnie.group.add(killerFacing);enemyMixer=new THREE.AnimationMixer(m);
-  const map={walk:/K40_WalkFT$/,run:/K40_RunFT$/,walkLeft:/K40_WalkLT$/,walkRight:/K40_WalkRT$/,attack:/K40_Attack_Wipe$/};
-  for(const [key,re] of Object.entries(map)){const clip=gltf.animations.find(a=>re.test(a.name));if(clip){const action=enemyMixer.clipAction(clip);killerAnim.actions[key]=action;if(key==='walk'){action.setLoop(THREE.LoopRepeat,Infinity);action.play();killerAnim.current=action;}}}
+  const map={idle:/K40_IdleMenu$/,walk:/K40_WalkFT$/,run:/K40_RunFT$/,walkLeft:/K40_WalkLT$/,walkRight:/K40_WalkRT$/,attack:/K40_Attack_Wipe$/};
+  for(const [key,re] of Object.entries(map)){const clip=gltf.animations.find(a=>re.test(a.name));if(clip){const action=enemyMixer.clipAction(clip);killerAnim.actions[key]=action;if(key==='idle'){action.setLoop(THREE.LoopRepeat,Infinity);action.play();killerAnim.current=action;}}}
   if(enemyRig.root)enemyRig.root.rotation.y=Math.PI;
   bonnieReady('ASESINO LISTO');
 },undefined,err=>{console.error('No cargó Springtrap:',err);clearTimeout(glbLoadTimer);bonnieReady('ASESINO · MODO LIGERO');});
@@ -1603,15 +1711,17 @@ function update(dt) {
 
   if (state === 'menu') player.yaw += dt * 0.08;
 
+  rosterPhaseUpdate(dt);
+  if(state==='caught'&&animatronicRoster.activeId&&animatronicRoster.activeId!=='springtrap'){const attacker=animatronicRoster.actors[animatronicRoster.activeId];if(attacker&&attacker.mixer&&attacker.current)attacker.mixer.update(dt);}
   const chaseDist=Math.hypot(bonnie.x-player.x,bonnie.z-player.z);
-  updateKillerAnimation(chaseDist);
-  if(enemyMixer&&killerAnim.current&&((state==='playing'&&bonnie.active&&bonnie.stun<=0)||state==='caught'))enemyMixer.update(dt);
+  if(animatronicRoster.activeId==='springtrap'&&((state==='playing'&&['depart','chase','return','ascend'].includes(animatronicRoster.step))||state==='caught'))updateKillerAnimation(chaseDist);
+  else if(killerAnim.actions.idle){if(killerAnim.current!==killerAnim.actions.idle){if(killerAnim.current)killerAnim.current.fadeOut(.18);killerAnim.current=killerAnim.actions.idle;killerAnim.current.reset().setLoop(THREE.LoopRepeat,Infinity).fadeIn(.18).play();}}
+  if(enemyMixer&&killerAnim.current&&((state==='playing'&&!diplomaOpen&&!cameraOpen)||state==='caught'))enemyMixer.update(dt);
 
 
   if (state === 'playing' && !diplomaOpen && !cameraOpen) {
     elapsed += dt;
     movePlayer(dt);
-    bonnieUpdate(dt);
 
     if (battery > 0 && flashOn) battery = Math.max(0, battery - 1.6 * dt);
     torch.visible = flashOn && battery > 0;
@@ -1636,8 +1746,11 @@ function update(dt) {
       else say('La puerta está cerrada. Necesitas 3 llaves.', 1800);
     }
 
-    const dist = Math.hypot(player.x - bonnie.x, player.z - bonnie.z);
-    if (bonnie.active && dist < 12 && actx) {
+    const activeActor=animatronicRoster.actors[animatronicRoster.activeId];
+    const enemyX=activeActor&&activeActor.id!=='springtrap'&&Number.isFinite(activeActor.x)?activeActor.x:bonnie.x;
+    const enemyZ=activeActor&&activeActor.id!=='springtrap'&&Number.isFinite(activeActor.z)?activeActor.z:bonnie.z;
+    const dist=Math.hypot(player.x-enemyX,player.z-enemyZ);
+    if (animatronicRoster.step==='chase' && dist < 12 && actx) {
       heartT -= dt;
       if (heartT <= 0) { heartbeat(); heartT = Math.max(0.4, dist / 22); }
     }
@@ -1671,7 +1784,7 @@ function update(dt) {
     $('stBar').style.background = stamina < 25 ? '#ef476f' : '#35e0a1';
     $('btnFlash').classList.toggle('on', flashOn && battery > 0);
     $('btnRun').classList.toggle('on', runHeld);
-    const dng = bonnie.active ? Math.max(0, 1 - dist / 9) : 0;
+    const dng = animatronicRoster.step==='chase' ? Math.max(0,1-dist/9) : 0;
     $('danger').style.opacity = dng * 0.9;
   }
 
@@ -1679,7 +1792,9 @@ function update(dt) {
     caughtTime += dt;
     camera.position.x = player.x + (Math.random() - 0.5) * (caughtTime < 0.55 ? 0.28 : 0.08);
     camera.position.y = EYE + (Math.random() - 0.5) * (caughtTime < 0.55 ? 0.25 : 0.08);
-    const dx = bonnie.x - player.x, dz = bonnie.z - player.z;
+    const attacker=animatronicRoster.actors[animatronicRoster.activeId];
+    const ax=attacker&&attacker.id!=='springtrap'?attacker.x:bonnie.x,az=attacker&&attacker.id!=='springtrap'?attacker.z:bonnie.z;
+    const dx=ax-player.x,dz=az-player.z;
     player.yaw = Math.atan2(-dx, -dz);
     player.pitch = Math.max(-0.12, Math.min(0.12, (1.4 - caughtTime) * 0.08));
     if (caughtTime > 0.65) $('jumpscareFX').classList.add('hit');
@@ -1689,11 +1804,11 @@ function update(dt) {
   if (state !== 'caught') camera.position.set(player.x, EYE, player.z);
   camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
 
-  bonnie.group.position.set(bonnie.x, 0, bonnie.z);
-  bonnie.group.rotation.y = bonnie.heading;
+  if(animatronicRoster.activeId!=='springtrap'){bonnie.group.position.set(...animatronicRoster.actors.springtrap.home);bonnie.group.rotation.y=Math.PI;}
+  else if(animatronicRoster.step==='chase'||animatronicRoster.step==='return'||state==='caught'){bonnie.group.position.set(bonnie.x,0,bonnie.z);bonnie.group.rotation.y=bonnie.heading;}
   const auraDist = Math.hypot(bonnie.x - player.x, bonnie.z - player.z);
   bonnieAura.position.set(bonnie.x, 1.65, bonnie.z);
-  bonnieAura.visible = bonnie.active && (auraDist < 18 || bonnie.stun > 0);
+  bonnieAura.visible = animatronicRoster.activeId==='springtrap'&&bonnie.active && (auraDist < 18 || bonnie.stun > 0);
   bonnieAura.material.color.setHex(bonnie.stun > 0 ? 0x5de5ff : 0xffffff);
   bonnieAura.material.opacity = bonnie.stun > 0 ? 0.88 : 0.42;
 

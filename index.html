@@ -221,6 +221,8 @@
   </div>
 </div>
 
+<button id="ventBtn" type="button" aria-label="Entrar o salir de la ventilación" style="display:none;position:fixed;z-index:14;left:50%;bottom:calc(145px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);padding:11px 16px;border:1px solid #a7c5be;border-radius:8px;background:rgba(4,15,18,.94);color:#e2fff7;font:700 12px var(--mono);letter-spacing:1px;pointer-events:auto;touch-action:manipulation">E · ESCONDERSE</button>
+<div id="ventOverlay" aria-hidden="true" style="display:none;position:fixed;inset:0;pointer-events:none;z-index:5;background:linear-gradient(90deg,#09131ced 0%,transparent 20%,transparent 80%,#09131ced 100%),linear-gradient(0deg,#080f19df 0%,transparent 28%,transparent 70%,#080f19d9 100%);box-shadow:inset 0 0 80px #000"><div style="position:absolute;left:15%;right:15%;top:21%;bottom:21%;border:9px solid #202b32;box-shadow:0 0 0 4px #060c0e, inset 0 0 25px #000;background:repeating-linear-gradient(to bottom,transparent 0%,transparent 12%,#101a1cf0 13%,#4c626470 15%,#101a1cf0 17%,transparent 18%,transparent 26%)"></div><div style="position:absolute;top:10%;width:100%;text-align:center;color:#c8e5d6;font:700 11px var(--mono);letter-spacing:2px;text-shadow:0 2px 4px #000">OCULTO EN LA VENTILACIÓN</div></div>
 <button id="officeDoorBtn" type="button" aria-label="Abrir o cerrar puerta de oficina" style="display:none;position:fixed;z-index:12;left:50%;bottom:calc(90px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);padding:10px 17px;border:1px solid #759083;border-radius:3px;background:rgba(4,11,10,.86);color:#dcf4e5;font:700 13px var(--mono);letter-spacing:1.5px;pointer-events:auto;touch-action:manipulation">E · ABRIR OFICINA</button>
 <button id="radioGrabBtn" type="button" aria-label="Agarrar radio" style="display:none;position:fixed;z-index:12;left:50%;bottom:90px;transform:translateX(-50%);padding:12px 18px;border:2px solid #9ec7aa;border-radius:30px;background:#09120feF;color:#e8fff0;font:900 16px var(--mono);letter-spacing:2px;pointer-events:auto;touch-action:manipulation">✋ AGARRAR RADIO</button>
 <button id="cameraOpenBtn" type="button" aria-label="Abrir cámaras">▦ &nbsp; CÁMARAS</button>
@@ -268,7 +270,7 @@
   <h2>CÓMO JUGAR</h2>
   <div class="help">
     Estás atrapado en la pizzería de noche. Encuentra <b>3 llaves</b> repartidas por las salas y llega a la <b>puerta verde de SALIDA</b>, al fondo del pasillo. También puedes buscar los <b>5 diplomas</b> con mensajes especiales; son opcionales.<br><br>
-    Toy Bonnie, Mimic y Springtrap tomarán turnos de 72 segundos. Cada uno regresa al escenario al terminar; Springtrap es el último y el más peligroso. La radio junto al conejo amarillo puede alterar el sonido de la mansión. Busca las baterías de repuesto y usa E junto a la oficina para abrir o cerrar sus puertas. Si te alcanza, es el final.<br><br>
+    Toy Bonnie sale después de 30 segundos. Toy Bonnie, Mimic y Springtrap tomarán turnos de 72 segundos. Cada uno regresa al escenario al terminar; Springtrap es el último y el más peligroso. La radio junto al conejo amarillo puede alterar el sonido de la mansión. Busca las baterías de repuesto y usa E junto a la oficina para abrir o cerrar sus puertas. Acércate a una rejilla y usa E o ESCONDERSE para entrar y salir; puedes permanecer dentro y repetirlo sin límite. Si te alcanza, es el final.<br><br>
     La <b>linterna</b> puede congelar a Bonnie: mantenla apuntada de frente medio segundo para detenerlo <b>4.5 segundos</b>; después tarda 6 segundos en recuperarse. La linterna consume batería. También puedes <b>correr</b>, aunque la energía se agota.<br><br>
     <b>Móvil:</b> joystick a la izquierda, desliza a la derecha para mirar, botones LUZ, CORRER y CÁMARAS para vigilar las salas.<br>
     <b>PC:</b> WASD, ratón, Shift y F.<br><br>
@@ -381,6 +383,7 @@ let securityFeedRenderer = null;
 let keys = [], keyMeshes = [], keyGroup = null, diplomaMeshes=[];
 let keysGot = 0, diplomasGot = 0, battery = 100, stamina = 100, flashOn = true, elapsed = 0, diplomaOpen=false;
 let heartT = 0, voiceT = 12, curRoom = -1, caughtTime = 0, missionUiT = 0;
+const vents=[];const ventState={inside:false,current:null,nearest:null};const clothPieces=[];
 const input = {};
 const player = { x: START[0] * CELL, z: START[1] * CELL, yaw: -Math.PI / 2, pitch: 0 };
 const EXIT = { x: 106, z: 35 };
@@ -565,6 +568,8 @@ function buildWorld() {
   });
   walls.instanceMatrix.needsUpdate = true; walls.instanceColor.needsUpdate = true;
   worldGroup.add(walls);
+  buildArchitecturalDetails(wallCells);
+  buildVents(wallCells);
 
   // objetos
   const wood = lamb(0x4a2c1a), steel = stdm(0x9aa3a8, 0.35, 0.8), dark = lamb(0x1a1a1e), red = lamb(0x8a0e1c);
@@ -579,9 +584,9 @@ function buildWorld() {
     if (P.type === 'stage') {
       box(w, 0.6, d, wood, cx, 0.3, cz);
       box(w - 0.4, 0.12, 0.2, red, cx, 0.62, cz + d / 2 - 0.15);
-      box(1.4, 3.0, d * 0.7, red, cx - w / 2 + 0.9, 2.1, cz - d * 0.1);
-      box(1.4, 3.0, d * 0.7, red, cx + w / 2 - 0.9, 2.1, cz - d * 0.1);
-      box(w, 0.7, 0.5, red, cx, 2.85, cz + d / 2 - 0.4);
+      buildStageCurtains(cx,cz,w,d);
+      box(w, 0.14, 0.20, stdm(0xc29c53,.45,.65), cx, 2.96, cz + d / 2 - 0.28);
+      box(w-.6, .10, .16, stdm(0xe0b85b,.4,.65),cx,.68,cz+d/2+.02);
       const banner = new THREE.Mesh(new THREE.PlaneGeometry(14, 2.4), new THREE.MeshBasicMaterial({ map: signTex('¡BIENVENIDOS A LA PIZZERÍA!', 1024, 176, '#ffd36b', '#6b1020', 'bold 78px Arial'), color: 0x9a9a9a }));
       banner.position.set(cx, 2.1, P.y0 * CELL - CELL / 2 + 0.06); worldGroup.add(banner);
     } else if (P.type === 'cove') {
@@ -731,6 +736,87 @@ function buildWorld() {
   addSource({ x: 69, y: 1.6, z: 46, col: 0x4fc8ff, i: 7, flick: 0.15, room: 7 });
 }
 
+// ---------- Ambiente arquitectónico optimizado para móviles ----------
+function buildArchitecturalDetails(wallCells){
+  const trimMat=new THREE.MeshStandardMaterial({color:0x3b3431,roughness:.88});
+  const trim=new THREE.InstancedMesh(new THREE.BoxGeometry(CELL-.02,.16,CELL-.02),trimMat,wallCells.length);
+  const crown=new THREE.InstancedMesh(new THREE.BoxGeometry(CELL-.02,.12,CELL-.02),trimMat,wallCells.length);
+  const m=new THREE.Matrix4();wallCells.forEach(([c,r],i)=>{m.makeTranslation(c*CELL,.08,r*CELL);trim.setMatrixAt(i,m);m.makeTranslation(c*CELL,WALL_H-.09,r*CELL);crown.setMatrixAt(i,m);});
+  trim.instanceMatrix.needsUpdate=true;crown.instanceMatrix.needsUpdate=true;worldGroup.add(trim,crown);
+  const metal=new THREE.MeshStandardMaterial({color:0x3b464a,roughness:.7,metalness:.5});
+  const pipes=new THREE.InstancedMesh(new THREE.CylinderGeometry(.065,.065,8,6),metal,10),q=new THREE.Quaternion().setFromEuler(new THREE.Euler(0,0,Math.PI/2)),v=new THREE.Vector3(),scale=new THREE.Vector3(1,1,1);
+  for(let i=0;i<10;i++){v.set(9+i*10,3.03,35);m.compose(v,q,scale);pipes.setMatrixAt(i,m);}pipes.instanceMatrix.needsUpdate=true;worldGroup.add(pipes);
+  const lampFrame=new THREE.InstancedMesh(new THREE.BoxGeometry(1.95,.12,.75),metal,12);
+  const framePlaces=[[10,10],[18,24],[30,12],[33,28],[7,44],[18,44],[27,44],[34,46],[45,14],[39,42],[44,53],[51,49]];
+  framePlaces.forEach(([x,z],i)=>{m.makeTranslation(x*CELL,3.1,z);lampFrame.setMatrixAt(i,m);});lampFrame.instanceMatrix.needsUpdate=true;worldGroup.add(lampFrame);
+  const chips=new THREE.InstancedMesh(new THREE.BoxGeometry(.22,.016,.14),new THREE.MeshStandardMaterial({color:0x665649,roughness:1}),48);
+  for(let i=0;i<48;i++){const c=2+(i*13)%52,r=2+(i*7)%27;m.makeTranslation(c*CELL+(i%3)*.19,.015,r*CELL+(i%4)*.16);chips.setMatrixAt(i,m);}chips.instanceMatrix.needsUpdate=true;worldGroup.add(chips);
+}
+function buildStageCurtains(cx,cz,w,d){
+  const redFabric=new THREE.MeshStandardMaterial({color:0x62101c,roughness:1,metalness:0,side:THREE.DoubleSide});
+  for(const side of [-1,1]){
+    const width=3.0,height=2.55,geo=new THREE.PlaneGeometry(width,height,14,10);
+    const attr=geo.attributes.position,base=new Float32Array(attr.array.length);
+    for(let i=0;i<attr.count;i++){const x=attr.getX(i),y=attr.getY(i);attr.setZ(i,Math.sin((x/width+.5)*Math.PI*9)*.12*(.45+(height/2-y)/height*.55));}
+    base.set(attr.array);geo.computeVertexNormals();const mesh=new THREE.Mesh(geo,redFabric);
+    mesh.position.set(cx+side*(w/2-width/2+.2),1.72,cz+d/2-.3);worldGroup.add(mesh);clothPieces.push({mesh,base,phase:side*1.9});
+    const tie=new THREE.Mesh(new THREE.TorusGeometry(.35,.035,5,12),new THREE.MeshStandardMaterial({color:0xc5a162,metalness:.5,roughness:.45}));tie.position.set(cx+side*(w/2-1.3),1.22,cz+d/2-.12);worldGroup.add(tie);
+  }
+  const valanceGeo=new THREE.PlaneGeometry(w-.4,.64,36,3),attr=valanceGeo.attributes.position;
+  for(let i=0;i<attr.count;i++){const x=attr.getX(i),y=attr.getY(i);attr.setZ(i,.07*Math.sin(x*5));if(y<0)attr.setY(i,y-.1*(.5+.5*Math.cos(x*2.5)));}valanceGeo.computeVertexNormals();
+  const valance=new THREE.Mesh(valanceGeo,redFabric);valance.position.set(cx,2.66,cz+d/2-.28);worldGroup.add(valance);
+}
+let curtainClock=0,curtainTick=0;
+function updateCurtains(dt){
+  if(state!=='playing'||cameraOpen||diplomaOpen)return;
+  curtainClock+=dt;curtainTick+=dt;if(curtainTick<1/15)return;curtainTick=0;
+  for(const c of clothPieces){if(!c.mesh.visible)continue;const p=c.mesh.geometry.attributes.position,base=c.base;
+    for(let i=0;i<p.count;i++){const k=i*3,x=base[k],y=base[k+1],weight=Math.max(0,(1.275-y)/2.55);p.array[k+2]=base[k+2]+.032*weight*Math.sin(curtainClock*1.25+x*2.2+c.phase);}
+    p.needsUpdate=true;
+  }
+}
+function buildVents(wallCells){
+  const dark=new THREE.MeshStandardMaterial({color:0x131d20,roughness:.82,metalness:.4});
+  const metal=new THREE.MeshStandardMaterial({color:0x566369,roughness:.55,metalness:.75});
+  const slatGeo=new THREE.BoxGeometry(1.45,.055,.06),backGeo=new THREE.BoxGeometry(1.65,1.25,.12),rimGeo=new THREE.BoxGeometry(1.75,.06,.1);
+  const choices=[];
+  for(let ri=0;ri<ROOMS.length;ri++){
+    const [x0,r0,x1,r1]=ROOMS[ri].r;let chosen=null;
+    for(let r=r0;r<=r1&&!chosen;r++)for(let c=x0;c<=x1&&!chosen;c++){
+      if(grid[r][c]!==0)continue;
+      for(const [dc,dr] of [[0,-1],[1,0],[0,1],[-1,0]]){
+        const wc=c+dc,wr=r+dr;if(grid[wr]?.[wc]!==1)continue;
+        const x=(c+dc*.48)*CELL,z=(r+dr*.48)*CELL;
+        if(choices.some(v=>Math.hypot(v.x-x,v.z-z)<5))continue;
+        chosen={x,z,dc,dr,room:ri};break;
+      }
+    }
+    if(chosen)choices.push(chosen);
+  }
+  for(const item of choices){
+    const group=new THREE.Group();group.position.set(item.x,.72,item.z);group.rotation.y=Math.atan2(-item.dc,-item.dr);worldGroup.add(group);
+    const back=new THREE.Mesh(backGeo,dark);group.add(back);
+    for(const y of [-.66,.66]){const rim=new THREE.Mesh(rimGeo,metal);rim.position.set(0,y,.09);group.add(rim);}
+    for(let i=0;i<6;i++){const slat=new THREE.Mesh(slatGeo,metal);slat.position.set(0,-.47+i*.19,.105);group.add(slat);}
+    vents.push({...item,group});
+  }
+}
+function resetVent(){ventState.inside=false;ventState.current=null;ventState.nearest=null;const btn=$('ventBtn'),overlay=$('ventOverlay');if(btn)btn.style.display='none';if(overlay)overlay.style.display='none';}
+function updateVents(){
+  const usable=state==='playing'&&!cameraOpen&&!diplomaOpen;
+  ventState.nearest=null;
+  if(usable&&!ventState.inside){let best=2.35;for(const vent of vents){const d=Math.hypot(player.x-vent.x,player.z-vent.z);if(d<best){best=d;ventState.nearest=vent;}}}
+  $('ventBtn').style.display=usable&&(ventState.inside||ventState.nearest)?'block':'none';
+  $('ventBtn').textContent=ventState.inside?'E · SALIR DE VENTILACIÓN':'E · ESCONDERSE EN VENTILACIÓN';
+  $('ventOverlay').style.display=usable&&ventState.inside?'block':'none';
+}
+function toggleVent(){
+  if(state!=='playing'||cameraOpen||diplomaOpen)return;
+  if(ventState.inside){ventState.inside=false;ventState.current=null;bonnie.timer=0;for(const a of Object.values(animatronicRoster.actors)){a.timer=0;a.path=[];}say('Saliste de la ventilación.',1700);playSnd('mask',.2);}
+  else if(ventState.nearest){ventState.current=ventState.nearest;ventState.inside=true;runHeld=false;joy.x=joy.y=0;for(const a of Object.values(animatronicRoster.actors))a.path=[];bonnie.path=[];say('Estás a salvo en la ventilación. Puedes salir cuando quieras.',2600);playSnd('mask',.2);}
+  updateVents();
+}
+
 // ---------- Llaves ----------
 const keyGeo = new THREE.TorusGeometry(0.25, 0.08, 8, 16);
 const keyMat = new THREE.MeshStandardMaterial({ color: 0xffd166, emissive: 0xffaa00, emissiveIntensity: 0.8 });
@@ -821,7 +907,7 @@ function toggleOfficeDoor(){
   say(officeDoorOpen?'Puerta de la oficina abierta':'Puerta de la oficina cerrada',1300);
 }
 function updateOfficeDoor(dt){
-  const near=state==='playing'&&Math.hypot(player.x-OFFICE_DOOR.x,player.z-OFFICE_DOOR.z)<3.1;
+  const near=state==='playing'&&!ventState.inside&&Math.hypot(player.x-OFFICE_DOOR.x,player.z-OFFICE_DOOR.z)<3.1;
   $('officeDoorBtn').style.display=near?'block':'none';
   const target=officeDoorOpen?1:0;officeDoorBlend+=(target-officeDoorBlend)*Math.min(1,dt*4.5);
   for(const hinge of officeDoorLeaves){const side=hinge.userData.side;hinge.rotation.y=side*(officeDoorBlend*Math.PI*.48);}
@@ -870,6 +956,7 @@ function resetRadioForGame(){
 }
 
 function newGame() {
+  resetVent();
   resetRadioForGame();
   setOfficeDoor(false,true);
   buildBatteryPickups();
@@ -931,12 +1018,13 @@ function startGame() {
   initAudio(); newGame(); show(null);
   $('hud').style.display='block'; $('vig').style.display='block'; $('flash').style.opacity=0; $('cameraOpenBtn').style.display='block';
   state='playing'; setTC(true); lock(); stopAmb(); startAmb();
-  say('Tres animatrónicos saldrán por turnos desde el escenario. Encuentra las llaves y escapa.',4500);
+  say('Tienes 30 segundos antes del primer turno. Busca llaves y ventilaciones.',4500);
 }
 
 function pause() { $('cameraOpenBtn').style.display='none'; resetTouchState(); state = 'paused'; setTC(false); show('pause'); document.exitPointerLock(); duckAmb(true); }
 function resume() { $('cameraOpenBtn').style.display='block'; state = 'playing'; show(null); setTC(true); lock(); duckAmb(false); }
 function toMenu() {
+  resetVent();
   resetTouchState();
   if(cameraOpen){cameraOpen=false;securityLight.visible=false;$('cameraModal').classList.remove('open');$('cameraModal').setAttribute('aria-hidden','true');}
   state = 'menu'; show('menu'); setTC(false); stopAmb();
@@ -944,6 +1032,7 @@ function toMenu() {
   newGame();
 }
 function endGame(type) {
+  resetVent();
   resetTouchState();
   state = type;
   setTC(false); stopAmb();
@@ -1050,6 +1139,7 @@ function toggleFlash() {
 
 // ---------- Movimiento del jugador ----------
 function movePlayer(dt) {
+  if(ventState.inside)return;
   const w = input.KeyW || input.ArrowUp, s = input.KeyS || input.ArrowDown;
   const a = input.KeyA || input.ArrowLeft, d = input.KeyD || input.ArrowRight;
   let fwd = (w ? 1 : 0) - (s ? 1 : 0) - joy.y;
@@ -1099,7 +1189,7 @@ function panTo(x, z) {
 }
 
 function bonnieUpdate(dt) {
-  if (!bonnie.ready) return;
+  if (!bonnie.ready || ventState.inside) return;
   bonnie.delay -= dt;
   if (bonnie.delay > 0) return;
   if (!bonnie.active) { bonnie.active = true; say('Algo te está buscando. Corre.', 3500); playSnd('hello', 0.7, panTo(bonnie.x, bonnie.z)); }
@@ -1181,14 +1271,14 @@ function loadRosterActor(id){
   actor.group.visible=true;worldGroup.add(actor.group);
   new GLTFLoader().load(actor.asset,gltf=>{
     const model=gltf.scene;model.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false;if(o.material){const mats=Array.isArray(o.material)?o.material:[o.material];for(const mat of mats){mat.side=THREE.DoubleSide;if(mat.map)mat.map.anisotropy=1;}}}});
-    fitModel(model,1.85);actor.group.add(model);actor.model=model;actor.mixer=new THREE.AnimationMixer(model);actor.actions={};
+    fitModel(model,1.85);const facing=new THREE.Group();facing.rotation.y=Math.PI;facing.add(model);actor.group.add(facing);actor.model=model;actor.facing=facing;actor.mixer=new THREE.AnimationMixer(model);actor.actions={};
     const names= id==='toy'?{idle:/Toy_Bonnie--Idle$/,walk:/Toy_Bonnie--Haywire$/,run:/Toy_Bonnie--Charge$/,attack:/Toy_Bonnie--Jumpscare$/}:{idle:/A_DLC_OldEndo_IdleA$/,walk:/A_DLC_OldEndo_Walk$/,run:/A_DLC_OldEndo_RunA$/,attack:/A_DLC_OldEndo_JumpscareFrontA$/};
     for(const [key,re] of Object.entries(names)){const clip=gltf.animations.find(a=>re.test(a.name));if(clip)actor.actions[key]=actor.mixer.clipAction(clip);}
     rosterAnim(actor,'idle');
   },undefined,err=>console.error('No se pudo cargar '+actor.name+':',err));
 }
 function loadRosterState(){
-  animatronicRoster.activeId=null;animatronicRoster.step='wait';animatronicRoster.turn=0;animatronicRoster.wait=8;animatronicRoster.time=0;
+  animatronicRoster.activeId=null;animatronicRoster.step='wait';animatronicRoster.turn=0;animatronicRoster.wait=30;animatronicRoster.time=0;
   for(const a of Object.values(animatronicRoster.actors)){
     a.path=[];a.timer=0;a.progress=0;a.anger=0;
     if(a.id!=='springtrap'&&a.group){a.group.position.set(...a.home);a.group.visible=true;rosterAnim(a,'idle');}
@@ -1227,7 +1317,7 @@ function moveRosterToward(a,target,dt){
 function rosterPhaseUpdate(dt){
   if(state!=='playing'||diplomaOpen||cameraOpen)return;
   if(animatronicRoster.step==='wait'){
-    animatronicRoster.wait-=dt;
+    if(state==='playing')animatronicRoster.wait-=dt;
     if(animatronicRoster.wait<=0){const ids=['toy','mimic','springtrap'];beginRosterTurn(animatronicRoster.actors[ids[animatronicRoster.turn%ids.length]]);}
   }else{
     const a=animatronicRoster.actors[animatronicRoster.activeId],g=actorGroup(a);
@@ -1252,19 +1342,19 @@ function rosterPhaseUpdate(dt){
   }
   if(state!=='playing')return;
   for(const a of Object.values(animatronicRoster.actors))if(a.mixer){
-    const walking=a.id===animatronicRoster.activeId&&['depart','chase','return','ascend'].includes(animatronicRoster.step);
+    const walking=a.id===animatronicRoster.activeId&&['depart','chase','return','ascend'].includes(animatronicRoster.step)&&!(ventState.inside&&animatronicRoster.step==='chase');
     rosterAnim(a,walking?(a.anger>0?'run':'walk'):'idle');a.mixer.update(dt);
   }
 }
 function updateRosterChaser(actor,dt){
-  if(!actor||!actor.group||!actor.model)return;
+  if(ventState.inside||!actor||!actor.group||!actor.model)return;
   const d=Math.hypot(actor.x-player.x,actor.z-player.z);actor.anger=d<9?1:0;
   moveRosterToward(actor,[player.x,0,player.z],dt);
   if(d<1.05&&clearLine(actor.x,actor.z,player.x,player.z,.05)){animatronicRoster.activeId=actor.id;caught();}
 }
 
 function caught() {
-  if (state !== 'playing') return;
+  if (state !== 'playing'||ventState.inside) return;
   state = 'caught'; caughtTime = 0;
   setTC(false);
   stopAmb();
@@ -1337,7 +1427,7 @@ function updateRadio(dt){
   const p=killerAnim.radioGroup.getWorldPosition(new THREE.Vector3());
   const dist=Math.hypot(player.x-p.x,player.z-p.z);killerAnim.radioDist=dist;
   const aimed=state==='playing'&&!killerAnim.radioHeld&&dist<5.2&&pickRadioRaycast()&&clearLine(player.x,player.z,p.x,p.z,0.05);
-  const canGrab=!killerAnim.radioHeld&&state==='playing'&&dist<5.2&&aimed&&!cameraOpen&&!diplomaOpen;
+  const canGrab=!ventState.inside&&!killerAnim.radioHeld&&state==='playing'&&dist<5.2&&aimed&&!cameraOpen&&!diplomaOpen;
   $('radioGrabBtn').style.display=canGrab?'block':'none';
   if(!killerAnim.radioHeld&&dist<1.25&&!killerAnim.radioNear){killerAnim.radioNear=true;say('Una radio vieja suena junto al conejo amarillo…',3000);}
   if(dist>1.8)killerAnim.radioNear=false;
@@ -1423,7 +1513,7 @@ addEventListener('keydown', e => {
   input[e.code] = true;
   if (e.repeat) return;
   if (e.code === 'KeyF') toggleFlash();
-  if(e.code==='KeyE'){if($('radioGrabBtn').style.display!=='none')grabRadio();else if($('officeDoorBtn').style.display!=='none')toggleOfficeDoor();}
+  if(e.code==='KeyE'){if(ventState.inside||ventState.nearest)toggleVent();else if($('radioGrabBtn').style.display!=='none')grabRadio();else if($('officeDoorBtn').style.display!=='none')toggleOfficeDoor();}
   if (e.code === 'Escape' && cameraOpen) closeSecurityCameras();
   else if (e.code === 'Escape' && diplomaOpen) closeDiploma();
   else if (e.code === 'Escape' && state === 'paused') resume();
@@ -1554,6 +1644,7 @@ bindTap($('btnPause'), () => { if (state === 'playing') pause(); });
 bindTap($('cameraOpenBtn'),openSecurityCameras);
 bindTap($('radioGrabBtn'),grabRadio);
 bindTap($('officeDoorBtn'),toggleOfficeDoor);
+bindTap($('ventBtn'),toggleVent);
 bindTap($('cameraCloseBtn'),closeSecurityCameras);
 bindTap($('cameraFeedClose'),()=>{ $('camFeed').style.display='none'; document.querySelectorAll('.cam-tile').forEach(b=>b.classList.remove('selected')); });
 $('cameraModal').addEventListener('pointerdown',e=>{if(e.target===$('cameraModal'))closeSecurityCameras();});
@@ -1706,6 +1797,8 @@ function update(dt) {
   updateLights(dt);
   updateRadio(dt);
   updateOfficeDoor(dt);
+  updateVents();
+  updateCurtains(dt);
   collectBatteryPickups(dt);
   whisperNearBonnie(dt);
 
@@ -1714,7 +1807,7 @@ function update(dt) {
   rosterPhaseUpdate(dt);
   if(state==='caught'&&animatronicRoster.activeId&&animatronicRoster.activeId!=='springtrap'){const attacker=animatronicRoster.actors[animatronicRoster.activeId];if(attacker&&attacker.mixer&&attacker.current)attacker.mixer.update(dt);}
   const chaseDist=Math.hypot(bonnie.x-player.x,bonnie.z-player.z);
-  if(animatronicRoster.activeId==='springtrap'&&((state==='playing'&&['depart','chase','return','ascend'].includes(animatronicRoster.step))||state==='caught'))updateKillerAnimation(chaseDist);
+  if(animatronicRoster.activeId==='springtrap'&&((state==='playing'&&['depart','chase','return','ascend'].includes(animatronicRoster.step)&&!(ventState.inside&&animatronicRoster.step==='chase'))||state==='caught'))updateKillerAnimation(chaseDist);
   else if(killerAnim.actions.idle){if(killerAnim.current!==killerAnim.actions.idle){if(killerAnim.current)killerAnim.current.fadeOut(.18);killerAnim.current=killerAnim.actions.idle;killerAnim.current.reset().setLoop(THREE.LoopRepeat,Infinity).fadeIn(.18).play();}}
   if(enemyMixer&&killerAnim.current&&((state==='playing'&&!diplomaOpen&&!cameraOpen)||state==='caught'))enemyMixer.update(dt);
 
@@ -1750,7 +1843,7 @@ function update(dt) {
     const enemyX=activeActor&&activeActor.id!=='springtrap'&&Number.isFinite(activeActor.x)?activeActor.x:bonnie.x;
     const enemyZ=activeActor&&activeActor.id!=='springtrap'&&Number.isFinite(activeActor.z)?activeActor.z:bonnie.z;
     const dist=Math.hypot(player.x-enemyX,player.z-enemyZ);
-    if (animatronicRoster.step==='chase' && dist < 12 && actx) {
+    if (!ventState.inside && animatronicRoster.step==='chase' && dist < 12 && actx) {
       heartT -= dt;
       if (heartT <= 0) { heartbeat(); heartT = Math.max(0.4, dist / 22); }
     }
@@ -1784,7 +1877,7 @@ function update(dt) {
     $('stBar').style.background = stamina < 25 ? '#ef476f' : '#35e0a1';
     $('btnFlash').classList.toggle('on', flashOn && battery > 0);
     $('btnRun').classList.toggle('on', runHeld);
-    const dng = animatronicRoster.step==='chase' ? Math.max(0,1-dist/9) : 0;
+    const dng = !ventState.inside&&animatronicRoster.step==='chase' ? Math.max(0,1-dist/9) : 0;
     $('danger').style.opacity = dng * 0.9;
   }
 
@@ -1801,7 +1894,7 @@ function update(dt) {
     if (caughtTime > 2.5) { $('flash').style.opacity = 0; endGame('gameover'); }
   }
 
-  if (state !== 'caught') camera.position.set(player.x, EYE, player.z);
+  if (state !== 'caught') camera.position.set(player.x, ventState.inside ? .62 : EYE, player.z);
   camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
 
   if(animatronicRoster.activeId!=='springtrap'){bonnie.group.position.set(...animatronicRoster.actors.springtrap.home);bonnie.group.rotation.y=Math.PI;}

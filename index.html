@@ -86,7 +86,7 @@
   #diplomaModal.open{display:flex}
   #diplomaCard{position:relative;width:min(580px,94vw);min-height:300px;padding:26px 32px 24px;color:#21190b;background:#fff7d8 url('assets/diploma-bg.jpg') center/100% 100% no-repeat;border:5px ridge #c6a34d;box-shadow:0 15px 70px #000;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
   #diplomaClose{position:absolute;right:8px;top:8px;width:38px;height:38px;border:2px solid #5c471c;border-radius:50%;background:#fff5d6;color:#241c0b;font:900 25px Arial;line-height:1;cursor:pointer;pointer-events:auto}
-  #diplomaIcon{width:62px;height:62px;object-fit:cover;border-radius:50%;display:block;margin:0 auto 8px;background:#fff5d6;border:3px solid #815b17;box-shadow:0 2px 9px #6b4b2399}
+  #diplomaIcon{width:62px;height:62px;object-fit:contain;border-radius:50%;display:block;margin:0 auto 8px;background:#fff5d6;border:3px solid #815b17;box-shadow:0 2px 9px #6b4b2399}
   #diplomaKicker{font:700 10px var(--mono);letter-spacing:3px;text-transform:uppercase;opacity:.8}
   #diplomaName{font:900 clamp(22px,5vw,36px) Georgia,serif;letter-spacing:1px;margin:6px 26px 8px}
   #diplomaPhrase{max-width:430px;font:italic 16px/1.5 Georgia,serif;margin:0 0 12px;white-space:pre-line}
@@ -739,7 +739,7 @@ const diplomaFrameGeo=new THREE.EdgesGeometry(diplomaGeo);
 const diplomaTextureLoader=new THREE.TextureLoader();
 const diplomaPickupMats=DIPLOMAS.map(d=>{
   const tex=diplomaTextureLoader.load(d.image);tex.colorSpace=THREE.SRGBColorSpace;
-  return new THREE.MeshBasicMaterial({map:tex,side:THREE.DoubleSide});
+  return new THREE.MeshBasicMaterial({map:tex,side:THREE.DoubleSide,transparent:d.image.endsWith('.png'),alphaTest:d.image.endsWith('.png')?0.05:0});
 });
 function buildDiplomas(){
   for(const m of diplomaMeshes)scene.remove(m); diplomaMeshes=[];

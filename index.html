@@ -270,7 +270,7 @@
   <h2>CÓMO JUGAR</h2>
   <div class="help">
     Estás atrapado en la pizzería de noche. Encuentra <b>3 llaves</b> repartidas por las salas y llega a la <b>puerta verde de SALIDA</b>, al fondo del pasillo. También puedes buscar los <b>5 diplomas</b> con mensajes especiales; son opcionales.<br><br>
-    Toy Bonnie sale después de 30 segundos. Toy Bonnie, Mimic y Springtrap tomarán turnos de 72 segundos. Cada uno regresa al escenario al terminar; Springtrap es el último y el más peligroso. La radio junto al conejo amarillo puede alterar el sonido de la mansión. Busca las baterías de repuesto y usa E junto a la oficina para abrir o cerrar sus puertas. Acércate a una rejilla y usa E o ESCONDERSE para entrar y salir; puedes permanecer dentro y repetirlo sin límite. Si te alcanza, es el final.<br><br>
+    Toy Bonnie será el primer enemigo: empieza a cazarte después de 30 segundos. Después se turna con Springtrap; cada uno vuelve al escenario cuando acaba su turno. La radio junto al conejo amarillo puede alterar el sonido de la mansión. Busca las baterías de repuesto y usa E junto a la oficina para abrir o cerrar sus puertas. Acércate a una rejilla y usa E o ESCONDERSE para entrar y salir; puedes permanecer dentro y repetirlo sin límite. Si te alcanza, es el final.<br><br>
     La <b>linterna</b> puede congelar a Bonnie: mantenla apuntada de frente medio segundo para detenerlo <b>4.5 segundos</b>; después tarda 6 segundos en recuperarse. La linterna consume batería. También puedes <b>correr</b>, aunque la energía se agota.<br><br>
     <b>Móvil:</b> joystick a la izquierda, desliza a la derecha para mirar, botones LUZ, CORRER y CÁMARAS para vigilar las salas.<br>
     <b>PC:</b> WASD, ratón, Shift y F.<br><br>
@@ -400,8 +400,7 @@ const bonnie = { x: 0, z: 0, heading: 0, path: [], timer: 0, active: false, read
 const killerAnim = {actions:{},current:null, radioGroup:null, radioMixer:null, radioHeld:false, radioPlaying:null, radioFilter:null, radioGain:null, radioPan:null, radioDist:999, glitchTimer:0, radioReverb:null};
 const animatronicRoster={activeId:null,lastPhase:-1,phaseStart:0,phaseEnd:0,actors:{
   toy:{id:'toy',name:'Toy Bonnie',asset:'assets/toy-bonnie-optimized.glb',home:[20,.65,6],entry:[20,0,10],speed:2.05,duration:72,anger:0},
-  mimic:{id:'mimic',name:'Mimic',asset:'assets/mimic-optimized.glb',home:[34,.65,6],entry:[34,0,10],speed:2.35,duration:72,anger:0},
-  springtrap:{id:'springtrap',name:'Springtrap',home:[23,.65,6],entry:[24,0,10],speed:3.0,duration:72,anger:0}
+  springtrap:{id:'springtrap',name:'Springtrap',home:[34,.65,6],entry:[34,0,10],speed:3.0,duration:72,anger:0}
 }};
 let strongestScareBuf=null, rosterT=0;
 const keyIcons = [...document.querySelectorAll('#keysRow .kico')];
@@ -681,7 +680,6 @@ function buildWorld() {
 
   // Los tres perseguidores empiezan en el escenario junto al Spring Bonnie amarillo.
   loadRosterActor('toy');
-  loadRosterActor('mimic');
 
   // Radio cercana al Spring Bonnie del escenario; música se filtra como radio vieja y se oye espacialmente.
   new GLTFLoader().load('assets/radio_transistor.glb',gltf=>{
@@ -1018,7 +1016,7 @@ function startGame() {
   initAudio(); newGame(); show(null);
   $('hud').style.display='block'; $('vig').style.display='block'; $('flash').style.opacity=0; $('cameraOpenBtn').style.display='block';
   state='playing'; setTC(true); lock(); stopAmb(); startAmb();
-  say('Tienes 30 segundos antes del primer turno. Busca llaves y ventilaciones.',4500);
+  say('Tienes 30 segundos para prepararte. Te avisaré cuando Toy Bonnie salga a cazarte.',4500);
 }
 
 function pause() { $('cameraOpenBtn').style.display='none'; resetTouchState(); state = 'paused'; setTC(false); show('pause'); document.exitPointerLock(); duckAmb(true); }
@@ -1271,8 +1269,8 @@ function loadRosterActor(id){
   actor.group.visible=true;worldGroup.add(actor.group);
   new GLTFLoader().load(actor.asset,gltf=>{
     const model=gltf.scene;model.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false;if(o.material){const mats=Array.isArray(o.material)?o.material:[o.material];for(const mat of mats){mat.side=THREE.DoubleSide;if(mat.map)mat.map.anisotropy=1;}}}});
-    fitModel(model,1.85);const facing=new THREE.Group();facing.rotation.y=Math.PI;facing.add(model);actor.group.add(facing);actor.model=model;actor.facing=facing;actor.mixer=new THREE.AnimationMixer(model);actor.actions={};
-    const names= id==='toy'?{idle:/Toy_Bonnie--Idle$/,walk:/Toy_Bonnie--Haywire$/,run:/Toy_Bonnie--Charge$/,attack:/Toy_Bonnie--Jumpscare$/}:{idle:/A_DLC_OldEndo_IdleA$/,walk:/A_DLC_OldEndo_Walk$/,run:/A_DLC_OldEndo_RunA$/,attack:/A_DLC_OldEndo_JumpscareFrontA$/};
+    fitModel(model,1.85);const facing=new THREE.Group();facing.rotation.y=0;facing.add(model);actor.group.add(facing);actor.model=model;actor.facing=facing;actor.mixer=new THREE.AnimationMixer(model);actor.actions={};
+    const names={idle:/Toy_Bonnie--Idle$/,walk:/Toy_Bonnie--Haywire$/,run:/Toy_Bonnie--Charge$/,attack:/Toy_Bonnie--Jumpscare$/};
     for(const [key,re] of Object.entries(names)){const clip=gltf.animations.find(a=>re.test(a.name));if(clip)actor.actions[key]=actor.mixer.clipAction(clip);}
     rosterAnim(actor,'idle');
   },undefined,err=>console.error('No se pudo cargar '+actor.name+':',err));
@@ -1318,7 +1316,7 @@ function rosterPhaseUpdate(dt){
   if(state!=='playing'||diplomaOpen||cameraOpen)return;
   if(animatronicRoster.step==='wait'){
     if(state==='playing')animatronicRoster.wait-=dt;
-    if(animatronicRoster.wait<=0){const ids=['toy','mimic','springtrap'];beginRosterTurn(animatronicRoster.actors[ids[animatronicRoster.turn%ids.length]]);}
+    if(animatronicRoster.wait<=0){const ids=['toy','springtrap'];beginRosterTurn(animatronicRoster.actors[ids[animatronicRoster.turn%ids.length]]);}
   }else{
     const a=animatronicRoster.actors[animatronicRoster.activeId],g=actorGroup(a);
     if(a&&g){
@@ -1326,7 +1324,7 @@ function rosterPhaseUpdate(dt){
       if(animatronicRoster.step==='depart'){
         a.progress=Math.min(1,a.progress+dt/2.3);const t=a.progress;
         g.position.set(a.home[0]+(a.entry[0]-a.home[0])*t,a.home[1]*(1-t),a.home[2]+(a.entry[2]-a.home[2])*t);
-        if(t>=1){a.x=a.entry[0];a.z=a.entry[2];if(a.id==='springtrap'){bonnie.x=a.x;bonnie.z=a.z;bonnie.active=true;bonnie.delay=0;bonnie.ready=true;bonnie.path=[];bonnie.timer=0;}animatronicRoster.step='chase';animatronicRoster.time=0;}
+        if(t>=1){a.x=a.entry[0];a.z=a.entry[2];if(a.id==='springtrap'){bonnie.x=a.x;bonnie.z=a.z;bonnie.active=true;bonnie.delay=0;bonnie.ready=true;bonnie.path=[];bonnie.timer=0;}animatronicRoster.step='chase';animatronicRoster.time=0;say(`¡${a.name.toUpperCase()} EMPIEZA A CAZARTE! ¡ESCÓNDETE!`,4200);}
       }else if(animatronicRoster.step==='chase'){
         animatronicRoster.time+=dt;
         if(a.id==='springtrap')bonnieUpdate(dt);else updateRosterChaser(a,dt);
@@ -1761,7 +1759,7 @@ new GLTFLoader().load('assets/springtrap-roster.glb',gltf=>{
   bonnie.group.add(killerFacing);enemyMixer=new THREE.AnimationMixer(m);
   const map={idle:/K40_IdleMenu$/,walk:/K40_WalkFT$/,run:/K40_RunFT$/,walkLeft:/K40_WalkLT$/,walkRight:/K40_WalkRT$/,attack:/K40_Attack_Wipe$/};
   for(const [key,re] of Object.entries(map)){const clip=gltf.animations.find(a=>re.test(a.name));if(clip){const action=enemyMixer.clipAction(clip);killerAnim.actions[key]=action;if(key==='idle'){action.setLoop(THREE.LoopRepeat,Infinity);action.play();killerAnim.current=action;}}}
-  if(enemyRig.root)enemyRig.root.rotation.y=Math.PI;
+  if(enemyRig.root)enemyRig.root.rotation.y=0;
   bonnieReady('ASESINO LISTO');
 },undefined,err=>{console.error('No cargó Springtrap:',err);clearTimeout(glbLoadTimer);bonnieReady('ASESINO · MODO LIGERO');});
 

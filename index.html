@@ -135,6 +135,26 @@
   #btnPause{right:calc(16px + env(safe-area-inset-right,0px));top:14px;width:50px;height:50px}
   #btnPause svg{width:22px;height:22px}
   @media (max-height:480px){.tbtn{width:66px;height:66px}#btnFlash{bottom:94px}#btnRun{bottom:20px}}
+
+  /* ---------- Monitor de cámaras ---------- */
+  #cameraOpenBtn{position:fixed;z-index:8;left:50%;bottom:18px;transform:translateX(-50%);pointer-events:auto;padding:11px 18px;border:1px solid #6f8a7c;background:rgba(5,12,11,.9);color:#d7e7db;font:700 13px var(--mono);letter-spacing:2px;box-shadow:0 0 18px #000;cursor:pointer;display:none}
+  #cameraOpenBtn:hover{border-color:#64e89a;color:#64e89a}
+  #cameraModal{position:fixed;inset:0;z-index:25;display:none;background:radial-gradient(ellipse at center,#111819 0%,#030607 78%);color:#d8e5dc;font-family:var(--mono);pointer-events:auto;overflow:auto;padding:calc(18px + env(safe-area-inset-top,0px)) calc(16px + env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) calc(16px + env(safe-area-inset-left,0px))}
+  #cameraModal.open{display:block}
+  .cam-head{display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid #496055;padding-bottom:12px;margin-bottom:14px}
+  .cam-title{font-size:clamp(16px,4vw,24px);letter-spacing:3px;color:#c7ead2}.cam-status{font-size:10px;color:#71d694;letter-spacing:2px;margin-top:5px}
+  .cam-x{width:44px;height:44px;border:1px solid #759083;background:#101817;color:#fff;font:28px var(--mono);cursor:pointer;flex:none}
+  #camFeed{position:relative;width:min(900px,100%);height:min(48vh,430px);min-height:210px;margin:0 auto 14px;border:2px solid #60756a;background:#050708;overflow:hidden;box-shadow:0 0 25px #000,inset 0 0 30px #000}
+  #camFeed::after{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.045) 0px,rgba(255,255,255,.045) 1px,transparent 2px,transparent 4px),linear-gradient(90deg,transparent 49.8%,rgba(255,255,255,.04) 50%,transparent 50.2%);mix-blend-mode:screen;opacity:.58}
+  #camFeed canvas{width:100%;height:100%;display:block;filter:contrast(1.12) saturate(.62) brightness(.82)}
+  #camFeedLabel{position:absolute;z-index:1;left:12px;top:10px;padding:6px 9px;background:#000b;color:#e1eee5;font-size:12px;letter-spacing:2px}
+  #camFeedLabel::before{content:'● ';color:#ff3636;animation:blink 1s steps(2) infinite}
+  .cam-grid{width:min(900px,100%);margin:auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(145px,42vw),1fr));gap:9px}
+  .cam-tile{min-height:58px;text-align:left;padding:10px;border:1px solid #475b51;background:linear-gradient(150deg,#1a2421,#090d0c);color:#c9d5ce;font:12px var(--mono);letter-spacing:.8px;cursor:pointer}
+  .cam-tile span{display:block;color:#7c9185;font-size:10px;margin-bottom:5px}.cam-tile.selected{border-color:#68e799;box-shadow:inset 0 0 14px #3bd67c24;color:#fff}
+  .cam-foot{text-align:center;color:#75857b;font-size:10px;letter-spacing:1px;margin:14px auto 0}
+  @media(max-height:560px){#camFeed{height:36vh;min-height:155px}.cam-tile{min-height:48px;padding:7px}}
+
 </style>
 </head>
 <body>
@@ -186,6 +206,8 @@
   </div>
 </div>
 
+<button id="cameraOpenBtn" type="button" aria-label="Abrir cámaras">▦ &nbsp; CÁMARAS</button>
+<div id="cameraModal" aria-hidden="true"><div class="cam-head"><div><div class="cam-title">MONITOR DE SEGURIDAD</div><div class="cam-status">● SEÑAL ESTABLE · 12 CÁMARAS</div></div><button id="cameraCloseBtn" class="cam-x" type="button" aria-label="Cerrar interfaz de cámaras">×</button></div><div id="camFeed" style="display:none"><canvas id="camFeedCanvas"></canvas><div id="camFeedLabel">CAM 01 · SALÓN PRINCIPAL</div><button id="cameraFeedClose" class="cam-x" type="button" aria-label="Salir de la cámara" style="position:absolute;right:8px;top:8px;z-index:3">×</button></div><div id="cameraGrid" class="cam-grid"></div><div class="cam-foot">ELIGE UNA CÁMARA PARA VER EL CUARTO · ESC PARA CERRAR</div></div>
 <div id="msg"></div>
 <div id="diplomaModal" aria-hidden="true">
   <div id="diplomaCard" role="dialog" aria-modal="true" aria-labelledby="diplomaName">
@@ -231,7 +253,7 @@
     Estás atrapado en la pizzería de noche. Encuentra <b>3 llaves</b> repartidas por las salas y llega a la <b>puerta verde de SALIDA</b>, al fondo del pasillo. También puedes buscar los <b>4 diplomas</b> con mensajes especiales; son opcionales.<br><br>
     Un animatrónico te persigue. Es <b>lento</b>, pero nunca se detiene. Si te alcanza, es el final.<br><br>
     La <b>linterna</b> puede congelar a Bonnie: mantenla apuntada de frente medio segundo para detenerlo <b>4.5 segundos</b>; después tarda 6 segundos en recuperarse. La linterna consume batería. También puedes <b>correr</b>, aunque la energía se agota.<br><br>
-    <b>Móvil:</b> joystick a la izquierda, desliza a la derecha para mirar, botones LUZ y CORRER.<br>
+    <b>Móvil:</b> joystick a la izquierda, desliza a la derecha para mirar, botones LUZ, CORRER y CÁMARAS para vigilar las salas.<br>
     <b>PC:</b> WASD, ratón, Shift y F.<br><br>
     <b>Consejo:</b> escucha el latido y las voces. Cuanto más cerca, más fuerte.
   </div>
@@ -241,6 +263,7 @@
 <div id="pause" class="screen hidden">
   <h2>PAUSA</h2>
   <button class="btn" id="resumeBtn">CONTINUAR</button>
+  <button class="btn sec" id="pauseCameraBtn">VER CÁMARAS</button>
   <button class="btn sec" id="pauseRestart">REINICIAR</button>
   <button class="btn sec" id="pauseMenu">MENÚ PRINCIPAL</button>
 </div>
@@ -334,6 +357,10 @@ const { grid, roomMap } = (function(){
 // MAP-END
 
 let diff = 'normal', state = 'menu';
+let cameraOpen = false, selectedRoomCam = 0, cameraReturnState = 'playing';
+const securityCamera = new THREE.PerspectiveCamera(80, 16/9, 0.08, 70);
+const securityLight = new THREE.HemisphereLight(0x9bdbc2,0x101d14,0.65); securityCamera.add(securityLight);
+let securityFeedRenderer = null;
 let keys = [], keyMeshes = [], keyGroup = null, diplomaMeshes=[];
 let keysGot = 0, diplomasGot = 0, battery = 100, stamina = 100, flashOn = true, elapsed = 0, diplomaOpen=false;
 let heartT = 0, voiceT = 12, curRoom = -1, caughtTime = 0, missionUiT = 0;
@@ -370,7 +397,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x040507);
 scene.fog = new THREE.Fog(0x040507, 4, 52);
 const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 150);
-scene.add(camera);
+scene.add(camera); scene.add(securityCamera); securityLight.visible=false;
 
 const torch = new THREE.SpotLight(0xfff1d6, 62, 24, 0.46, 0.55, 2);
 torch.target.position.set(0, 0, -5);
@@ -611,45 +638,12 @@ function buildWorld() {
   amyrStageGroup.position.set(27, 0.63, 3 * CELL);
   worldGroup.add(amyrStageGroup);
   springDisplay.group = amyrStageGroup; springDisplay.baseY = 0.63; springDisplay.group.visible=true;
-  new GLTFLoader().load('assets/springbonnie_v2.o.glb', gltf => {
-    const actor = gltf.scene;
-    // Este archivo trae una malla de suelo auxiliar enorme, no parte del personaje.
-    actor.traverse(o => { if (o.isMesh && o.name === 'Cube.011_0' && o.parent) { o.parent.remove(o); o.geometry.dispose(); } });
-    actor.traverse(o => { if (o.isMesh && o.material) o.material.side = THREE.DoubleSide; });
-    const mergedMeshes=mergeSpringStaticMeshes(actor);
-    console.log('AMYR Spring Bonnie: geometrías estáticas agrupadas',mergedMeshes);
-    fitModel(actor, 2.3);
-    amyrStageGroup.add(actor); springDisplay.root = actor; springDisplay.bones = {};
-    actor.traverse(o => { if (o.isBone) { springDisplay.bones[o.name] = o; } });
-    springDisplay.head = springDisplay.bones['Bone.005_Armature'] || springDisplay.bones['Bone.007_Armature'];
-    // Lentes rectangulares negros con reflejo tenue, anclados al hueso de la cabeza.
-    const glasses = new THREE.Group();
-    const frameMat = new THREE.MeshStandardMaterial({ color: 0x111820, metalness: 0.28, roughness: 0.48, emissive: 0x071323, emissiveIntensity: 0.22 });
-    const lensMat = new THREE.MeshBasicMaterial({ color: 0x56d7ff, transparent: true, opacity: 0.15, side: THREE.DoubleSide, depthWrite: false });
-    function frameBar(w,h,d,x,y,z) { const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),frameMat); o.position.set(x,y,z); glasses.add(o); }
-    const lensW=0.62, lensH=0.39, bar=0.055, gap=0.13, lensZ=0.035;
-    for (const side of [-1,1]) {
-      const cx=side*(lensW/2+gap/2);
-      frameBar(lensW+bar*2,bar,0.045,cx,lensH/2,lensZ);
-      frameBar(lensW+bar*2,bar,0.045,cx,-lensH/2,lensZ);
-      frameBar(bar,lensH,0.045,cx-lensW/2,0,lensZ);
-      frameBar(bar,lensH,0.045,cx+lensW/2,0,lensZ);
-      const pane=new THREE.Mesh(new THREE.PlaneGeometry(lensW,lensH),lensMat); pane.position.set(cx,0,lensZ+0.026); glasses.add(pane);
-    }
-    frameBar(gap+bar,bar,0.045,0,0,lensZ);
-    frameBar(0.32,bar,0.045,-(lensW+gap)/2-0.19,0,lensZ);
-    frameBar(0.32,bar,0.045,(lensW+gap)/2+0.19,0,lensZ);
-    actor.updateMatrixWorld(true);
-    const head=springDisplay.head;
-    if (head) {
-      const anchorWorld=actor.localToWorld(new THREE.Vector3(0.77,9.45,3.88));
-      head.worldToLocal(anchorWorld); glasses.position.copy(anchorWorld);
-      const actorQ=new THREE.Quaternion(),headQ=new THREE.Quaternion();
-      actor.getWorldQuaternion(actorQ); head.getWorldQuaternion(headQ);
-      glasses.quaternion.copy(headQ.invert().multiply(actorQ)); head.add(glasses);
-    } else { glasses.position.set(0.05,1.89,0.43); actor.add(glasses); }
-    springDisplay.headBase=springDisplay.head ? springDisplay.head.quaternion.clone() : null;
-  }, undefined, err => { console.warn('Spring Bonnie de AMYR no cargó:', err); });
+  // Nuevo Spring Bonnie con lentes, incluido en la aplicación por partes.
+  const springParts=Array.from({length:8},(_,i)=>`assets/bonnie_part_${String(i+1).padStart(2,'0')}.bin`);
+  Promise.all(springParts.map(url=>fetch(url).then(r=>{if(!r.ok)throw new Error(url+' '+r.status);return r.arrayBuffer();})))
+    .then(parts=>{const bytes=new Uint8Array(parts.reduce((n,p)=>n+p.byteLength,0));let offset=0;for(const part of parts){bytes.set(new Uint8Array(part),offset);offset+=part.byteLength;}
+      new GLTFLoader().parse(bytes.buffer,'',gltf=>{const actor=gltf.scene;actor.traverse(o=>{if(o.isMesh){o.frustumCulled=false;if(o.material){const mats=Array.isArray(o.material)?o.material:[o.material];mats.forEach(m=>m.side=THREE.DoubleSide);}}});fitModel(actor,2.3);amyrStageGroup.add(actor);springDisplay.root=actor;springDisplay.head=null;},err=>console.error('No se pudo procesar el nuevo Spring Bonnie:',err));
+    }).catch(err=>console.error('No se pudo cargar el nuevo Spring Bonnie:',err));
 
   // Sin letreros ni marcas de YouTube/Discord en esta pared.
 
@@ -835,17 +829,18 @@ function newGame() {
 
 function startGame() {
   initAudio(); newGame(); show(null);
-  $('hud').style.display='block'; $('vig').style.display='block'; $('flash').style.opacity=0;
+  $('hud').style.display='block'; $('vig').style.display='block'; $('flash').style.opacity=0; $('cameraOpenBtn').style.display='block';
   state='playing'; setTC(true); lock(); stopAmb(); startAmb();
   say('Encuentra 3 llaves y escapa por la puerta verde.',4000);
 }
 
-function pause() { resetTouchState(); state = 'paused'; setTC(false); show('pause'); document.exitPointerLock(); duckAmb(true); }
-function resume() { state = 'playing'; show(null); setTC(true); lock(); duckAmb(false); }
+function pause() { $('cameraOpenBtn').style.display='none'; resetTouchState(); state = 'paused'; setTC(false); show('pause'); document.exitPointerLock(); duckAmb(true); }
+function resume() { $('cameraOpenBtn').style.display='block'; state = 'playing'; show(null); setTC(true); lock(); duckAmb(false); }
 function toMenu() {
   resetTouchState();
+  if(cameraOpen){cameraOpen=false;securityLight.visible=false;$('cameraModal').classList.remove('open');$('cameraModal').setAttribute('aria-hidden','true');}
   state = 'menu'; show('menu'); setTC(false); stopAmb();
-  $('hud').style.display = 'none'; $('vig').style.display = 'none';
+  $('hud').style.display = 'none'; $('vig').style.display = 'none'; $('cameraOpenBtn').style.display='none';
   newGame();
 }
 function endGame(type) {
@@ -853,9 +848,55 @@ function endGame(type) {
   state = type;
   setTC(false); stopAmb();
   document.exitPointerLock();
-  $('hud').style.display = 'none';
+  $('hud').style.display = 'none'; $('cameraOpenBtn').style.display='none'; if(cameraOpen){cameraOpen=false;securityLight.visible=false;$('cameraModal').classList.remove('open');$('cameraModal').setAttribute('aria-hidden','true');}
   if (type === 'won') { playSnd('mask', 0.9); $('winStats').textContent = `ESCAPASTE · Tiempo ${fmt(elapsed)} · Llaves 3/3`; show('win'); }
   else { $('goStats').textContent = `Sobreviviste ${fmt(elapsed)} · Llaves ${keysGot}/3`; show('gameover'); }
+}
+
+function buildCameraTiles(){
+  const gridEl=$('cameraGrid'); gridEl.innerHTML='';
+  ROOMS.forEach((room,i)=>{
+    const b=document.createElement('button'); b.type='button'; b.className='cam-tile';
+    b.innerHTML=`<span>CAM ${String(i+1).padStart(2,'0')}</span>${room.name}`;
+    b.addEventListener('click',()=>selectSecurityCamera(i)); gridEl.appendChild(b);
+  });
+  $('camFeed').style.display='none';
+  document.querySelectorAll('.cam-tile').forEach(b=>b.classList.remove('selected'));
+}
+function selectSecurityCamera(i){
+  selectedRoomCam=(i+ROOMS.length)%ROOMS.length;
+  const room=ROOMS[selectedRoomCam], [x0,y0,x1,y1]=room.r;
+  const cx=(x0+x1)*CELL/2, cz=(y0+y1)*CELL/2;
+  // Una celda libre dentro del cuarto, debajo del techo y apuntando al centro.
+  const choices=[];
+  for(let r=y0;r<=y1;r++)for(let c=x0;c<=x1;c++){
+    if(grid[r][c]===0 && roomMap[r][c]===selectedRoomCam) choices.push([c,r]);
+  }
+  choices.sort((a,b)=>Math.hypot(b[0]*CELL-cx,b[1]*CELL-cz)-Math.hypot(a[0]*CELL-cx,a[1]*CELL-cz));
+  const [col,row]=choices[0]||[x0,y0];
+  securityCamera.position.set(col*CELL,WALL_H-0.35,row*CELL);
+  securityCamera.lookAt(cx,1.05,cz);
+  $('camFeed').style.display='block'; resizeSecurityFeed();
+  $('camFeedLabel').textContent=`CAM ${String(selectedRoomCam+1).padStart(2,'0')} · ${room.name}`;
+  document.querySelectorAll('.cam-tile').forEach((b,j)=>b.classList.toggle('selected',j===selectedRoomCam));
+}
+function openSecurityCameras(){
+  if(state!=='playing'||diplomaOpen||cameraOpen)return;
+  cameraReturnState=state; cameraOpen=true; state='cameras'; securityLight.visible=true; resetTouchState(); for(const k in input)input[k]=false;
+  document.exitPointerLock(); $('cameraModal').classList.add('open'); $('cameraModal').setAttribute('aria-hidden','false');
+  $('cameraOpenBtn').style.display='none'; buildCameraTiles();
+  try{if(!securityFeedRenderer){securityFeedRenderer=new THREE.WebGLRenderer({canvas:$('camFeedCanvas'),antialias:false,alpha:false});securityFeedRenderer.setPixelRatio(Math.min(devicePixelRatio,1.5));securityFeedRenderer.outputColorSpace=THREE.SRGBColorSpace;securityFeedRenderer.toneMapping=THREE.ACESFilmicToneMapping;securityFeedRenderer.toneMappingExposure=1.18;} resizeSecurityFeed();}catch(e){console.warn('No se pudo iniciar el monitor:',e);}
+}
+function closeSecurityCameras(){
+  if(!cameraOpen)return;
+  cameraOpen=false; securityLight.visible=false; $('cameraModal').classList.remove('open'); $('cameraModal').setAttribute('aria-hidden','true');
+  if(cameraReturnState==='playing') $('cameraOpenBtn').style.display='block';
+  if(cameraReturnState==='playing'){state='playing';setTC(true);lock();}else state=cameraReturnState;
+}
+function resizeSecurityFeed(){
+  if(!securityFeedRenderer)return;
+  const el=$('camFeed'), w=Math.max(1,el.clientWidth), h=Math.max(1,el.clientHeight);
+  securityCamera.aspect=w/h;securityCamera.updateProjectionMatrix();securityFeedRenderer.setSize(w,h,false);
 }
 
 function show(id) {
@@ -1094,7 +1135,8 @@ addEventListener('keydown', e => {
   input[e.code] = true;
   if (e.repeat) return;
   if (e.code === 'KeyF') toggleFlash();
-  if (e.code === 'Escape' && diplomaOpen) closeDiploma();
+  if (e.code === 'Escape' && cameraOpen) closeSecurityCameras();
+  else if (e.code === 'Escape' && diplomaOpen) closeDiploma();
   else if (e.code === 'Escape' && state === 'paused') resume();
 });
 addEventListener('keyup', e => input[e.code] = false);
@@ -1220,6 +1262,11 @@ function bindHold(el, down, up) {
 bindHold($('btnRun'), () => { runHeld = true; }, () => { runHeld = false; });
 bindTap($('btnFlash'), toggleFlash);
 bindTap($('btnPause'), () => { if (state === 'playing') pause(); });
+bindTap($('cameraOpenBtn'),openSecurityCameras);
+bindTap($('cameraCloseBtn'),closeSecurityCameras);
+bindTap($('cameraFeedClose'),()=>{ $('camFeed').style.display='none'; document.querySelectorAll('.cam-tile').forEach(b=>b.classList.remove('selected')); });
+$('cameraModal').addEventListener('pointerdown',e=>{if(e.target===$('cameraModal'))closeSecurityCameras();});
+$('cameraModal').addEventListener('touchmove',e=>e.stopPropagation(),{passive:true});
 bindTap($('diplomaClose'), closeDiploma);
 $('diplomaModal').addEventListener('pointerdown',e=>{if(e.target===$('diplomaModal'))closeDiploma();});
 $('diplomaModal').addEventListener('touchmove',e=>e.stopPropagation(),{passive:false});
@@ -1234,6 +1281,7 @@ document.querySelectorAll('[data-d]').forEach(b => bindTap(b, () => {
   document.querySelectorAll('[data-d]').forEach(x => x.classList.toggle('sel', x === b));
 }));
 bindTap($('resumeBtn'), resume);
+bindTap($('pauseCameraBtn'), () => { if(state==='paused'){cameraReturnState='paused';cameraOpen=true;securityLight.visible=true;state='cameras';$('cameraModal').classList.add('open');$('cameraModal').setAttribute('aria-hidden','false');buildCameraTiles();try{if(!securityFeedRenderer){securityFeedRenderer=new THREE.WebGLRenderer({canvas:$('camFeedCanvas'),antialias:false});securityFeedRenderer.setPixelRatio(Math.min(devicePixelRatio,1.5));securityFeedRenderer.outputColorSpace=THREE.SRGBColorSpace;}resizeSecurityFeed();}catch(e){console.warn(e);}} });
 bindTap($('pauseRestart'), startGame);
 bindTap($('pauseMenu'), toMenu);
 bindTap($('retryBtn'), startGame);
@@ -1351,7 +1399,7 @@ new GLTFLoader().load(
   event => {
     if (event && event.total) {
       const percent = Math.round(event.loaded / event.total * 100);
-      $('loadTxt').textContent = glbLoaded ? 'LISTO' : `LISTO · MODELO ${percent}%`;
+      $('loadTxt').textContent = glbLoaded ? 'LISTO' : `CARGANDO BONNIE ${percent}%`;
     }
   },
   () => {
@@ -1401,7 +1449,7 @@ function update(dt) {
   }
 
 
-  if (state === 'playing' && !diplomaOpen) {
+  if (state === 'playing' && !diplomaOpen && !cameraOpen) {
     elapsed += dt;
     movePlayer(dt);
     bonnieUpdate(dt);
@@ -1500,6 +1548,7 @@ addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.setSize(innerWidth, innerHeight);
+  resizeSecurityFeed();
 });
 
 const clock = new THREE.Clock();
@@ -1507,6 +1556,7 @@ function loop() {
   const dt = Math.min(clock.getDelta(), 0.05);
   update(dt);
   renderer.render(scene, camera);
+  if(cameraOpen&&securityFeedRenderer&&$('camFeed').style.display!=='none'){securityFeedRenderer.render(scene,securityCamera);}
   requestAnimationFrame(loop);
 }
 

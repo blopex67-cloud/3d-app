@@ -208,6 +208,7 @@
   </div>
 </div>
 
+<button id="radioGrabBtn" type="button" aria-label="Agarrar radio" style="display:none;position:fixed;z-index:12;left:50%;bottom:90px;transform:translateX(-50%);padding:12px 18px;border:2px solid #9ec7aa;border-radius:30px;background:#09120feF;color:#e8fff0;font:900 16px var(--mono);letter-spacing:2px;pointer-events:auto;touch-action:manipulation">✋ AGARRAR RADIO</button>
 <button id="cameraOpenBtn" type="button" aria-label="Abrir cámaras">▦ &nbsp; CÁMARAS</button>
 <div id="cameraModal" aria-hidden="true"><div class="cam-head"><div><div class="cam-title">MONITOR DE SEGURIDAD</div><div class="cam-status">● SEÑAL ESTABLE · 12 CÁMARAS</div></div><button id="cameraCloseBtn" class="cam-x" type="button" aria-label="Cerrar interfaz de cámaras">×</button></div><div id="camFeed" style="display:none"><canvas id="camFeedCanvas"></canvas><div id="camFeedLabel">CAM 01 · SALÓN PRINCIPAL</div><button id="cameraFeedClose" class="cam-x" type="button" aria-label="Salir de la cámara" style="position:absolute;right:8px;top:8px;z-index:3">×</button></div><div id="cameraGrid" class="cam-grid"></div><div class="cam-foot">ELIGE UNA CÁMARA PARA VER EL CUARTO · ESC PARA CERRAR</div></div>
 <div id="msg"></div>
@@ -253,7 +254,7 @@
   <h2>CÓMO JUGAR</h2>
   <div class="help">
     Estás atrapado en la pizzería de noche. Encuentra <b>3 llaves</b> repartidas por las salas y llega a la <b>puerta verde de SALIDA</b>, al fondo del pasillo. También puedes buscar los <b>4 diplomas</b> con mensajes especiales; son opcionales.<br><br>
-    Un animatrónico te persigue. Es <b>lento</b>, pero nunca se detiene. Si te alcanza, es el final.<br><br>
+    Springtrap te persigue. Escucha sus pasos: a corta distancia corre y ataca. La radio junto al conejo amarillo puede alterar el sonido de la mansión. Si te alcanza, es el final.<br><br>
     La <b>linterna</b> puede congelar a Bonnie: mantenla apuntada de frente medio segundo para detenerlo <b>4.5 segundos</b>; después tarda 6 segundos en recuperarse. La linterna consume batería. También puedes <b>correr</b>, aunque la energía se agota.<br><br>
     <b>Móvil:</b> joystick a la izquierda, desliza a la derecha para mirar, botones LUZ, CORRER y CÁMARAS para vigilar las salas.<br>
     <b>PC:</b> WASD, ratón, Shift y F.<br><br>
@@ -378,6 +379,7 @@ const DIPLOMAS=[
 const DIPLOMA_SPOTS=[[4,8],[23,10],[29,7],[42,11]]; // Galaxy a la izquierda; Atlas a la derecha
 const FREEZE_SECONDS=4.5, FREEZE_CHARGE=0.45, FREEZE_COOLDOWN=6.0; // carga continua al apuntar, duración congelado y recarga
 const bonnie = { x: 0, z: 0, heading: 0, path: [], timer: 0, active: false, ready: false, delay: 8, stun: 0, beamCharge: 0, freezeCooldown: 0, freezeDone: false, group: new THREE.Group() };
+const killerAnim = {actions:{},current:null, radioGroup:null, radioMixer:null, radioHeld:false, radioPlaying:null, radioFilter:null, radioGain:null, radioPan:null, radioDist:999, glitchTimer:0, radioReverb:null};
 const keyIcons = [...document.querySelectorAll('#keysRow .kico')];
 
 function lock() { if (!IS_TOUCH) $('c').requestPointerLock(); }
@@ -648,6 +650,11 @@ function buildWorld() {
       new GLTFLoader().parse(bytes.buffer,'',gltf=>{const actor=gltf.scene;actor.traverse(o=>{if(o.isMesh){o.frustumCulled=false;if(o.material){const mats=Array.isArray(o.material)?o.material:[o.material];mats.forEach(m=>m.side=THREE.DoubleSide);}}});fitModel(actor,2.3);amyrStageGroup.add(actor);springDisplay.root=actor;springDisplay.head=null;},err=>console.error('No se pudo procesar el nuevo Spring Bonnie:',err));
     }).catch(err=>console.error('No se pudo cargar el nuevo Spring Bonnie:',err));
 
+  // Radio cercana al Spring Bonnie del escenario; música se filtra como radio vieja y se oye espacialmente.
+  new GLTFLoader().load('assets/radio_transistor.glb',gltf=>{
+    const rg=new THREE.Group();rg.add(gltf.scene);fitModel(gltf.scene,.72);rg.position.set(29.8,.05,10.2);rg.rotation.y=-.45;rg.scale.setScalar(.8);worldGroup.add(rg);killerAnim.radioGroup=rg;
+    killerAnim.radioMixer=new THREE.AnimationMixer(gltf.scene);startRadioMusic();
+  },undefined,e=>console.warn('La radio no cargó:',e));
   // Sin letreros ni marcas de YouTube/Discord en esta pared.
 
   // puerta de salida
@@ -778,7 +785,15 @@ function clearLine(x0, z0, x1, z1, R) {
 }
 
 // ---------- Partida ----------
+function resetRadioForGame(){
+  if(!killerAnim.radioGroup)return;
+  if(killerAnim.radioHeld){camera.remove(killerAnim.radioGroup);worldGroup.add(killerAnim.radioGroup);killerAnim.radioGroup.scale.setScalar(.8);killerAnim.radioGroup.position.set(29.8,.05,10.2);killerAnim.radioGroup.rotation.set(0,-.45,0);killerAnim.radioHeld=false;killerAnim.radioNear=false;}
+  if(killerAnim.radioPlaying&&actx)killerAnim.radioGain.gain.setTargetAtTime(0,actx.currentTime,.1);
+  $('radioGrabBtn').style.display='none';
+}
+
 function newGame() {
+  resetRadioForGame();
   resetTouchState();
   keys = KEY_SPOTS.slice().sort(() => Math.random() - 0.5).slice(0, 3);
   keysGot = 0; diplomasGot=0; diplomaOpen=false; closeDiploma(); battery = 100; stamina = 100; elapsed = 0; flashOn = true; curRoom = -1; voiceT = 12; caughtTime = 0; missionUiT=0;
@@ -1039,7 +1054,8 @@ function bonnieUpdate(dt) {
     bonnie.stun=FREEZE_SECONDS; bonnie.freezeCooldown=FREEZE_COOLDOWN; bonnie.beamCharge=0;
     bonnie.freezeDone=true; playSnd('mask',0.5); say('BONNIE CONGELADO · 4.5 s',2200);
   }
-  let speed = DIFF[diff].speed;
+  const chaseDistance=Math.hypot(player.x-bonnie.x,player.z-bonnie.z);
+  let speed = DIFF[diff].speed * (chaseDistance < 10 ? 2.05 : 1.55);
 
   if (bonnie.stun > 0) return;
   let tx = player.x, tz = player.z;
@@ -1090,7 +1106,7 @@ function caught() {
 // ---------- Audio ----------
 let actx = null, noiseBuf = null, master = null, ambSrc = null, ambGain = null, wantAmb = false;
 const SND = {};
-const SND_FILES = { scream: 'scream', amb: 'ambience', hello: 'hello', hi: 'hi', laugh: 'laugh', mask: 'mask' };
+const SND_FILES = { scream: 'scream', amb: 'ambience', hello: 'hello', hi: 'hi', laugh: 'laugh', mask: 'mask', radioMusic:'radio_song' };
 function initAudio() {
   if (actx) { if (actx.state === 'suspended') actx.resume(); return; }
   actx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1112,7 +1128,8 @@ async function loadSounds() {
       SND[k] = await actx.decodeAudioData(await r.arrayBuffer());
     } catch (e) { /* sonido opcional */ }
   }
-  if (wantAmb) startAmb();
+  if(wantAmb)startAmb();
+  if(SND.radioMusic)startRadioMusic();
 }
 function playSnd(name, vol = 1, pan = 0, rate = 1) {
   if (!actx || !SND[name]) return null;
@@ -1123,6 +1140,59 @@ function playSnd(name, vol = 1, pan = 0, rate = 1) {
   else g.connect(master);
   s.start();
   return s;
+}
+function startRadioMusic(){
+  if(!actx||!SND.radioMusic||killerAnim.radioPlaying)return;
+  const src=actx.createBufferSource();src.buffer=SND.radioMusic;src.loop=true;
+  const filter=actx.createBiquadFilter();filter.type='lowpass';filter.frequency.value=1750;filter.Q.value=.8;
+  const shaper=actx.createWaveShaper();const curve=new Float32Array(1024);for(let i=0;i<curve.length;i++){const x=i*2/(curve.length-1)-1;curve[i]=(Math.tanh(1.8*x)+.045*Math.sin(37*x)) / Math.tanh(1.8);}shaper.curve=curve;shaper.oversample='2x';
+  const gain=actx.createGain();gain.gain.value=0;const pan=actx.createStereoPanner?actx.createStereoPanner():null;
+  src.connect(filter);filter.connect(shaper);shaper.connect(gain);if(pan){gain.connect(pan);pan.connect(master);}else gain.connect(master);
+  src.start();killerAnim.radioPlaying=src;killerAnim.radioFilter=filter;killerAnim.radioGain=gain;killerAnim.radioPan=pan;
+  if(noiseBuf){const hiss=actx.createBufferSource(),hissGain=actx.createGain(),hissFilter=actx.createBiquadFilter();hiss.buffer=noiseBuf;hiss.loop=true;hissFilter.type='bandpass';hissFilter.frequency.value=2100;hissGain.gain.value=.012;hiss.connect(hissFilter);hissFilter.connect(hissGain);hissGain.connect(gain);hiss.start();killerAnim.radioHiss=hiss;}
+}
+function updateRadio(dt){
+  if(!killerAnim.radioGroup)return;
+  const p=killerAnim.radioGroup.getWorldPosition(new THREE.Vector3());
+  const dist=Math.hypot(player.x-p.x,player.z-p.z);killerAnim.radioDist=dist;
+  const aimed=pickRadioRaycast()&&clearLine(player.x,player.z,p.x,p.z,0.05);
+  const canGrab=!killerAnim.radioHeld&&state==='playing'&&dist<5.2&&aimed&&!cameraOpen&&!diplomaOpen;
+  $('radioGrabBtn').style.display=canGrab?'block':'none';
+  if(!killerAnim.radioHeld&&dist<1.25&&!killerAnim.radioNear){killerAnim.radioNear=true;say('Una radio vieja suena junto al conejo amarillo…',3000);}
+  if(dist>1.8)killerAnim.radioNear=false;
+  if(killerAnim.radioPlaying&&actx){
+    const reach=32;let vol=killerAnim.radioHeld?.78:Math.pow(Math.max(0,1-dist/reach),1.65)*.52;
+    if(state!=='playing'&&state!=='paused')vol=0;
+    killerAnim.radioGain.gain.setTargetAtTime(vol,actx.currentTime,.22);
+    const cutoff=killerAnim.radioHeld?7400:Math.max(520,1850-dist*34);
+    killerAnim.radioFilter.frequency.setTargetAtTime(cutoff,actx.currentTime,.25);
+    if(killerAnim.radioPan&&!killerAnim.radioHeld)killerAnim.radioPan.pan.setTargetAtTime(panTo(p.x,p.z),actx.currentTime,.16);
+    if(killerAnim.glitchTimer>0)killerAnim.glitchTimer-=dt;
+    else if(dist<24&&Math.random()<.0025){killerAnim.glitchTimer=.15+Math.random()*.35;const now=actx.currentTime;killerAnim.radioFilter.frequency.cancelScheduledValues(now);killerAnim.radioFilter.frequency.setValueAtTime(1150,now);killerAnim.radioFilter.frequency.linearRampToValueAtTime(340+Math.random()*350,now+.035);killerAnim.radioGain.gain.setValueAtTime(vol*.12,now);killerAnim.radioGain.gain.linearRampToValueAtTime(vol,now+.13);}
+  }
+  if(killerAnim.radioMixer&&killerAnim.radioHeld)killerAnim.radioMixer.update(dt);
+}
+function grabRadio(){
+  if(!killerAnim.radioGroup||killerAnim.radioHeld||killerAnim.radioDist>5.2||state!=='playing'||!pickRadioRaycast())return;
+  killerAnim.radioHeld=true;const world=new THREE.Vector3();killerAnim.radioGroup.getWorldPosition(world);killerAnim.radioGroup.parent?.remove(killerAnim.radioGroup);camera.add(killerAnim.radioGroup);killerAnim.radioGroup.position.set(.42,-.38,-.88);killerAnim.radioGroup.rotation.set(0,Math.PI,0);killerAnim.radioGroup.scale.setScalar(.43);
+  $('radioGrabBtn').style.display='none';say('Radio tomada. La canción se aclara entre la estática…',3200);playSnd('mask',.4);
+}
+function updateKillerAnimation(dist=99){
+  if(!enemyMixer||!killerAnim.actions)return;
+  if(state==='caught'){
+    const attack=killerAnim.actions.attack;if(attack&&killerAnim.current!==attack){if(killerAnim.current)killerAnim.current.fadeOut(.12);attack.reset().setLoop(THREE.LoopOnce,1);attack.clampWhenFinished=true;attack.fadeIn(.12).play();killerAnim.current=attack;}return;
+  }
+  let name='walk';
+  if(bonnie.active&&dist<10)name='run';
+  const desired=Math.atan2(player.x-bonnie.x,player.z-bonnie.z);let turn=Math.atan2(Math.sin(desired-bonnie.heading),Math.cos(desired-bonnie.heading));
+  if(name==='walk'&&Math.abs(turn)>.62)name=turn>0?'walkRight':'walkLeft';
+  const action=killerAnim.actions[name]||killerAnim.actions.walk;
+  if(action&&action!==killerAnim.current){if(killerAnim.current)killerAnim.current.fadeOut(.18);action.reset().setLoop(THREE.LoopRepeat,Infinity).fadeIn(.18).play();killerAnim.current=action;}
+}
+function pickRadioRaycast(){
+  if(!killerAnim.radioGroup||killerAnim.radioHeld)return false;
+  camera.updateMatrixWorld(true);killerAnim.radioGroup.updateMatrixWorld(true);
+  const ray=new THREE.Raycaster();ray.setFromCamera({x:0,y:0},camera);return ray.intersectObject(killerAnim.radioGroup,true).length>0;
 }
 function startAmb() {
   wantAmb = true;
@@ -1172,6 +1242,7 @@ addEventListener('keydown', e => {
   input[e.code] = true;
   if (e.repeat) return;
   if (e.code === 'KeyF') toggleFlash();
+  if((e.code==='KeyE'||e.code==='Space')&&$('radioGrabBtn').style.display!=='none')grabRadio();
   if (e.code === 'Escape' && cameraOpen) closeSecurityCameras();
   else if (e.code === 'Escape' && diplomaOpen) closeDiploma();
   else if (e.code === 'Escape' && state === 'paused') resume();
@@ -1300,6 +1371,7 @@ bindHold($('btnRun'), () => { runHeld = true; }, () => { runHeld = false; });
 bindTap($('btnFlash'), toggleFlash);
 bindTap($('btnPause'), () => { if (state === 'playing') pause(); });
 bindTap($('cameraOpenBtn'),openSecurityCameras);
+bindTap($('radioGrabBtn'),grabRadio);
 bindTap($('cameraCloseBtn'),closeSecurityCameras);
 bindTap($('cameraFeedClose'),()=>{ $('camFeed').style.display='none'; document.querySelectorAll('.cam-tile').forEach(b=>b.classList.remove('selected')); });
 $('cameraModal').addEventListener('pointerdown',e=>{if(e.target===$('cameraModal'))closeSecurityCameras();});
@@ -1398,52 +1470,23 @@ function makeFallbackBonnie() {
 }
 
 let fallbackBonnie = null, glbLoaded = false, glbLoadTimer = 0;
-function bonnieReady(message) {
-  bonnie.ready = true;
-  $('playBtn').disabled = false;
-  $('loadTxt').textContent = message || 'LISTO';
-}
-
-// No bloquear el botón: arrancar de inmediato con el personaje de respaldo.
-fallbackBonnie = makeFallbackBonnie();
-bonnie.group.add(fallbackBonnie);
-bonnieReady('LISTO · CARGANDO MODELO EN SEGUNDO PLANO');
-
-// Si el GLB tarda mucho, permanece habilitado el respaldo y dejamos de mostrar "cargando".
-glbLoadTimer = setTimeout(() => {
-  if (!glbLoaded) $('loadTxt').textContent = 'LISTO · MODO LIGERO';
-}, 8000);
-
-new GLTFLoader().load(
-  'assets/fnaf_ar_toy_bonnie.glb',
-  gltf => {
-    glbLoaded = true; clearTimeout(glbLoadTimer);
-    const m = gltf.scene;
-    m.traverse(o => { if (o.isMesh) { o.frustumCulled = false; } });
-    fitModel(m);
-    enemyRig.root = m;
-    m.updateMatrixWorld(true);
-    if (fallbackBonnie) { bonnie.group.remove(fallbackBonnie); fallbackBonnie = null; }
-    bonnie.group.add(m);
-    enemyMixer = new THREE.AnimationMixer(m);
-    const walkClip = gltf.animations.find(a => /(?:^|--)Charge$/i.test(a.name)) || gltf.animations.find(a => /walk/i.test(a.name));
-    if (walkClip) {
-      enemyWalkAction = enemyMixer.clipAction(walkClip);
-      enemyWalkAction.reset(); enemyWalkAction.setLoop(THREE.LoopRepeat, Infinity); enemyWalkAction.enabled=true;
-    } else console.warn('El modelo no trae clip Charge/Walk; se mantiene la pose base.');
-    bonnieReady('LISTO');
-  },
-  event => {
-    if (event && event.total) {
-      const percent = Math.round(event.loaded / event.total * 100);
-      $('loadTxt').textContent = glbLoaded ? 'LISTO' : `CARGANDO BONNIE ${percent}%`;
-    }
-  },
-  () => {
-    glbLoaded = true; clearTimeout(glbLoadTimer);
-    bonnieReady('LISTO · MODO LIGERO');
-  }
-);
+function bonnieReady(message){bonnie.ready=true;$('playBtn').disabled=false;$('loadTxt').textContent=message||'LISTO';}
+// El perseguidor ahora es Springtrap optimizado: cinco animaciones guardadas, texturas reducidas y pistas resampleadas.
+fallbackBonnie=makeFallbackBonnie();bonnie.group.add(fallbackBonnie);bonnieReady('LISTO · CARGANDO SPRINGTRAP');
+glbLoadTimer=setTimeout(()=>{if(!glbLoaded)$('loadTxt').textContent='LISTO · CARGANDO ASESINO';},9000);
+new GLTFLoader().load('assets/springtrap-optimized.glb',gltf=>{
+  glbLoaded=true;clearTimeout(glbLoadTimer);const m=gltf.scene;
+  m.traverse(o=>{if(o.isMesh){o.frustumCulled=false;if(o.material){const arr=Array.isArray(o.material)?o.material:[o.material];arr.forEach(mat=>{mat.side=THREE.DoubleSide;if(mat.map)mat.map.anisotropy=2;});}}});
+  fitModel(m,2.7);enemyRig.root=m;m.updateMatrixWorld(true);
+  // Omitir arma secundaria opcional para reducir draw calls y mantener silueta de asesino.
+  m.traverse(o=>{if(o.isMesh&&/AltWeaponMesh/i.test(o.name))o.visible=false;});
+  if(fallbackBonnie){bonnie.group.remove(fallbackBonnie);fallbackBonnie=null;}
+  bonnie.group.add(m);enemyMixer=new THREE.AnimationMixer(m);
+  const map={walk:/K40_WalkFT$/,run:/K40_RunFT$/,walkLeft:/K40_WalkLT$/,walkRight:/K40_WalkRT$/,attack:/K40_Attack_Wipe$/};
+  for(const [key,re] of Object.entries(map)){const clip=gltf.animations.find(a=>re.test(a.name));if(clip){const action=enemyMixer.clipAction(clip);killerAnim.actions[key]=action;if(key==='walk'){action.setLoop(THREE.LoopRepeat,Infinity);action.play();killerAnim.current=action;}}}
+  if(enemyRig.root)enemyRig.root.rotation.y=Math.PI;
+  bonnieReady('ASESINO LISTO');
+},undefined,err=>{console.error('No cargó Springtrap:',err);clearTimeout(glbLoadTimer);bonnieReady('ASESINO · MODO LIGERO');});
 
 function updateSpringDisplay(dt) {
   if (!springDisplay.root || !springDisplay.head || !springDisplay.headBase || state==='menu' || state==='help') return;
@@ -1475,16 +1518,14 @@ function update(dt) {
   const t = performance.now() / 1000;
   updateSpringDisplay(dt);
   updateLights(dt);
+  updateRadio(dt);
   whisperNearBonnie(dt);
 
   if (state === 'menu') player.yaw += dt * 0.08;
 
-  if (enemyMixer && enemyWalkAction) {
-    const shouldWalk=state==='playing' && bonnie.active && bonnie.stun<=0;
-    if(shouldWalk && !enemyWalking){enemyWalkAction.reset();enemyWalkAction.play();enemyWalking=true;}
-    else if(!shouldWalk && enemyWalking){enemyWalkAction.stop();enemyWalking=false;}
-    if(enemyWalking) enemyMixer.update(dt);
-  }
+  const chaseDist=Math.hypot(bonnie.x-player.x,bonnie.z-player.z);
+  updateKillerAnimation(chaseDist);
+  if(enemyMixer&&killerAnim.current&&((state==='playing'&&bonnie.active&&bonnie.stun<=0)||state==='caught'))enemyMixer.update(dt);
 
 
   if (state === 'playing' && !diplomaOpen && !cameraOpen) {

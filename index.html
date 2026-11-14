@@ -145,7 +145,9 @@
   .cam-title{font-size:clamp(16px,4vw,24px);letter-spacing:3px;color:#c7ead2}.cam-status{font-size:10px;color:#71d694;letter-spacing:2px;margin-top:5px}
   .cam-x{width:44px;height:44px;border:1px solid #759083;background:#101817;color:#fff;font:28px var(--mono);cursor:pointer;flex:none}
   #camFeed{position:relative;width:min(900px,100%);height:min(48vh,430px);min-height:210px;margin:0 auto 14px;border:2px solid #60756a;background:#050708;overflow:hidden;box-shadow:0 0 25px #000,inset 0 0 30px #000}
-  #camFeed::after{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.045) 0px,rgba(255,255,255,.045) 1px,transparent 2px,transparent 4px),linear-gradient(90deg,transparent 49.8%,rgba(255,255,255,.04) 50%,transparent 50.2%);mix-blend-mode:screen;opacity:.58}
+  #camFeed::after{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.07) 0 1px,transparent 2px 4px),linear-gradient(90deg,transparent 49.8%,rgba(255,255,255,.05) 50%,transparent 50.2%);mix-blend-mode:screen;opacity:.62}
+  #camFeed::before{content:'';position:absolute;z-index:2;inset:0;pointer-events:none;opacity:0;background:linear-gradient(transparent 0 35%,rgba(255,255,255,.2) 36% 40%,transparent 42%),repeating-linear-gradient(0deg,transparent 0 23px,rgba(190,255,224,.05) 24px 25px),linear-gradient(90deg,rgba(255,0,40,.13),transparent 12%,transparent 88%,rgba(0,225,255,.11));animation:camGlitch 5.7s infinite steps(1)}
+  @keyframes camGlitch{0%,78%,80%,84%,100%{opacity:0;transform:none;clip-path:inset(0)}79%{opacity:.9;transform:translateX(3px);clip-path:inset(14% 0 68%)}81%{opacity:.65;transform:translateX(-4px);clip-path:inset(57% 0 27%)}82%{opacity:.35;transform:translateX(2px);clip-path:inset(31% 0 55%) }83%{opacity:0;transform:none}}
   #camFeed canvas{width:100%;height:100%;display:block;filter:contrast(1.12) saturate(.62) brightness(.82)}
   #camFeedLabel{position:absolute;z-index:1;left:12px;top:10px;padding:6px 9px;background:#000b;color:#e1eee5;font-size:12px;letter-spacing:2px}
   #camFeedLabel::before{content:'● ';color:#ff3636;animation:blink 1s steps(2) infinite}
@@ -636,6 +638,7 @@ function buildWorld() {
   // Homenaje a AMYR: Spring Bonnie en el escenario central.
   const amyrStageGroup = new THREE.Group();
   amyrStageGroup.position.set(27, 0.63, 3 * CELL);
+  amyrStageGroup.rotation.y = Math.PI; // orientar al nuevo Spring Bonnie hacia el frente del escenario
   worldGroup.add(amyrStageGroup);
   springDisplay.group = amyrStageGroup; springDisplay.baseY = 0.63; springDisplay.group.visible=true;
   // Nuevo Spring Bonnie con lentes, incluido en la aplicación por partes.
@@ -652,6 +655,8 @@ function buildWorld() {
   door.position.set(106.85, 1.4, 35); worldGroup.add(door);
   const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.7), new THREE.MeshBasicMaterial({ map: signTex('SALIDA', 256, 80, '#38ff9a', '#04170c', 'bold 48px Arial') }));
   sign.rotation.y = -Math.PI / 2; sign.position.set(106.65, 3.0, 35); worldGroup.add(sign);
+
+  buildGore();
 
   // ---------- Luces ----------
   const cfg = [
@@ -909,6 +914,38 @@ function say(t, ms = 2600) {
   clearTimeout(msgTO); msgTO = setTimeout(() => m.style.opacity = 0, ms);
 }
 const fmt = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+const BONNIE_WHISPERS=['Te escucho respirar...','No debiste venir a esta sala.','La puerta ya no te salvará.','Quédate conmigo. Para siempre.','Las luces se apagan... y yo sigo aquí.','Te estaba esperando.'];
+let whisperCooldown=0,lastWhisper=-1;
+function whisperNearBonnie(dt){
+  if(state!=='playing'||cameraOpen||diplomaOpen)return;
+  whisperCooldown=Math.max(0,whisperCooldown-dt);
+  const d=Math.hypot(player.x-27,player.z-6);
+  if(d>5.5||whisperCooldown>0)return;
+  let i=Math.floor(Math.random()*BONNIE_WHISPERS.length);if(i===lastWhisper)i=(i+1)%BONNIE_WHISPERS.length;lastWhisper=i;whisperCooldown=13+Math.random()*7;
+  say(`SPRING BONNIE: «${BONNIE_WHISPERS[i]}»`,4200);
+  try{if('speechSynthesis'in window){speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(BONNIE_WHISPERS[i]);u.lang='es-MX';u.rate=.78;u.pitch=.52;u.volume=.78;speechSynthesis.speak(u);}}catch(_){}
+}
+function buildGore(){
+  const bloodMat=new THREE.MeshStandardMaterial({color:0x39000d,emissive:0xa4001c,emissiveIntensity:1.2,roughness:.24,metalness:.08,transparent:true,opacity:.9,side:THREE.DoubleSide});
+  const bloodSpots=[[7,7,.9],[20,9,.72],[32,5,.65],[33,13,.82],[8,21,.65],[18,23,.8],[27,22,.6],[34,23,.7],[43,8,.75],[45,25,.9],[51,24,.58],[15,17,.7],[39,17,.6]];
+  bloodSpots.forEach(([cx,cz,r],i)=>{
+    const shape=new THREE.Shape(),n=11;for(let k=0;k<n;k++){const a=k/n*Math.PI*2,rr=r*(.72+.28*Math.sin(k*4.73+i*2));const x=Math.cos(a)*rr,z=Math.sin(a)*rr;if(!k)shape.moveTo(x,z);else shape.lineTo(x,z);}shape.closePath();
+    const mesh=new THREE.Mesh(new THREE.ShapeGeometry(shape,16),bloodMat);mesh.rotation.x=-Math.PI/2;mesh.position.set(cx*CELL,.035,cz*CELL);worldGroup.add(mesh);
+    for(let d=0;d<3;d++){const drop=new THREE.Mesh(new THREE.CircleGeometry(.045+Math.random()*.07,7),bloodMat);drop.rotation.x=-Math.PI/2;drop.position.set(cx*CELL+(Math.random()-.5)*r*1.8,.038,cz*CELL+(Math.random()-.5)*r*1.8);worldGroup.add(drop);}
+  });
+  const meatMat=new THREE.MeshStandardMaterial({color:0x6b1019,roughness:.86}),fatMat=new THREE.MeshStandardMaterial({color:0xb86a54,roughness:.8});
+  [[15,24],[28,23],[43,24],[35,13]].forEach(([cx,cz],i)=>{
+    const meat=new THREE.Mesh(new THREE.IcosahedronGeometry(.38+i%2*.12,1),meatMat);meat.scale.set(1.25,.55,.8);meat.rotation.set(.2,i*1.7,.25);meat.position.set(cx*CELL,.4,cz*CELL);worldGroup.add(meat);
+    for(let k=0;k<3;k++){const bit=new THREE.Mesh(new THREE.SphereGeometry(.1,7,5),k===1?fatMat:meatMat);bit.scale.set(1.5,.65,1);bit.position.set(cx*CELL+(Math.random()-.5)*.7,.33,cz*CELL+(Math.random()-.5)*.6);worldGroup.add(bit);}
+  });
+  const webMat=new THREE.LineBasicMaterial({color:0x87908a,transparent:true,opacity:.5});
+  [[4,4],[23,4],[29,12],[35,6],[43,5],[51,12],[17,23],[34,23],[44,23],[51,25]].forEach(([cx,cz])=>{
+    const x=cx*CELL,z=cz*CELL,pts=[];for(let k=0;k<=5;k++){const t=k/5;pts.push(new THREE.Vector3(x-1.1+2.2*t,WALL_H-.12,z));pts.push(new THREE.Vector3(x-1.1,WALL_H-.12,z+1.7*t));}
+    for(let ring=1;ring<=3;ring++){const t=ring/4;pts.push(new THREE.Vector3(x-1.1+2.2*t,WALL_H-.12,z));pts.push(new THREE.Vector3(x,WALL_H-.12,z+1.7*t));pts.push(new THREE.Vector3(x-1.1,WALL_H-.12,z+1.7*t));pts.push(new THREE.Vector3(x-1.1+2.2*t,WALL_H-.12,z+1.7*t));}
+    const geo=new THREE.BufferGeometry().setFromPoints(pts);const lines=new THREE.LineSegments(geo,webMat);worldGroup.add(lines);
+  });
+}
 
 function toggleFlash() {
   if (state !== 'playing') return;
@@ -1438,6 +1475,7 @@ function update(dt) {
   const t = performance.now() / 1000;
   updateSpringDisplay(dt);
   updateLights(dt);
+  whisperNearBonnie(dt);
 
   if (state === 'menu') player.yaw += dt * 0.08;
 

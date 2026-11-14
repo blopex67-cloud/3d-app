@@ -1481,7 +1481,11 @@ new GLTFLoader().load('assets/springtrap-optimized.glb',gltf=>{
   // Omitir arma secundaria opcional para reducir draw calls y mantener silueta de asesino.
   m.traverse(o=>{if(o.isMesh&&/AltWeaponMesh/i.test(o.name))o.visible=false;});
   if(fallbackBonnie){bonnie.group.remove(fallbackBonnie);fallbackBonnie=null;}
-  bonnie.group.add(m);enemyMixer=new THREE.AnimationMixer(m);
+  // Girar únicamente el modelo del asesino, incluso durante sus animaciones.
+  const killerFacing = new THREE.Group();
+  killerFacing.rotation.y = Math.PI;
+  killerFacing.add(m);
+  bonnie.group.add(killerFacing);enemyMixer=new THREE.AnimationMixer(m);
   const map={walk:/K40_WalkFT$/,run:/K40_RunFT$/,walkLeft:/K40_WalkLT$/,walkRight:/K40_WalkRT$/,attack:/K40_Attack_Wipe$/};
   for(const [key,re] of Object.entries(map)){const clip=gltf.animations.find(a=>re.test(a.name));if(clip){const action=enemyMixer.clipAction(clip);killerAnim.actions[key]=action;if(key==='walk'){action.setLoop(THREE.LoopRepeat,Infinity);action.play();killerAnim.current=action;}}}
   if(enemyRig.root)enemyRig.root.rotation.y=Math.PI;

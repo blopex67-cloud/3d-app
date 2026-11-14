@@ -56,8 +56,7 @@
 
   /* ---------- HUD ---------- */
   #hud{position:fixed;inset:0;pointer-events:none;z-index:5;display:none;font-family:var(--mono)}
-  .plate{position:relative;background:linear-gradient(180deg,rgba(44,46,50,.9),rgba(14,15,17,.93));border:2px solid #07070a;border-radius:6px;padding:6px 9px;
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 3px 10px rgba(0,0,0,.7)}
+  .plate{position:relative;background:linear-gradient(180deg,rgba(4,12,11,.46),rgba(3,8,8,.54));border:1px solid rgba(145,177,157,.6);border-radius:3px;padding:4px 7px;box-shadow:inset 0 1px 0 rgba(221,255,231,.07),0 2px 6px rgba(0,0,0,.3)}
   #leftcol{position:absolute;top:8px;left:calc(8px + env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:4px;transform:scale(.84);transform-origin:top left}
   #clk{font-size:24px;font-weight:900;color:#ff3b30;text-shadow:0 0 10px rgba(255,40,30,.8);letter-spacing:2px;line-height:1}
   #night{font-size:9px;letter-spacing:3px;opacity:.7;margin-top:4px}
@@ -69,14 +68,14 @@
   .seg{position:relative;width:84px;height:9px;background:#0b0b0d;border:1px solid #000;border-radius:2px;overflow:hidden}
   .seg>div{height:100%;transition:width .15s}
   .seg::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 10px,#0b0b0d 10px 12px)}
-  #missionPanel{width:220px;padding:5px 8px;background:linear-gradient(180deg,rgba(26,30,34,.88),rgba(7,9,12,.91));border-color:#202328;pointer-events:none}
+  #missionPanel{width:190px;padding:4px 6px;background:linear-gradient(180deg,rgba(4,12,11,.46),rgba(3,8,8,.54));border-color:rgba(145,177,157,.52);pointer-events:none}
   .missionTitle{font-size:9px;letter-spacing:1.5px;color:#ffcf78;margin-bottom:3px;font-weight:900}
   .missionLine{font-size:9px;line-height:1.35;letter-spacing:.3px;color:#c8c8c3}
   .missionLine.done{color:#53e4a5;text-shadow:0 0 7px rgba(83,228,165,.42)}
   #freezeLabel{font-size:8px;letter-spacing:.3px;color:#b6c8d4;margin-top:3px}
   .freezeTrack{height:5px;background:#090b0d;border:1px solid #000;margin-top:3px;border-radius:4px;overflow:hidden}
   #freezeBar{height:100%;width:0;background:linear-gradient(90deg,#42c9ff,#a4f7ff);transition:width .12s linear}
-  @media(max-width:700px){#leftcol{transform:scale(.74)}#missionPanel{width:204px;padding:4px 7px}.missionLine{font-size:8px}#missionPanel .missionTitle{font-size:8px}.seg{width:76px}}
+  @media(max-width:700px){#leftcol{transform:scale(.66);gap:3px}#missionPanel{width:174px;padding:3px 5px}.missionLine{font-size:7px}#missionPanel .missionTitle{font-size:7px}.seg{width:68px}.plate{padding:4px 6px;border-width:1px}#clk{font-size:21px}#night{font-size:8px;letter-spacing:2px}.brow{gap:4px;font-size:8px}.brow svg{width:13px;height:13px}}
   #cam{position:absolute;top:14px;left:50%;transform:translateX(-50%);font-size:14px;letter-spacing:4px;text-transform:uppercase;white-space:nowrap;text-shadow:0 0 6px rgba(0,0,0,.9)}
   #cam i{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--red);margin-right:8px;box-shadow:0 0 8px var(--red);animation:blink 1s steps(2) infinite}
   .kb{position:absolute;bottom:16px;right:16px;font-size:13px;line-height:1.8;opacity:.85}
@@ -90,7 +89,7 @@
   #diplomaIcon{width:62px;height:62px;object-fit:cover;border-radius:50%;display:block;margin:0 auto 8px;background:#fff5d6;border:3px solid #815b17;box-shadow:0 2px 9px #6b4b2399}
   #diplomaKicker{font:700 10px var(--mono);letter-spacing:3px;text-transform:uppercase;opacity:.8}
   #diplomaName{font:900 clamp(22px,5vw,36px) Georgia,serif;letter-spacing:1px;margin:6px 26px 8px}
-  #diplomaPhrase{max-width:430px;font:italic 16px/1.5 Georgia,serif;margin:0 0 12px}
+  #diplomaPhrase{max-width:430px;font:italic 16px/1.5 Georgia,serif;margin:0 0 12px;white-space:pre-line}
   #diplomaCount{font:700 10px var(--mono);letter-spacing:2px;color:#5c471c}
   @media(max-width:560px){#diplomaCard{min-height:270px;padding:24px 18px 18px}#diplomaPhrase{font-size:14px}#diplomaIcon{width:52px;height:52px}}
   #vig{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,.92));z-index:4;display:none}
@@ -157,6 +156,20 @@
   .cam-foot{text-align:center;color:#75857b;font-size:10px;letter-spacing:1px;margin:14px auto 0}
   @media(max-height:560px){#camFeed{height:36vh;min-height:155px}.cam-tile{min-height:48px;padding:7px}}
 
+
+  /* Estética de monitor: bordes finos y selector de cámaras en mapa compacto. */
+  #cameraModal{padding:8px 10px 12px;overflow:hidden;background:#030606}
+  .cam-head{position:relative;z-index:3;padding:3px 4px 6px;margin:0;border-bottom:1px solid #52655b}
+  .cam-title{font-size:clamp(11px,2.8vw,16px);letter-spacing:2px}.cam-status{font-size:8px;letter-spacing:1px;margin-top:2px}
+  .cam-head .cam-x{width:34px;height:34px;font-size:23px}
+  #camFeed{position:absolute;inset:51px 10px 12px;width:auto;height:auto;min-height:0;margin:0;border:1px solid #819389;box-shadow:inset 0 0 20px #000}
+  #camFeedLabel{font-size:10px;letter-spacing:1px;top:6px;left:6px}
+  #cameraGrid{position:absolute;right:18px;bottom:20px;z-index:5;width:min(42vw,300px);margin:0;padding:5px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;border:1px solid #87968a;background:rgba(3,8,7,.78)}
+  .cam-tile{min-width:0;min-height:28px;padding:3px 4px;border:1px solid #9aafa2;background:rgba(41,53,48,.82);font-size:clamp(6px,1vw,9px);line-height:1.05;letter-spacing:0;text-align:center;overflow:hidden}
+  .cam-tile span{font-size:8px;letter-spacing:0;margin:0 0 1px;color:#d6eadc}.cam-tile.selected{background:#677b2d;border-color:#dcef9f}
+  .cam-foot{position:absolute;z-index:3;left:15px;bottom:15px;margin:0;width:45%;font-size:8px;text-align:left;color:#9ca99f;letter-spacing:.5px}
+  @media(max-width:500px){#cameraGrid{width:46vw;gap:2px;padding:3px}.cam-tile{min-height:25px;padding:2px;font-size:6px}.cam-tile span{font-size:7px}.cam-foot{width:43%;font-size:7px}}
+
 </style>
 </head>
 <body>
@@ -194,7 +207,7 @@
     <div id="missionPanel" class="plate">
       <div class="missionTitle">OBJETIVOS DE NOCHE</div>
       <div class="missionLine" id="missionKeys">○ Reúne 3 llaves · 0/3</div>
-      <div class="missionLine" id="missionDiplomas">○ Diplomas · 0/4</div>
+      <div class="missionLine" id="missionDiplomas">○ Diplomas · 0/5</div>
       <div class="missionLine" id="missionFreeze">○ Congela a Bonnie · opcional</div>
       <div class="missionLine" id="missionExit">○ Llega a la salida</div>
       <div id="freezeLabel">Linterna · apunta a Bonnie</div>
@@ -208,6 +221,7 @@
   </div>
 </div>
 
+<button id="officeDoorBtn" type="button" aria-label="Abrir o cerrar puerta de oficina" style="display:none;position:fixed;z-index:12;left:50%;bottom:calc(90px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);padding:10px 17px;border:1px solid #759083;border-radius:3px;background:rgba(4,11,10,.86);color:#dcf4e5;font:700 13px var(--mono);letter-spacing:1.5px;pointer-events:auto;touch-action:manipulation">E · ABRIR OFICINA</button>
 <button id="radioGrabBtn" type="button" aria-label="Agarrar radio" style="display:none;position:fixed;z-index:12;left:50%;bottom:90px;transform:translateX(-50%);padding:12px 18px;border:2px solid #9ec7aa;border-radius:30px;background:#09120feF;color:#e8fff0;font:900 16px var(--mono);letter-spacing:2px;pointer-events:auto;touch-action:manipulation">✋ AGARRAR RADIO</button>
 <button id="cameraOpenBtn" type="button" aria-label="Abrir cámaras">▦ &nbsp; CÁMARAS</button>
 <div id="cameraModal" aria-hidden="true"><div class="cam-head"><div><div class="cam-title">MONITOR DE SEGURIDAD</div><div class="cam-status">● SEÑAL ESTABLE · 12 CÁMARAS</div></div><button id="cameraCloseBtn" class="cam-x" type="button" aria-label="Cerrar interfaz de cámaras">×</button></div><div id="camFeed" style="display:none"><canvas id="camFeedCanvas"></canvas><div id="camFeedLabel">CAM 01 · SALÓN PRINCIPAL</div><button id="cameraFeedClose" class="cam-x" type="button" aria-label="Salir de la cámara" style="position:absolute;right:8px;top:8px;z-index:3">×</button></div><div id="cameraGrid" class="cam-grid"></div><div class="cam-foot">ELIGE UNA CÁMARA PARA VER EL CUARTO · ESC PARA CERRAR</div></div>
@@ -219,7 +233,7 @@
     <div id="diplomaKicker">DIPLOMA DE GRADUACIÓN · BONNIE’S TERROR</div>
     <div id="diplomaName">AMYR ANIMATIONS</div>
     <p id="diplomaPhrase"></p>
-    <div id="diplomaCount">DIPLOMA 1 DE 4</div>
+    <div id="diplomaCount">DIPLOMA 1 DE 5</div>
   </div>
 </div>
 
@@ -253,8 +267,8 @@
 <div id="help" class="screen hidden">
   <h2>CÓMO JUGAR</h2>
   <div class="help">
-    Estás atrapado en la pizzería de noche. Encuentra <b>3 llaves</b> repartidas por las salas y llega a la <b>puerta verde de SALIDA</b>, al fondo del pasillo. También puedes buscar los <b>4 diplomas</b> con mensajes especiales; son opcionales.<br><br>
-    Springtrap te persigue. Escucha sus pasos: a corta distancia corre y ataca. La radio junto al conejo amarillo puede alterar el sonido de la mansión. Si te alcanza, es el final.<br><br>
+    Estás atrapado en la pizzería de noche. Encuentra <b>3 llaves</b> repartidas por las salas y llega a la <b>puerta verde de SALIDA</b>, al fondo del pasillo. También puedes buscar los <b>5 diplomas</b> con mensajes especiales; son opcionales.<br><br>
+    Springtrap te persigue. Escucha sus pasos: a corta distancia corre y ataca. La radio junto al conejo amarillo puede alterar el sonido de la mansión. Busca las baterías de repuesto y usa E junto a la oficina para abrir o cerrar sus puertas. Si te alcanza, es el final.<br><br>
     La <b>linterna</b> puede congelar a Bonnie: mantenla apuntada de frente medio segundo para detenerlo <b>4.5 segundos</b>; después tarda 6 segundos en recuperarse. La linterna consume batería. También puedes <b>correr</b>, aunque la energía se agota.<br><br>
     <b>Móvil:</b> joystick a la izquierda, desliza a la derecha para mirar, botones LUZ, CORRER y CÁMARAS para vigilar las salas.<br>
     <b>PC:</b> WASD, ratón, Shift y F.<br><br>
@@ -374,9 +388,10 @@ const DIPLOMAS=[
   {name:'GALAXY X3D',icon:'GX',image:'assets/galaxy-x3d.jpg',phrase:'Tus metas tienen mucho camino por delante, y cada paso que das te acerca a ellas. Confía en tu talento: aún te esperan cosas grandes.'},
   {name:'ATLAS 3D',icon:'A3',image:'assets/atlas-3d.jpg',phrase:'Tu talento y creatividad convierten cada idea en una posibilidad. Sigue creando a tu manera: el mundo todavía no ha visto todo lo que puedes hacer.'},
   {name:'AMYR ANIMATIONS',icon:'AM',image:'assets/amyr-animations.jpg',phrase:'Tu creatividad no solo crea contenido: también deja huella. Sigue adelante; tu generosidad y tu forma de ser inspiran a quienes te rodean.'},
-  {name:'VOLUMI3D',icon:'V3',image:'assets/volumi3d.jpg',phrase:'Tus sueños merecen hacerse realidad. Cada intento te acerca a ellos; sigue creyendo en ti, incluso cuando el camino se ponga difícil.'}
+  {name:'VOLUMI3D',icon:'V3',image:'assets/volumi3d.jpg',phrase:'Tus sueños merecen hacerse realidad. Cada intento te acerca a ellos; sigue creyendo en ti, incluso cuando el camino se ponga difícil.'},
+  {name:'AMYR ANIMATIONS',icon:'AM',image:'assets/amyr-freddy.png',phrase:'Su dolor hermanos buscará alivio en nuestra lucha, para todos todo, para nosotros nada.\n\nATT AMYR ANIMATIONS'}
 ];
-const DIPLOMA_SPOTS=[[4,8],[23,10],[29,7],[42,11]]; // Galaxy a la izquierda; Atlas a la derecha
+const DIPLOMA_SPOTS=[[4,8],[23,10],[29,7],[42,11],[16,6]]; // El nuevo diploma AMYR está junto a la radio
 const FREEZE_SECONDS=4.5, FREEZE_CHARGE=0.45, FREEZE_COOLDOWN=6.0; // carga continua al apuntar, duración congelado y recarga
 const bonnie = { x: 0, z: 0, heading: 0, path: [], timer: 0, active: false, ready: false, delay: 8, stun: 0, beamCharge: 0, freezeCooldown: 0, freezeDone: false, group: new THREE.Group() };
 const killerAnim = {actions:{},current:null, radioGroup:null, radioMixer:null, radioHeld:false, radioPlaying:null, radioFilter:null, radioGain:null, radioPan:null, radioDist:999, glitchTimer:0, radioReverb:null};
@@ -391,7 +406,7 @@ const enemyRig = { root: null };
 const springDisplay = { group: null, root: null, bones: {}, head: null, headBase: null, gazeQ: new THREE.Quaternion(), parentQ: new THREE.Quaternion(), headPos: new THREE.Vector3(), gazeDir: new THREE.Vector3(), targetQ: new THREE.Quaternion(), baseInv: new THREE.Quaternion(), euler: new THREE.Euler(0,0,0,'YXZ') };
 // ---------- Renderer / escena ----------
 const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: !IS_TOUCH, powerPreference: 'high-performance', precision: 'mediump' });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, IS_TOUCH ? 1.35 : 1.75));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.08;
@@ -482,6 +497,9 @@ const lamb = (c, o = {}) => new THREE.MeshLambertMaterial({ color: c, ...o });
 const stdm = (c, r = 0.6, m = 0) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
 let worldGroup = null;
 const sources = [];
+let officeDoorLeaves=[],officeDoorOpen=false,officeDoorBlend=0;
+let batteryPickups=[];
+const OFFICE_DOOR={x:69,z:39,grid:[[34,19],[35,19]]};
 const panelGeo = new THREE.PlaneGeometry(1.8, 0.55);
 
 function addSource(o) {
@@ -647,7 +665,7 @@ function buildWorld() {
   const springParts=Array.from({length:8},(_,i)=>`assets/bonnie_part_${String(i+1).padStart(2,'0')}.bin`);
   Promise.all(springParts.map(url=>fetch(url).then(r=>{if(!r.ok)throw new Error(url+' '+r.status);return r.arrayBuffer();})))
     .then(parts=>{const bytes=new Uint8Array(parts.reduce((n,p)=>n+p.byteLength,0));let offset=0;for(const part of parts){bytes.set(new Uint8Array(part),offset);offset+=part.byteLength;}
-      new GLTFLoader().parse(bytes.buffer,'',gltf=>{const actor=gltf.scene;actor.traverse(o=>{if(o.isMesh){o.frustumCulled=false;if(o.material){const mats=Array.isArray(o.material)?o.material:[o.material];mats.forEach(m=>m.side=THREE.DoubleSide);}}});fitModel(actor,2.3);amyrStageGroup.add(actor);springDisplay.root=actor;springDisplay.head=null;},err=>console.error('No se pudo procesar el nuevo Spring Bonnie:',err));
+      new GLTFLoader().parse(bytes.buffer,'',gltf=>{const actor=gltf.scene;actor.traverse(o=>{if(o.isMesh){o.frustumCulled=true;if(o.material){const mats=Array.isArray(o.material)?o.material:[o.material];mats.forEach(m=>m.side=THREE.DoubleSide);}}});fitModel(actor,2.3);amyrStageGroup.add(actor);springDisplay.root=actor;springDisplay.head=null;},err=>console.error('No se pudo procesar el nuevo Spring Bonnie:',err));
     }).catch(err=>console.error('No se pudo cargar el nuevo Spring Bonnie:',err));
 
   // Radio cercana al Spring Bonnie del escenario; música se filtra como radio vieja y se oye espacialmente.
@@ -655,6 +673,17 @@ function buildWorld() {
     const rg=new THREE.Group();rg.add(gltf.scene);fitModel(gltf.scene,.72);rg.position.set(29.8,.05,10.2);rg.rotation.y=-.45;rg.scale.setScalar(.8);worldGroup.add(rg);killerAnim.radioGroup=rg;
     killerAnim.radioMixer=new THREE.AnimationMixer(gltf.scene);startRadioMusic();
   },undefined,e=>console.warn('La radio no cargó:',e));
+  // Puerta doble accionable de la oficina, con animación de bisagras.
+  officeDoorLeaves=[];officeDoorOpen=false;officeDoorBlend=0;
+  for(const side of [-1,1]){
+    const hinge=new THREE.Group();hinge.position.set(OFFICE_DOOR.x+side*2,0,OFFICE_DOOR.z);worldGroup.add(hinge);
+    const leaf=new THREE.Mesh(new THREE.BoxGeometry(2,2.72,.16),stdm(0x29251f,.82,0));
+    leaf.position.set(-side,1.36,0);hinge.add(leaf);
+    const inset=new THREE.Mesh(new THREE.BoxGeometry(1.5,2.22,.025),stdm(0x49321f,.75,0));inset.position.set(-side,1.37,-.094);hinge.add(inset);
+    const knob=new THREE.Mesh(new THREE.SphereGeometry(.075,8,6),stdm(0xb28a43,.28,.72));knob.position.set(-side*.53,1.3,-.13);hinge.add(knob);
+    hinge.userData.side=side;officeDoorLeaves.push(hinge);
+  }
+  setOfficeDoor(false,true);
   // Sin letreros ni marcas de YouTube/Discord en esta pared.
 
   // puerta de salida
@@ -717,7 +746,7 @@ function buildDiplomas(){
   DIPLOMA_SPOTS.forEach(([c,r],i)=>{
     const g=new THREE.Group();g.position.set(c*CELL,1.05,r*CELL);g.rotation.y=(i%2?0.18:-0.18);
     const card=new THREE.Mesh(diplomaGeo,diplomaPickupMats[i]);g.add(card);
-    const edge=new THREE.LineSegments(diplomaFrameGeo,new THREE.LineBasicMaterial({color:[0x62d9ff,0xc19aff,0xffd45a,0x62ffc1][i]}));edge.position.z=0.004;g.add(edge);
+    const edge=new THREE.LineSegments(diplomaFrameGeo,new THREE.LineBasicMaterial({color:[0x62d9ff,0xc19aff,0xffd45a,0x62ffc1,0xf5b539][i]}));edge.position.z=0.004;g.add(edge);
     g.userData.diplomaIndex=i;g.userData.baseY=1.05;scene.add(g);diplomaMeshes.push(g);
   });
 }
@@ -768,6 +797,44 @@ function updateLights(dt) {
   }
 }
 
+function setOfficeDoor(open,instant=false){
+  officeDoorOpen=!!open;
+  for(const [c,r] of OFFICE_DOOR.grid)grid[r][c]=officeDoorOpen?0:1;
+  if(instant)officeDoorBlend=officeDoorOpen?1:0;
+  $('officeDoorBtn').textContent=officeDoorOpen?'E · CERRAR OFICINA':'E · ABRIR OFICINA';
+}
+function toggleOfficeDoor(){
+  if(state!=='playing')return;
+  if(officeDoorOpen&&Math.abs(player.x-OFFICE_DOOR.x)<2.4&&Math.abs(player.z-OFFICE_DOOR.z)<1.3){say('Sal del umbral para cerrar la puerta.',1800);return;}
+  setOfficeDoor(!officeDoorOpen);bonnie.path=[];bonnie.timer=0;
+  playSnd('mask',.28);
+  say(officeDoorOpen?'Puerta de la oficina abierta':'Puerta de la oficina cerrada',1300);
+}
+function updateOfficeDoor(dt){
+  const near=state==='playing'&&Math.hypot(player.x-OFFICE_DOOR.x,player.z-OFFICE_DOOR.z)<3.1;
+  $('officeDoorBtn').style.display=near?'block':'none';
+  const target=officeDoorOpen?1:0;officeDoorBlend+=(target-officeDoorBlend)*Math.min(1,dt*4.5);
+  for(const hinge of officeDoorLeaves){const side=hinge.userData.side;hinge.rotation.y=side*(officeDoorBlend*Math.PI*.48);}
+}
+function buildBatteryPickups(){
+  for(const b of batteryPickups)b.group.parent?.remove(b.group);batteryPickups=[];
+  const spots=[[8,17],[21,18],[42,17],[50,18]];
+  spots.forEach(([c,r],i)=>{
+    const group=new THREE.Group();group.position.set(c*CELL,.58,r*CELL);
+    const dark=new THREE.MeshStandardMaterial({color:0x252c32,metalness:.56,roughness:.35});
+    const green=new THREE.MeshStandardMaterial({color:0x61e2a1,emissive:0x147a45,emissiveIntensity:.95,metalness:.22,roughness:.35});
+    const body=new THREE.Mesh(new THREE.BoxGeometry(.43,.56,.28),dark);group.add(body);
+    const cap=new THREE.Mesh(new THREE.BoxGeometry(.21,.085,.19),stdm(0xb6bbc0,.34,.7));cap.position.y=.32;group.add(cap);
+    for(let stripe=0;stripe<2;stripe++){const line=new THREE.Mesh(new THREE.BoxGeometry(.34,.055,.012),green);line.position.set(0,.1-stripe*.17,.147);group.add(line);}
+    group.userData={id:i,used:false,baseY:.58};worldGroup.add(group);batteryPickups.push({group,used:false});
+  });
+}
+function collectBatteryPickups(dt){
+  for(const p of batteryPickups){if(p.used)continue;p.group.rotation.y+=dt*.75;p.group.position.y=p.group.userData.baseY+Math.sin(performance.now()*.002+p.group.userData.id)*.07;
+    if(state==='playing'&&battery<99&&Math.hypot(player.x-p.group.position.x,player.z-p.group.position.z)<1.55){p.used=true;p.group.visible=false;const before=battery;battery=Math.min(100,battery+34);const gained=Math.round(battery-before);say(gained?`Batería de repuesto · +${gained}%`:'Batería de repuesto · carga completa',2400);playSnd('mask',.45);}
+  }
+}
+
 // ---------- Colisiones ----------
 function isWall(x, z) {
   const c = Math.round(x / CELL), r = Math.round(z / CELL);
@@ -794,6 +861,8 @@ function resetRadioForGame(){
 
 function newGame() {
   resetRadioForGame();
+  setOfficeDoor(false,true);
+  buildBatteryPickups();
   resetTouchState();
   keys = KEY_SPOTS.slice().sort(() => Math.random() - 0.5).slice(0, 3);
   keysGot = 0; diplomasGot=0; diplomaOpen=false; closeDiploma(); battery = 100; stamina = 100; elapsed = 0; flashOn = true; curRoom = -1; voiceT = 12; caughtTime = 0; missionUiT=0;
@@ -1064,12 +1133,16 @@ function bonnieUpdate(dt) {
   } else if (bonnie.path.length) {
     while (bonnie.path.length > 1 && clearLine(bonnie.x, bonnie.z, bonnie.path[1][0] * CELL, bonnie.path[1][1] * CELL, 0.55)) bonnie.path.shift();
     const [c, r] = bonnie.path[0]; tx = c * CELL; tz = r * CELL;
+  } else {
+    // Sin ruta (por ejemplo con la oficina cerrada): no atravesar paredes ni puertas.
+    return;
   }
   const dx = tx - bonnie.x, dz = tz - bonnie.z, dist = Math.hypot(dx, dz);
   if (dist < 0.2 && bonnie.path.length) bonnie.path.shift();
   else if (dist > 0.001) {
     const s = Math.min(speed * dt, dist);
-    bonnie.x += dx / dist * s; bonnie.z += dz / dist * s;
+    const nx=bonnie.x+dx/dist*s,nz=bonnie.z+dz/dist*s;
+    if(!blockedR(nx,nz,.35)){bonnie.x=nx;bonnie.z=nz;}else bonnie.timer=0;
     bonnie.heading = Math.atan2(dx, dz) + FACE_OFFSET;
   }
 
@@ -1155,7 +1228,7 @@ function updateRadio(dt){
   if(!killerAnim.radioGroup)return;
   const p=killerAnim.radioGroup.getWorldPosition(new THREE.Vector3());
   const dist=Math.hypot(player.x-p.x,player.z-p.z);killerAnim.radioDist=dist;
-  const aimed=pickRadioRaycast()&&clearLine(player.x,player.z,p.x,p.z,0.05);
+  const aimed=state==='playing'&&!killerAnim.radioHeld&&dist<5.2&&pickRadioRaycast()&&clearLine(player.x,player.z,p.x,p.z,0.05);
   const canGrab=!killerAnim.radioHeld&&state==='playing'&&dist<5.2&&aimed&&!cameraOpen&&!diplomaOpen;
   $('radioGrabBtn').style.display=canGrab?'block':'none';
   if(!killerAnim.radioHeld&&dist<1.25&&!killerAnim.radioNear){killerAnim.radioNear=true;say('Una radio vieja suena junto al conejo amarillo…',3000);}
@@ -1242,7 +1315,7 @@ addEventListener('keydown', e => {
   input[e.code] = true;
   if (e.repeat) return;
   if (e.code === 'KeyF') toggleFlash();
-  if((e.code==='KeyE'||e.code==='Space')&&$('radioGrabBtn').style.display!=='none')grabRadio();
+  if(e.code==='KeyE'){if($('radioGrabBtn').style.display!=='none')grabRadio();else if($('officeDoorBtn').style.display!=='none')toggleOfficeDoor();}
   if (e.code === 'Escape' && cameraOpen) closeSecurityCameras();
   else if (e.code === 'Escape' && diplomaOpen) closeDiploma();
   else if (e.code === 'Escape' && state === 'paused') resume();
@@ -1372,6 +1445,7 @@ bindTap($('btnFlash'), toggleFlash);
 bindTap($('btnPause'), () => { if (state === 'playing') pause(); });
 bindTap($('cameraOpenBtn'),openSecurityCameras);
 bindTap($('radioGrabBtn'),grabRadio);
+bindTap($('officeDoorBtn'),toggleOfficeDoor);
 bindTap($('cameraCloseBtn'),closeSecurityCameras);
 bindTap($('cameraFeedClose'),()=>{ $('camFeed').style.display='none'; document.querySelectorAll('.cam-tile').forEach(b=>b.classList.remove('selected')); });
 $('cameraModal').addEventListener('pointerdown',e=>{if(e.target===$('cameraModal'))closeSecurityCameras();});
@@ -1523,6 +1597,8 @@ function update(dt) {
   updateSpringDisplay(dt);
   updateLights(dt);
   updateRadio(dt);
+  updateOfficeDoor(dt);
+  collectBatteryPickups(dt);
   whisperNearBonnie(dt);
 
   if (state === 'menu') player.yaw += dt * 0.08;
@@ -1577,7 +1653,7 @@ function update(dt) {
       missionUiT=0.1;
       const keyMission=$('missionKeys'),diplomaMission=$('missionDiplomas'),freezeMission=$('missionFreeze'),exitMission=$('missionExit');
       keyMission.textContent=`${keysGot>=3?'✓':'○'} Llaves ${keysGot}/3`; keyMission.classList.toggle('done',keysGot>=3);
-      diplomaMission.textContent=`${diplomasGot>=4?'✓':'○'} Diplomas ${diplomasGot}/4`; diplomaMission.classList.toggle('done',diplomasGot>=4);
+      diplomaMission.textContent=`${diplomasGot>=DIPLOMAS.length?'✓':'○'} Diplomas ${diplomasGot}/${DIPLOMAS.length}`; diplomaMission.classList.toggle('done',diplomasGot>=DIPLOMAS.length);
       freezeMission.textContent=`${bonnie.freezeDone?'✓':'○'} Congela a Bonnie · ${bonnie.freezeDone?'completo':'opcional'}`; freezeMission.classList.toggle('done',bonnie.freezeDone);
       const nearExit=Math.hypot(player.x-EXIT.x,player.z-EXIT.z)<2.4;
       exitMission.textContent=`${keysGot>=3&&nearExit?'✓':'○'} Llega a la salida${keysGot<3?' · requiere 3 llaves':''}`; exitMission.classList.toggle('done',keysGot>=3&&nearExit);
@@ -1629,7 +1705,7 @@ function update(dt) {
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(devicePixelRatio, IS_TOUCH ? 1.35 : 1.75));
   renderer.setSize(innerWidth, innerHeight);
   resizeSecurityFeed();
 });

@@ -8,6 +8,24 @@ public class PrototypeBootstrap : MonoBehaviour
     const float Cell = 4f;
     Transform world;
     CharacterController controller;
+    static readonly Dictionary<string, Material> safeMaterials = new Dictionary<string, Material>();
+    static readonly string[] safeShaderNames = { "Universal Render Pipeline/Lit", "Standard", "Legacy Shaders/Diffuse", "Unlit/Color", "Sprites/Default" };
+    static Shader safeLitShader;
+    static Shader GetSafeLitShader()
+    {
+        if (safeLitShader != null && safeLitShader.isSupported) return safeLitShader;
+        for (int i = 0; i < safeShaderNames.Length; i++)
+        {
+            Shader candidate = Shader.Find(safeShaderNames[i]);
+            if (candidate != null && candidate.isSupported) { safeLitShader = candidate; return candidate; }
+        }
+        Shader[] loaded = Resources.FindObjectsOfTypeAll<Shader>();
+        for (int i = 0; i < loaded.Length; i++)
+            if (loaded[i] != null && loaded[i].isSupported && loaded[i].name.IndexOf("Unlit/Color", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            { safeLitShader = loaded[i]; return loaded[i]; }
+        return null;
+    }
+
     Camera cam;
     Text status;
     Vector2 moveInput, lookInput;
@@ -23,7 +41,8 @@ public class PrototypeBootstrap : MonoBehaviour
         Screen.orientation = ScreenOrientation.LandscapeLeft;
         world = new GameObject("Pizzeria prototype").transform;
         BuildLighting(); BuildRoom(); BuildVents(); BuildPlayer(); BuildUI();
-        status.text = "PROTO · visor 3D táctil listo";
+        RepairUnsupportedMaterials();
+        status.text = "PROTO · materiales Android protegidos";
     }
 
     void BuildLighting()
@@ -142,10 +161,56 @@ public class PrototypeBootstrap : MonoBehaviour
     {
         var obj=GameObject.CreatePrimitive(PrimitiveType.Cube);obj.name=label;obj.transform.SetParent(world);obj.transform.position=pos;obj.transform.localScale=scale;Paint(obj,color,emission??Color.black);return obj;
     }
-    void Paint(GameObject obj,Color color,Color emission=default)
+    Material GetSafeMaterial(Color color, Color emission)
     {
-        var shader=Shader.Find("Universal Render Pipeline/Lit");if(shader==null)shader=Shader.Find("Standard");var mat=new Material(shader);mat.color=color;
-        if(emission.maxColorComponent>.001f){mat.EnableKeyword("_EMISSION");mat.SetColor("_EmissionColor",emission);}obj.GetComponent<Renderer>().material=mat;
+        string key = ColorUtility.ToHtmlStringRGBA(color) + ":" + ColorUtility.ToHtmlStringRGBA(emission);
+        Material cached;
+        if (safeMaterials.TryGetValue(key, out cached) && cached != null && cached.shader != null && cached.shader.isSupported) return cached;
+        Shader shader = GetSafeLitShader();
+        if (shader == null)
+        {
+            Debug.LogError("No hay ningún shader compatible para Android; revisa que Unity incluya los shaders Standard/Unlit.");
+            return null;
+        }
+        var material = new Material(shader) { name = "AndroidSafe_" + key, color = color, enableInstancing = true };
+        if (emission.maxColorComponent > .001f && material.HasProperty("_EmissionColor"))
+        {
+            material.EnableKeyword("_EMISSION");
+            material.SetColor("_EmissionColor", emission);
+        }
+        safeMaterials[key] = material;
+        return material;
+    }
+
+    void Paint(GameObject obj, Color color, Color emission = default)
+    {
+        var renderer = obj.GetComponent<Renderer>();
+        if (renderer == null) return;
+        var material = GetSafeMaterial(color, emission);
+        if (material != null) renderer.sharedMaterial = material;
+    }
+
+    void RepairUnsupportedMaterials()
+    {
+        var renderers = Resources.FindObjectsOfTypeAll<Renderer>();
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            var renderer = renderers[i];
+            if (renderer == null || !renderer.gameObject.scene.IsValid()) continue;
+            var materials = renderer.sharedMaterials;
+            bool changed = false;
+            for (int j = 0; j < materials.Length; j++)
+            {
+                var shader = materials[j] != null ? materials[j].shader : null;
+                if (shader == null || !shader.isSupported || shader.name == "Hidden/InternalErrorShader")
+                {
+                    Color preserved = materials[j] != null ? materials[j].color : new Color(.32f,.34f,.35f,1);
+                    var replacement = GetSafeMaterial(preserved, Color.black);
+                    if (replacement != null) { materials[j] = replacement; changed = true; }
+                }
+            }
+            if (changed) renderer.sharedMaterials = materials;
+        }
     }
 
     void ToggleLight(){RenderSettings.ambientIntensity=RenderSettings.ambientIntensity>.8f?.38f:1.15f;}

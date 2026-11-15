@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!129 &1
+PlayerSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 27
+  productGUID: 00000000000000000000000000000000
+  companyName: AMYR ANIMATIONS
+  productName: BONNIE'S TERROR Unity Prototype
+  defaultScreenOrientation: 3
+  m_ActiveColorSpace: 0
+  defaultIsNativeResolution: 1
+  runInBackground: 1
+  bundleVersion: 0.1.0
+  applicationIdentifier:
+    Android: com.amyranimations.bonniesterror.unity
+  AndroidMinSdkVersion: 23
+  AndroidTargetSdkVersion: 35
+  AndroidTargetArchitectures: 2
+  scriptingBackend:
+    Android: 1
+  il2cppCompilerConfiguration:
+    Android: 2
+  activeInputHandler: 0
+  androidStartInFullscreen: 1
+  AndroidUseSwappy: 1
+  AndroidEnableSustainedPerformanceMode: 1

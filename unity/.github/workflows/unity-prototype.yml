@@ -1,0 +1,18 @@
+name: Bonnie Terror Unity prototype
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  info:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Unity project structure
+        run: |
+          test -f unity/Assets/Scenes/Main.unity
+          test -f unity/Assets/Scripts/PrototypeBootstrap.cs
+          test -f unity/ProjectSettings/EditorBuildSettings.asset
+          test -f unity/Packages/manifest.json
+          echo "Unity project files are present. Use Unity Build Automation for APK compilation."

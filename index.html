@@ -10,6 +10,34 @@
   html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:var(--mono);color:var(--ink);user-select:none;-webkit-user-select:none;touch-action:none}
   #c{position:fixed;inset:0;width:100%;height:100%;display:block}
 
+  #introCinematic{position:fixed;inset:0;z-index:30;display:none;overflow:hidden;background:#020404;color:#eef5ed;font-family:var(--mono);pointer-events:auto}
+  #introCinematic.open{display:block}
+  .intro-noise,.intro-scan,.intro-glitch{position:absolute;inset:0;pointer-events:none}
+  .intro-noise{opacity:.11;background:repeating-radial-gradient(circle at 20% 30%,transparent 0 2px,#cde9d8 3px,transparent 4px 7px);mix-blend-mode:screen;animation:introNoise .18s steps(2) infinite}
+  .intro-scan{opacity:.15;background:repeating-linear-gradient(0deg,transparent 0 3px,#d8f8e8 4px,transparent 5px 7px);mix-blend-mode:screen}
+  .intro-card{position:absolute;left:7vw;bottom:12vh;max-width:min(640px,82vw);padding:clamp(12px,2.5vw,24px);border-left:3px solid #d8eee0;background:linear-gradient(90deg,rgba(0,0,0,.84),rgba(0,0,0,.24));text-shadow:0 2px 7px #000;animation:cardIn .45s both}
+  .intro-kicker{font-size:clamp(9px,1.6vw,13px);letter-spacing:.18em;color:#b9d0c1}
+  .intro-title{font-weight:900;font-size:clamp(22px,5vw,48px);letter-spacing:.08em;margin:8px 0;text-transform:uppercase}
+  .intro-copy{font-size:clamp(12px,2vw,18px);letter-spacing:.04em;color:#dce6df}
+  .intro-rec{position:absolute;top:5vh;left:5vw;font-size:clamp(9px,1.5vw,13px);letter-spacing:.17em;text-shadow:0 1px 5px #000}
+  .intro-rec span{color:#ff3448;animation:blink .8s steps(2) infinite}
+  #introSkip{position:absolute;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));padding:11px 14px;border:1px solid #d9e6dc;background:#07100ddd;color:#fff;font:700 11px var(--mono);letter-spacing:.12em;touch-action:manipulation}
+  .intro-evidence{display:none;position:absolute;right:8vw;top:18vh;width:min(290px,34vw);padding:14px 15px 12px;background:#d4ccb1;color:#181715;box-shadow:7px 10px 28px #000b;transform:rotate(2.4deg);font-family:var(--mono)}
+  .intro-evidence.show{display:block;animation:evidenceIn .45s both}
+  .evidence-stamp{font-size:9px;letter-spacing:.13em;color:#7f1f20;border-bottom:1px solid #675d50;padding-bottom:5px}
+  .evidence-title{font-weight:900;font-size:clamp(19px,3vw,31px);letter-spacing:.09em;margin:9px 0 3px}
+  .evidence-line,.evidence-small{font-size:clamp(8px,1.05vw,10px);letter-spacing:.05em}
+  .evidence-photo{height:clamp(64px,11vh,100px);margin:9px 0;background:linear-gradient(135deg,#18201e,#777363 42%,#252623 43%,#090b0a);position:relative;filter:grayscale(1)}
+  .evidence-photo:after{content:'FOTOGRAMA RECUPERADO';position:absolute;bottom:5px;left:6px;color:#f2edda;background:#111b;padding:3px 4px;font-size:8px;letter-spacing:.06em}
+  .evidence-redact{font-size:10px;font-weight:900;color:#791c1e;border-top:1px solid #867b68;border-bottom:1px solid #867b68;padding:6px 0;margin:7px 0}
+  .evidence-small{color:#4b453a}
+  .intro-glitch{opacity:0;background:linear-gradient(transparent 0 35%,rgba(255,255,255,.42) 36% 41%,transparent 43%),linear-gradient(90deg,rgba(255,0,30,.30),transparent 28%,transparent 72%,rgba(0,210,255,.22));mix-blend-mode:screen}
+  #introCinematic.glitch .intro-glitch{animation:introGlitch .32s steps(2) both}
+  @keyframes introGlitch{0%{opacity:0;transform:none}25%{opacity:.9;transform:translateX(5px) skewX(3deg)}55%{opacity:.7;transform:translateX(-6px);clip-path:inset(35% 0 44%)}100%{opacity:0;transform:none}}
+  @keyframes introNoise{0%{transform:translate(0,0)}50%{transform:translate(1%,-1%)}100%{transform:translate(-1%,1%)}}
+  @keyframes cardIn{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:none}}
+  @keyframes evidenceIn{from{opacity:0;transform:translate(12px,8px) rotate(5deg)}to{opacity:1;transform:rotate(2.4deg)}}
+
   @keyframes blink{50%{opacity:0}}
   @keyframes glitch{0%,90%,100%{transform:none}91%{transform:translate(-4px,1px) skewX(6deg)}93%{transform:translate(5px,-1px)}95%{transform:translate(-2px,0) skewX(-5deg)}97%{transform:none}}
 
@@ -124,9 +152,10 @@
   #knob{position:absolute;left:38px;top:38px;width:64px;height:64px;border-radius:50%;pointer-events:none;
     background:radial-gradient(circle at 34% 28%,#ffd1d4 0,#ff6673 18%,#c8162b 54%,#590b17 82%,#26070c 100%);box-shadow:0 2px 14px rgba(255,42,58,.72),inset 0 2px 4px rgba(255,255,255,.48),inset 0 -5px 8px rgba(0,0,0,.75)}
   .tbtn{position:absolute;z-index:2;pointer-events:auto;width:78px;height:78px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
-    font-family:var(--cond);font-weight:800;font-size:10px;letter-spacing:2px;color:var(--ink);touch-action:none;border:3px solid #0b0b0d;
+    font-family:var(--cond);font-weight:800;font-size:10px;letter-spacing:2px;color:#fff;touch-action:none;border:3px solid #0b0b0d;
     background:radial-gradient(circle at 35% 28%,#a2a5ab,#55575d 52%,#232428);box-shadow:inset 0 2px 0 rgba(255,255,255,.4),inset 0 -4px 8px rgba(0,0,0,.55),0 4px 10px rgba(0,0,0,.8),0 0 0 2px #17171a}
-  .tbtn svg{width:30px;height:30px}
+  .tbtn svg{width:29px;height:29px;color:#fff;stroke:#fff;filter:drop-shadow(0 1px 2px #000)}
+  .tbtn span{color:#fff;text-shadow:0 1px 3px #000}
   .tbtn.on{color:var(--amber);box-shadow:inset 0 2px 0 rgba(255,255,255,.4),inset 0 -4px 8px rgba(0,0,0,.55),0 4px 10px rgba(0,0,0,.8),0 0 0 2px #17171a,0 0 16px rgba(255,194,61,.75)}
   .tbtn:active{filter:brightness(.85)}
   #btnRun{right:calc(28px + env(safe-area-inset-right,0px));bottom:28px}
@@ -186,9 +215,9 @@
       <div id="clk">12 AM</div>
       <div id="night">NOCHE 1 · <span id="timer">00:00</span></div>
       <div id="keysRow">
-        <svg class="kico" viewBox="0 0 24 24"><circle cx="7" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M11 12h11M18 12v4M21 12v3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
-        <svg class="kico" viewBox="0 0 24 24"><circle cx="7" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M11 12h11M18 12v4M21 12v3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
-        <svg class="kico" viewBox="0 0 24 24"><circle cx="7" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M11 12h11M18 12v4M21 12v3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+        <svg class="kico" viewBox="0 0 24 24" aria-label="Llave"><circle cx="7.5" cy="8" r="4.2" fill="none" stroke="currentColor" stroke-width="2.1"/><path d="M10.5 11 20 20m-3-3 2-2m-5-1 2-2" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg>
+        <svg class="kico" viewBox="0 0 24 24" aria-label="Llave"><circle cx="7.5" cy="8" r="4.2" fill="none" stroke="currentColor" stroke-width="2.1"/><path d="M10.5 11 20 20m-3-3 2-2m-5-1 2-2" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg>
+        <svg class="kico" viewBox="0 0 24 24" aria-label="Llave"><circle cx="7.5" cy="8" r="4.2" fill="none" stroke="currentColor" stroke-width="2.1"/><path d="M10.5 11 20 20m-3-3 2-2m-5-1 2-2" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg>
         <span id="keysTxt">0/3</span>
       </div>
     </div>
@@ -227,6 +256,7 @@
 <button id="radioGrabBtn" type="button" aria-label="Agarrar radio" style="display:none;position:fixed;z-index:12;left:50%;bottom:90px;transform:translateX(-50%);padding:12px 18px;border:2px solid #9ec7aa;border-radius:30px;background:#09120feF;color:#e8fff0;font:900 16px var(--mono);letter-spacing:2px;pointer-events:auto;touch-action:manipulation">✋ AGARRAR RADIO</button>
 <button id="cameraOpenBtn" type="button" aria-label="Abrir cámaras">▦ &nbsp; CÁMARAS</button>
 <div id="cameraModal" aria-hidden="true"><div class="cam-head"><div><div class="cam-title">MONITOR DE SEGURIDAD</div><div class="cam-status">● SEÑAL ESTABLE · 12 CÁMARAS</div></div><button id="cameraCloseBtn" class="cam-x" type="button" aria-label="Cerrar interfaz de cámaras">×</button></div><div id="camFeed" style="display:none"><canvas id="camFeedCanvas"></canvas><div id="camFeedLabel">CAM 01 · SALÓN PRINCIPAL</div><button id="cameraFeedClose" class="cam-x" type="button" aria-label="Salir de la cámara" style="position:absolute;right:8px;top:8px;z-index:3">×</button></div><div id="cameraGrid" class="cam-grid"></div><div class="cam-foot">ELIGE UNA CÁMARA PARA VER EL CUARTO · ESC PARA CERRAR</div></div>
+<div id="introCinematic" aria-hidden="true"><div class="intro-noise"></div><div class="intro-scan"></div><div class="intro-card"><div class="intro-kicker" id="introKicker">REGISTRO NOCTURNO · 00:00</div><div class="intro-title" id="introTitle">EL ÚLTIMO TURNO</div><div class="intro-copy" id="introCopy">La pizzería ya debería estar vacía.</div></div><div class="intro-evidence" id="introEvidence"><div class="evidence-stamp">ARCHIVO POLICIAL · COPIA</div><div class="evidence-title">DESAPARICIONES</div><div class="evidence-line">EXPEDIENTE N.º 04 — EL ALMACÉN</div><div class="evidence-photo"></div><div class="evidence-redact">ÚLTIMA SEÑAL: 02:17 AM</div><div class="evidence-small">CASO ABIERTO · NO DIFUNDIR</div></div><div class="intro-rec">REC <span>●</span> &nbsp; CÁMARA DE SEGURIDAD</div><button id="introSkip" type="button">SALTAR CINEMÁTICA »</button><div class="intro-glitch" id="introGlitch"></div></div>
 <div id="msg"></div>
 <div id="diplomaModal" aria-hidden="true">
   <div id="diplomaCard" role="dialog" aria-modal="true" aria-labelledby="diplomaName">
@@ -243,8 +273,8 @@
   <div id="lookZone"></div>
   <div id="joyZone"></div>
   <div id="joyBase"><div id="knob"></div></div>
-  <div class="tbtn" id="btnFlash"><svg viewBox="0 0 24 24"><path d="M8 2h8v5l2 3v12H6V10l2-3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 13v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>LUZ</span></div>
-  <div class="tbtn" id="btnRun"><svg viewBox="0 0 24 24"><path d="M13 2L5 14h6l-1 8 8-12h-6z" fill="currentColor"/></svg><span>CORRER</span></div>
+  <div class="tbtn" id="btnFlash"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6v3l2 3v11H7V9l2-3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 10h8M12 13v4M5 3 3 1M19 3l2-2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span>LUZ</span></div>
+  <div class="tbtn" id="btnRun"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="14" cy="4" r="2" fill="currentColor" stroke="none"/><path d="m12 7-3 4 4 2 2 6m-6-7-4 3m7-4 4 2 2-2m-9 5-2 5m4-8 4 2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>CORRER</span></div>
   <div class="tbtn" id="btnPause"><svg viewBox="0 0 24 24"><rect x="5" y="4" width="5" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="5" height="16" rx="1" fill="currentColor"/></svg></div>
 </div>
 
@@ -414,7 +444,7 @@ const enemyRig = { root: null };
 const springDisplay = { group: null, root: null, bones: {}, head: null, headBase: null, gazeQ: new THREE.Quaternion(), parentQ: new THREE.Quaternion(), headPos: new THREE.Vector3(), gazeDir: new THREE.Vector3(), targetQ: new THREE.Quaternion(), baseInv: new THREE.Quaternion(), euler: new THREE.Euler(0,0,0,'YXZ') };
 // ---------- Renderer / escena ----------
 const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: !IS_TOUCH, powerPreference: 'high-performance', precision: 'mediump' });
-renderer.setPixelRatio(Math.min(devicePixelRatio, IS_TOUCH ? 1.35 : 1.75));
+renderer.setPixelRatio(Math.min(devicePixelRatio, IS_TOUCH ? 1.40 : 1.75));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.08;
@@ -849,7 +879,7 @@ let poolT = 0, flickerTick = 0;
 function updateLights(dt) {
   flickerTick -= dt;
   if (flickerTick <= 0) {
-    flickerTick = 0.12;
+    flickerTick = 0.16;
   for (const s of sources) {
     if (s.dead) { s.level = 0; continue; }
     s.ft -= dt;
@@ -862,7 +892,7 @@ function updateLights(dt) {
   }
   poolT -= dt;
   if (poolT <= 0) {
-    poolT = 0.5;
+    poolT = 0.65;
     const cand = sources.filter(s => !s.dead)
       .map(s => ({ s, d: ((s.x - player.x) ** 2 + (s.z - player.z) ** 2) * (s.room === curRoom ? 1 : 6) }))
       .sort((a, b) => a.d - b.d).slice(0, POOL.length).map(o => o.s);
@@ -875,7 +905,7 @@ function updateLights(dt) {
   }
   for (const p of POOL) {
     const tgt = p.src ? p.src.level * p.src.i : 0;
-    p.cur += (tgt - p.cur) * Math.min(1, dt * 14);
+    p.cur += (tgt - p.cur) * Math.min(1, dt * 10);
     p.l.intensity = p.cur;
   }
 }
@@ -1001,11 +1031,60 @@ function newGame() {
   loadRosterState();
 }
 
-function startGame() {
-  initAudio(); newGame(); show(null);
-  $('hud').style.display='block'; $('vig').style.display='block'; $('flash').style.opacity=0; $('cameraOpenBtn').style.display='block';
-  state='playing'; setTC(true); lock(); stopAmb(); startAmb();
+let introTime=0,introActive=false,introCompletedThisSession=false,introMusicOsc=null,introMusicGain=null,introMusicTimer=0;
+const introShots=[
+  {p:[22,2.1,24],look:[28,1.05,7],kicker:'REGISTRO NOCTURNO · 00:00',title:'EL ÚLTIMO TURNO',copy:'La pizzería ya debería estar vacía.'},
+  {p:[42,2.0,17],look:[31,1.05,6],kicker:'CÁMARA 03 · SEÑAL INESTABLE',title:'EL ESCENARIO',copy:'Las luces siguen encendidas. Ellos también.'},
+  {p:[33,1.9,15],look:[20,1.05,6],kicker:'AVISO INTERNO · ARCHIVO 01',title:'NO HAY FUNCIÓN ESTA NOCHE',copy:'Desde la cocina aseguran que los muñecos estaban cantando.'},
+  {p:[58,2.15,13],look:[34,1.1,6],kicker:'EXPEDIENTE N.º 04 · COPIA POLICIAL',title:'UNA NOCHE SIN TESTIGOS',copy:'La última señal apareció después del cierre.'},
+  {p:[31,2.25,12],look:[27,1.1,6],kicker:'FIN DE GRABACIÓN · NOCHE 1',title:'AHORA TE TOCA A TI',copy:'Reúne las llaves. Encuentra la salida. No te quedes solo.'}
+];
+function introSeen(){try{return localStorage.getItem('bonniesTerrorIntroSeen')==='1'||introCompletedThisSession;}catch(_){return introCompletedThisSession;}}
+function setIntroCard(i){const v=introShots[Math.min(i,introShots.length-1)];$('introKicker').textContent=v.kicker;$('introTitle').textContent=v.title;$('introCopy').textContent=v.copy;const card=document.querySelector('.intro-card');card.style.animation='none';void card.offsetWidth;card.style.animation='cardIn .45s both';const evidence=$('introEvidence');evidence.classList.toggle('show',i===3);}
+function startIntroMusic(){
+  if(!actx||introMusicOsc)return;
+  const osc=actx.createOscillator(),gain=actx.createGain(),filter=actx.createBiquadFilter();
+  const notes=[196,220,261.63,220,174.61,196,146.83,164.81];let n=0,now=actx.currentTime;
+  osc.type='triangle';osc.frequency.setValueAtTime(notes[0],now);filter.type='lowpass';filter.frequency.value=620;gain.gain.value=0;
+  osc.connect(filter);filter.connect(gain);gain.connect(master);osc.start();gain.gain.linearRampToValueAtTime(.055,now+1.1);
+  introMusicOsc=osc;introMusicGain=gain;
+  introMusicTimer=setInterval(()=>{if(!introMusicOsc||!actx)return;n=(n+1)%notes.length;const t=actx.currentTime;osc.frequency.cancelScheduledValues(t);osc.frequency.setTargetAtTime(notes[n],t,.08);},430);
+}
+function stopIntroMusic(){if(introMusicTimer){clearInterval(introMusicTimer);introMusicTimer=0;}if(introMusicOsc&&actx){const osc=introMusicOsc,gain=introMusicGain;introMusicOsc=null;introMusicGain=null;gain.gain.cancelScheduledValues(actx.currentTime);gain.gain.setTargetAtTime(0,actx.currentTime,.12);setTimeout(()=>{try{osc.stop();}catch(_){}},500);}}
+function launchGameplay(){
+  $('hud').style.display='block';$('vig').style.display='block';$('flash').style.opacity=0;$('cameraOpenBtn').style.display='block';
+  state='playing';setTC(true);lock();if(!ambSrc)startAmb();
   say('Tienes 30 segundos para prepararte. Te avisaré cuando Toy Bonnie salga a cazarte.',4500);
+}
+function beginIntro(){
+  introActive=true;introTime=0;updateIntro.lastShot=-1;state='intro';show(null);setTC(false);document.exitPointerLock();
+  $('hud').style.display='none';$('vig').style.display='none';$('cameraOpenBtn').style.display='none';$('introCinematic').classList.add('open');$('introCinematic').setAttribute('aria-hidden','false');setIntroCard(0);
+  if(enemyMixer&&killerAnim.actions.walk){const a=killerAnim.actions.walk;a.reset().setLoop(THREE.LoopRepeat,Infinity).play();killerAnim.current=a;}
+  const toy=animatronicRoster.actors.toy;if(toy&&toy.model)rosterAnim(toy,'walk');
+  startAmb();startIntroMusic();
+}
+function finishIntro(){
+  if(!introActive)return;introActive=false;introCompletedThisSession=true;try{localStorage.setItem('bonniesTerrorIntroSeen','1');}catch(_){}
+  $('introCinematic').classList.remove('open','glitch');$('introCinematic').setAttribute('aria-hidden','true');$('introEvidence').classList.remove('show');stopIntroMusic();
+  if(enemyMixer&&killerAnim.actions.idle){if(killerAnim.current)killerAnim.current.fadeOut(.12);const a=killerAnim.actions.idle;a.reset().setLoop(THREE.LoopRepeat,Infinity).fadeIn(.12).play();killerAnim.current=a;}
+  const toy=animatronicRoster.actors.toy;if(toy&&toy.model)rosterAnim(toy,'idle');
+  launchGameplay();
+}
+function skipIntro(){if(introActive)finishIntro();}
+function updateIntro(dt){
+  if(!introActive)return;introTime+=dt;const duration=2.7,total=introShots.length*duration;
+  if(introTime>=total){finishIntro();return;}
+  const i=Math.min(introShots.length-1,Math.floor(introTime/duration)),t0=(introTime-i*duration)/duration;
+  if(i!==updateIntro.lastShot){updateIntro.lastShot=i;setIntroCard(i);$('introCinematic').classList.remove('glitch');void $('introCinematic').offsetWidth;$('introCinematic').classList.add('glitch');}
+  const a=introShots[i],b=introShots[Math.min(i+1,introShots.length-1)],t=t0*t0*(3-2*t0);
+  camera.position.set(a.p[0]+(b.p[0]-a.p[0])*t,a.p[1]+(b.p[1]-a.p[1])*t,a.p[2]+(b.p[2]-a.p[2])*t);
+  camera.lookAt(a.look[0]+(b.look[0]-a.look[0])*t,a.look[1]+(b.look[1]-a.look[1])*t,a.look[2]+(b.look[2]-a.look[2])*t);
+  const toy=animatronicRoster.actors.toy;if(toy&&toy.mixer&&toy.model)toy.mixer.update(dt);
+  if(enemyMixer&&killerAnim.current)enemyMixer.update(dt);
+}
+function startGame(){
+  initAudio();newGame();show(null);stopAmb();
+  try{if(!introSeen())beginIntro();else launchGameplay();}catch(_){$('introCinematic').classList.remove('open');launchGameplay();}
 }
 
 function pause() { $('cameraOpenBtn').style.display='none'; resetTouchState(); state = 'paused'; setTC(false); show('pause'); document.exitPointerLock(); duckAmb(true); }
@@ -1643,6 +1722,7 @@ $('diplomaModal').addEventListener('touchmove',e=>e.stopPropagation(),{passive:f
 
 // ---------- Menús ----------
 bindTap($('playBtn'), startGame);
+bindTap($('introSkip'), skipIntro);
 bindTap($('helpBtn'), () => show('help'));
 bindTap($('helpBack'), () => show('menu'));
 document.querySelectorAll('[data-d]').forEach(b => bindTap(b, () => {
@@ -1780,6 +1860,8 @@ function updateSpringDisplay(dt) {
 const HRS = ['12', '1', '2', '3', '4', '5', '6'];
 function update(dt) {
   const t = performance.now() / 1000;
+  updateIntro(dt);
+  if(state==='intro'){updateRadio(dt);return;}
   updateSpringDisplay(dt);
   updateLights(dt);
   updateRadio(dt);
@@ -1796,7 +1878,7 @@ function update(dt) {
   const chaseDist=Math.hypot(bonnie.x-player.x,bonnie.z-player.z);
   if(animatronicRoster.activeId==='springtrap'&&((state==='playing'&&['depart','chase','return','ascend'].includes(animatronicRoster.step)&&!(ventState.inside&&animatronicRoster.step==='chase'))||state==='caught'))updateKillerAnimation(chaseDist);
   else if(killerAnim.actions.idle){if(killerAnim.current!==killerAnim.actions.idle){if(killerAnim.current)killerAnim.current.fadeOut(.18);killerAnim.current=killerAnim.actions.idle;killerAnim.current.reset().setLoop(THREE.LoopRepeat,Infinity).fadeIn(.18).play();}}
-  if(enemyMixer&&killerAnim.current&&((state==='playing'&&!diplomaOpen&&!cameraOpen)||state==='caught'))enemyMixer.update(dt);
+  if(enemyMixer&&killerAnim.current&&((state==='playing'&&!diplomaOpen&&!cameraOpen)||state==='caught'||state==='intro'))enemyMixer.update(dt);
 
 
   if (state === 'playing' && !diplomaOpen && !cameraOpen) {
@@ -1900,7 +1982,7 @@ function update(dt) {
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setPixelRatio(Math.min(devicePixelRatio, IS_TOUCH ? 1.35 : 1.75));
+  renderer.setPixelRatio(Math.min(devicePixelRatio, IS_TOUCH ? 1.40 : 1.75));
   renderer.setSize(innerWidth, innerHeight);
   resizeSecurityFeed();
 });

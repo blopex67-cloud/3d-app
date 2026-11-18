@@ -10,34 +10,12 @@
   html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:var(--mono);color:var(--ink);user-select:none;-webkit-user-select:none;touch-action:none}
   #c{position:fixed;inset:0;width:100%;height:100%;display:block}
 
-  #introCinematic{position:fixed;inset:0;z-index:30;display:none;overflow:hidden;background:#020404;color:#eef5ed;font-family:var(--mono);pointer-events:auto}
+  #introCinematic{position:fixed;inset:0;z-index:30;display:none;overflow:hidden;background:transparent;color:#eef5ed;font-family:var(--mono);pointer-events:none}
   #introCinematic.open{display:block}
-  .intro-noise,.intro-scan,.intro-glitch{position:absolute;inset:0;pointer-events:none}
-  .intro-noise{opacity:.11;background:repeating-radial-gradient(circle at 20% 30%,transparent 0 2px,#cde9d8 3px,transparent 4px 7px);mix-blend-mode:screen;animation:introNoise .18s steps(2) infinite}
-  .intro-scan{opacity:.15;background:repeating-linear-gradient(0deg,transparent 0 3px,#d8f8e8 4px,transparent 5px 7px);mix-blend-mode:screen}
-  .intro-card{position:absolute;left:7vw;bottom:12vh;max-width:min(640px,82vw);padding:clamp(12px,2.5vw,24px);border-left:3px solid #d8eee0;background:linear-gradient(90deg,rgba(0,0,0,.84),rgba(0,0,0,.24));text-shadow:0 2px 7px #000;animation:cardIn .45s both}
-  .intro-kicker{font-size:clamp(9px,1.6vw,13px);letter-spacing:.18em;color:#b9d0c1}
-  .intro-title{font-weight:900;font-size:clamp(22px,5vw,48px);letter-spacing:.08em;margin:8px 0;text-transform:uppercase}
-  .intro-copy{font-size:clamp(12px,2vw,18px);letter-spacing:.04em;color:#dce6df}
-  .intro-rec{position:absolute;top:5vh;left:5vw;font-size:clamp(9px,1.5vw,13px);letter-spacing:.17em;text-shadow:0 1px 5px #000}
+  .intro-rec{position:absolute;top:calc(16px + env(safe-area-inset-top,0px));left:calc(18px + env(safe-area-inset-left,0px));font-size:clamp(9px,1.5vw,13px);letter-spacing:.17em;text-shadow:0 1px 5px #000}
   .intro-rec span{color:#ff3448;animation:blink .8s steps(2) infinite}
-  #introSkip{position:absolute;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));padding:11px 14px;border:1px solid #d9e6dc;background:#07100ddd;color:#fff;font:700 11px var(--mono);letter-spacing:.12em;touch-action:manipulation}
-  .intro-evidence{display:none;position:absolute;right:8vw;top:18vh;width:min(290px,34vw);padding:14px 15px 12px;background:#d4ccb1;color:#181715;box-shadow:7px 10px 28px #000b;transform:rotate(2.4deg);font-family:var(--mono)}
-  .intro-evidence.show{display:block;animation:evidenceIn .45s both}
-  .evidence-stamp{font-size:9px;letter-spacing:.13em;color:#7f1f20;border-bottom:1px solid #675d50;padding-bottom:5px}
-  .evidence-title{font-weight:900;font-size:clamp(19px,3vw,31px);letter-spacing:.09em;margin:9px 0 3px}
-  .evidence-line,.evidence-small{font-size:clamp(8px,1.05vw,10px);letter-spacing:.05em}
-  .evidence-photo{height:clamp(64px,11vh,100px);margin:9px 0;background:linear-gradient(135deg,#18201e,#777363 42%,#252623 43%,#090b0a);position:relative;filter:grayscale(1)}
-  .evidence-photo:after{content:'FOTOGRAMA RECUPERADO';position:absolute;bottom:5px;left:6px;color:#f2edda;background:#111b;padding:3px 4px;font-size:8px;letter-spacing:.06em}
-  .evidence-redact{font-size:10px;font-weight:900;color:#791c1e;border-top:1px solid #867b68;border-bottom:1px solid #867b68;padding:6px 0;margin:7px 0}
-  .evidence-small{color:#4b453a}
-  .intro-glitch{opacity:0;background:linear-gradient(transparent 0 35%,rgba(255,255,255,.42) 36% 41%,transparent 43%),linear-gradient(90deg,rgba(255,0,30,.30),transparent 28%,transparent 72%,rgba(0,210,255,.22));mix-blend-mode:screen}
-  #introCinematic.glitch .intro-glitch{animation:introGlitch .32s steps(2) both}
-  @keyframes introGlitch{0%{opacity:0;transform:none}25%{opacity:.9;transform:translateX(5px) skewX(3deg)}55%{opacity:.7;transform:translateX(-6px);clip-path:inset(35% 0 44%)}100%{opacity:0;transform:none}}
-  @keyframes introNoise{0%{transform:translate(0,0)}50%{transform:translate(1%,-1%)}100%{transform:translate(-1%,1%)}}
-  @keyframes cardIn{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:none}}
-  @keyframes evidenceIn{from{opacity:0;transform:translate(12px,8px) rotate(5deg)}to{opacity:1;transform:rotate(2.4deg)}}
-
+  #introSkip{position:absolute;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));padding:10px 13px;border:1px solid #d9e6dc;background:#07100ddd;color:#fff;font:700 10px var(--mono);letter-spacing:.12em;touch-action:manipulation;pointer-events:auto}
+  .intro-glitch{display:none}
   @keyframes blink{50%{opacity:0}}
   @keyframes glitch{0%,90%,100%{transform:none}91%{transform:translate(-4px,1px) skewX(6deg)}93%{transform:translate(5px,-1px)}95%{transform:translate(-2px,0) skewX(-5deg)}97%{transform:none}}
 
@@ -256,7 +234,7 @@
 <button id="radioGrabBtn" type="button" aria-label="Agarrar radio" style="display:none;position:fixed;z-index:12;left:50%;bottom:90px;transform:translateX(-50%);padding:12px 18px;border:2px solid #9ec7aa;border-radius:30px;background:#09120feF;color:#e8fff0;font:900 16px var(--mono);letter-spacing:2px;pointer-events:auto;touch-action:manipulation">✋ AGARRAR RADIO</button>
 <button id="cameraOpenBtn" type="button" aria-label="Abrir cámaras">▦ &nbsp; CÁMARAS</button>
 <div id="cameraModal" aria-hidden="true"><div class="cam-head"><div><div class="cam-title">MONITOR DE SEGURIDAD</div><div class="cam-status">● SEÑAL ESTABLE · 12 CÁMARAS</div></div><button id="cameraCloseBtn" class="cam-x" type="button" aria-label="Cerrar interfaz de cámaras">×</button></div><div id="camFeed" style="display:none"><canvas id="camFeedCanvas"></canvas><div id="camFeedLabel">CAM 01 · SALÓN PRINCIPAL</div><button id="cameraFeedClose" class="cam-x" type="button" aria-label="Salir de la cámara" style="position:absolute;right:8px;top:8px;z-index:3">×</button></div><div id="cameraGrid" class="cam-grid"></div><div class="cam-foot">ELIGE UNA CÁMARA PARA VER EL CUARTO · ESC PARA CERRAR</div></div>
-<div id="introCinematic" aria-hidden="true"><div class="intro-noise"></div><div class="intro-scan"></div><div class="intro-card"><div class="intro-kicker" id="introKicker">REGISTRO NOCTURNO · 00:00</div><div class="intro-title" id="introTitle">EL ÚLTIMO TURNO</div><div class="intro-copy" id="introCopy">La pizzería ya debería estar vacía.</div></div><div class="intro-evidence" id="introEvidence"><div class="evidence-stamp">ARCHIVO POLICIAL · COPIA</div><div class="evidence-title">DESAPARICIONES</div><div class="evidence-line">EXPEDIENTE N.º 04 — EL ALMACÉN</div><div class="evidence-photo"></div><div class="evidence-redact">ÚLTIMA SEÑAL: 02:17 AM</div><div class="evidence-small">CASO ABIERTO · NO DIFUNDIR</div></div><div class="intro-rec">REC <span>●</span> &nbsp; CÁMARA DE SEGURIDAD</div><button id="introSkip" type="button">SALTAR CINEMÁTICA »</button><div class="intro-glitch" id="introGlitch"></div></div>
+<div id="introCinematic" aria-hidden="true"><div class="intro-rec">REC <span>●</span> &nbsp; CÁMARA DE SEGURIDAD</div><button id="introSkip" type="button">SALTAR »</button><div class="intro-glitch" id="introGlitch"></div></div>
 <div id="msg"></div>
 <div id="diplomaModal" aria-hidden="true">
   <div id="diplomaCard" role="dialog" aria-modal="true" aria-labelledby="diplomaName">
@@ -694,10 +672,10 @@ function buildWorld() {
     }
   });
 
-  // Los créditos quedan en el menú; el muro del pasillo usa solo letras LED pegadas a la pared.
-  // Se quitó el animatrónico blanco del escenario. Se conservan la tarima y la radio.
+  // El animatrónico blanco del escenario fue retirado. Los dos modelos ya previstos
+  // para el escenario (Toy Bonnie y Springtrap, en sus posiciones de reposo) se conservan.
 
-  // Enemigos activos: Toy Bonnie y Springtrap.
+  // Enemigos que sí salen a cazar: Toy Bonnie y Springtrap. Mimic permanece eliminado.
   loadRosterActor('toy');
 
   // Radio cercana al Spring Bonnie del escenario; música se filtra como radio vieja y se oye espacialmente.
@@ -1032,61 +1010,65 @@ function newGame() {
 }
 
 let introTime=0,introActive=false,introCompletedThisSession=false,introMusicOsc=null,introMusicGain=null,introMusicTimer=0;
-const introShots=[
-  {p:[22,2.1,24],look:[28,1.05,7],kicker:'REGISTRO NOCTURNO · 00:00',title:'EL ÚLTIMO TURNO',copy:'La pizzería ya debería estar vacía.'},
-  {p:[42,2.0,17],look:[31,1.05,6],kicker:'CÁMARA 03 · SEÑAL INESTABLE',title:'EL ESCENARIO',copy:'Las luces siguen encendidas. Ellos también.'},
-  {p:[33,1.9,15],look:[20,1.05,6],kicker:'AVISO INTERNO · ARCHIVO 01',title:'NO HAY FUNCIÓN ESTA NOCHE',copy:'Desde la cocina aseguran que los muñecos estaban cantando.'},
-  {p:[58,2.15,13],look:[34,1.1,6],kicker:'EXPEDIENTE N.º 04 · COPIA POLICIAL',title:'UNA NOCHE SIN TESTIGOS',copy:'La última señal apareció después del cierre.'},
-  {p:[31,2.25,12],look:[27,1.1,6],kicker:'FIN DE GRABACIÓN · NOCHE 1',title:'AHORA TE TOCA A TI',copy:'Reúne las llaves. Encuentra la salida. No te quedes solo.'}
-];
-function introSeen(){try{return localStorage.getItem('bonniesTerrorIntroSeen')==='1'||introCompletedThisSession;}catch(_){return introCompletedThisSession;}}
-function setIntroCard(i){const v=introShots[Math.min(i,introShots.length-1)];$('introKicker').textContent=v.kicker;$('introTitle').textContent=v.title;$('introCopy').textContent=v.copy;const card=document.querySelector('.intro-card');card.style.animation='none';void card.offsetWidth;card.style.animation='cardIn .45s both';const evidence=$('introEvidence');evidence.classList.toggle('show',i===3);}
+let introCamPath=null,introLookPath=null;
+function introSeen(){try{return localStorage.getItem('bonniesTerrorIntro3dSeen')==='1'||introCompletedThisSession;}catch(_){return introCompletedThisSession;}}
 function startIntroMusic(){
   if(!actx||introMusicOsc)return;
   const osc=actx.createOscillator(),gain=actx.createGain(),filter=actx.createBiquadFilter();
-  const notes=[196,220,261.63,220,174.61,196,146.83,164.81];let n=0,now=actx.currentTime;
-  osc.type='triangle';osc.frequency.setValueAtTime(notes[0],now);filter.type='lowpass';filter.frequency.value=620;gain.gain.value=0;
-  osc.connect(filter);filter.connect(gain);gain.connect(master);osc.start();gain.gain.linearRampToValueAtTime(.055,now+1.1);
+  const notes=[146.83,174.61,196,174.61,130.81,146.83,110,130.81];let n=0,now=actx.currentTime;
+  osc.type='sine';osc.frequency.setValueAtTime(notes[0],now);filter.type='lowpass';filter.frequency.value=360;gain.gain.value=0;
+  osc.connect(filter);filter.connect(gain);gain.connect(master);osc.start();gain.gain.linearRampToValueAtTime(.025,now+1.4);
   introMusicOsc=osc;introMusicGain=gain;
-  introMusicTimer=setInterval(()=>{if(!introMusicOsc||!actx)return;n=(n+1)%notes.length;const t=actx.currentTime;osc.frequency.cancelScheduledValues(t);osc.frequency.setTargetAtTime(notes[n],t,.08);},430);
+  introMusicTimer=setInterval(()=>{if(!introMusicOsc||!actx)return;n=(n+1)%notes.length;const t=actx.currentTime;osc.frequency.setTargetAtTime(notes[n],t,.12);},650);
 }
-function stopIntroMusic(){if(introMusicTimer){clearInterval(introMusicTimer);introMusicTimer=0;}if(introMusicOsc&&actx){const osc=introMusicOsc,gain=introMusicGain;introMusicOsc=null;introMusicGain=null;gain.gain.cancelScheduledValues(actx.currentTime);gain.gain.setTargetAtTime(0,actx.currentTime,.12);setTimeout(()=>{try{osc.stop();}catch(_){}},500);}}
+function stopIntroMusic(){if(introMusicTimer){clearInterval(introMusicTimer);introMusicTimer=0;}if(introMusicOsc&&actx){const osc=introMusicOsc,gain=introMusicGain;introMusicOsc=null;introMusicGain=null;gain.gain.cancelScheduledValues(actx.currentTime);gain.gain.setTargetAtTime(0,actx.currentTime,.15);setTimeout(()=>{try{osc.stop();}catch(_){}},600);}}
 function launchGameplay(){
   $('hud').style.display='block';$('vig').style.display='block';$('flash').style.opacity=0;$('cameraOpenBtn').style.display='block';
   state='playing';setTC(true);lock();if(!ambSrc)startAmb();
   say('Tienes 30 segundos para prepararte. Te avisaré cuando Toy Bonnie salga a cazarte.',4500);
 }
 function beginIntro(){
-  introActive=true;introTime=0;updateIntro.lastShot=-1;state='intro';show(null);setTC(false);document.exitPointerLock();
-  $('hud').style.display='none';$('vig').style.display='none';$('cameraOpenBtn').style.display='none';$('introCinematic').classList.add('open');$('introCinematic').setAttribute('aria-hidden','false');setIntroCard(0);
-  if(enemyMixer&&killerAnim.actions.walk){const a=killerAnim.actions.walk;a.reset().setLoop(THREE.LoopRepeat,Infinity).play();killerAnim.current=a;}
-  const toy=animatronicRoster.actors.toy;if(toy&&toy.model)rosterAnim(toy,'walk');
+  introActive=true;introTime=0;state='intro';show(null);setTC(false);document.exitPointerLock();
+  $('hud').style.display='none';$('vig').style.display='none';$('cameraOpenBtn').style.display='none';
+  $('introCinematic').classList.add('open');$('introCinematic').setAttribute('aria-hidden','false');
+  $('msg').style.opacity='0';
+  // Continuous 3D fly-through: start at the entrance corridor, pass the party room and glide across the stage.
+  introCamPath=new THREE.CatmullRomCurve3([
+    new THREE.Vector3(7,1.78,34),new THREE.Vector3(7.5,1.78,28),new THREE.Vector3(12,1.78,22),
+    new THREE.Vector3(18,1.78,17),new THREE.Vector3(23,1.78,12),new THREE.Vector3(29,1.82,10),
+    new THREE.Vector3(35,1.82,10),new THREE.Vector3(31,1.78,17),new THREE.Vector3(27,1.78,23)
+  ]);
+  introLookPath=new THREE.CatmullRomCurve3([
+    new THREE.Vector3(15,1.1,34),new THREE.Vector3(15,1.1,24),new THREE.Vector3(23,1.1,17),
+    new THREE.Vector3(27,1.15,8),new THREE.Vector3(28,1.15,6),new THREE.Vector3(22,1.15,6),
+    new THREE.Vector3(28,1.15,11),new THREE.Vector3(31,1.1,18),new THREE.Vector3(27,1.1,25)
+  ]);
+  if(enemyMixer&&killerAnim.actions.idle){const a=killerAnim.actions.idle;a.reset().setLoop(THREE.LoopRepeat,Infinity).play();killerAnim.current=a;}
+  const toy=animatronicRoster.actors.toy;if(toy&&toy.mixer&&toy.actions?.idle)rosterAnim(toy,'idle');
   startAmb();startIntroMusic();
 }
 function finishIntro(){
-  if(!introActive)return;introActive=false;introCompletedThisSession=true;try{localStorage.setItem('bonniesTerrorIntroSeen','1');}catch(_){}
-  $('introCinematic').classList.remove('open','glitch');$('introCinematic').setAttribute('aria-hidden','true');$('introEvidence').classList.remove('show');stopIntroMusic();
-  if(enemyMixer&&killerAnim.actions.idle){if(killerAnim.current)killerAnim.current.fadeOut(.12);const a=killerAnim.actions.idle;a.reset().setLoop(THREE.LoopRepeat,Infinity).fadeIn(.12).play();killerAnim.current=a;}
-  const toy=animatronicRoster.actors.toy;if(toy&&toy.model)rosterAnim(toy,'idle');
+  if(!introActive)return;introActive=false;introCompletedThisSession=true;try{localStorage.setItem('bonniesTerrorIntro3dSeen','1');}catch(_){}
+  $('introCinematic').classList.remove('open','glitch');$('introCinematic').setAttribute('aria-hidden','true');stopIntroMusic();
   launchGameplay();
 }
 function skipIntro(){if(introActive)finishIntro();}
 function updateIntro(dt){
-  if(!introActive)return;introTime+=dt;const duration=2.7,total=introShots.length*duration;
-  if(introTime>=total){finishIntro();return;}
-  const i=Math.min(introShots.length-1,Math.floor(introTime/duration)),t0=(introTime-i*duration)/duration;
-  if(i!==updateIntro.lastShot){updateIntro.lastShot=i;setIntroCard(i);$('introCinematic').classList.remove('glitch');void $('introCinematic').offsetWidth;$('introCinematic').classList.add('glitch');}
-  const a=introShots[i],b=introShots[Math.min(i+1,introShots.length-1)],t=t0*t0*(3-2*t0);
-  camera.position.set(a.p[0]+(b.p[0]-a.p[0])*t,a.p[1]+(b.p[1]-a.p[1])*t,a.p[2]+(b.p[2]-a.p[2])*t);
-  camera.lookAt(a.look[0]+(b.look[0]-a.look[0])*t,a.look[1]+(b.look[1]-a.look[1])*t,a.look[2]+(b.look[2]-a.look[2])*t);
-  const toy=animatronicRoster.actors.toy;if(toy&&toy.mixer&&toy.model)toy.mixer.update(dt);
+  if(!introActive)return;
+  introTime+=dt;const duration=13.5,t=Math.min(1,introTime/duration);
+  // Smooth continuous travel, with a gentle curve through the complete Three.js scene.
+  const position=introCamPath.getPointAt(t),look=introLookPath.getPointAt(t);
+  camera.position.copy(position);camera.lookAt(look);
+  const toy=animatronicRoster.actors.toy;
+  if(toy?.mixer&&toy.model)toy.mixer.update(dt);
   if(enemyMixer&&killerAnim.current)enemyMixer.update(dt);
+  if(introTime>=duration)finishIntro();
 }
 function startGame(){
   initAudio();newGame();show(null);stopAmb();
-  try{if(!introSeen())beginIntro();else launchGameplay();}catch(_){$('introCinematic').classList.remove('open');launchGameplay();}
+  try{if(!introSeen())beginIntro();else launchGameplay();}
+  catch(_){$('introCinematic').classList.remove('open');launchGameplay();}
 }
-
 function pause() { $('cameraOpenBtn').style.display='none'; resetTouchState(); state = 'paused'; setTC(false); show('pause'); document.exitPointerLock(); duckAmb(true); }
 function resume() { $('cameraOpenBtn').style.display='block'; state = 'playing'; show(null); setTC(true); lock(); duckAmb(false); }
 function toMenu() {
@@ -1963,8 +1945,8 @@ function update(dt) {
     if (caughtTime > 2.5) { $('flash').style.opacity = 0; endGame('gameover'); }
   }
 
-  if (state !== 'caught') camera.position.set(player.x, ventState.inside ? .62 : EYE, player.z);
-  camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+  if (state !== 'caught' && state !== 'intro') camera.position.set(player.x, ventState.inside ? .62 : EYE, player.z);
+  if (state !== 'intro') camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
 
   if(animatronicRoster.activeId!=='springtrap'){bonnie.group.position.set(...animatronicRoster.actors.springtrap.home);bonnie.group.rotation.y=Math.PI;}
   else if(animatronicRoster.step==='chase'||animatronicRoster.step==='return'||state==='caught'){bonnie.group.position.set(bonnie.x,0,bonnie.z);bonnie.group.rotation.y=bonnie.heading;}

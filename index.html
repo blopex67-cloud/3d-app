@@ -665,20 +665,9 @@ function buildWorld() {
   });
 
   // Los créditos quedan en el menú; el muro del pasillo usa solo letras LED pegadas a la pared.
-  // Homenaje a AMYR: Spring Bonnie en el escenario central.
-  const amyrStageGroup = new THREE.Group();
-  amyrStageGroup.position.set(27, 0.63, 3 * CELL);
-  amyrStageGroup.rotation.y = Math.PI; // orientar al nuevo Spring Bonnie hacia el frente del escenario
-  worldGroup.add(amyrStageGroup);
-  springDisplay.group = amyrStageGroup; springDisplay.baseY = 0.63; springDisplay.group.visible=true;
-  // Nuevo Spring Bonnie con lentes, incluido en la aplicación por partes.
-  const springParts=Array.from({length:8},(_,i)=>`assets/bonnie_part_${String(i+1).padStart(2,'0')}.bin`);
-  Promise.all(springParts.map(url=>fetch(url).then(r=>{if(!r.ok)throw new Error(url+' '+r.status);return r.arrayBuffer();})))
-    .then(parts=>{const bytes=new Uint8Array(parts.reduce((n,p)=>n+p.byteLength,0));let offset=0;for(const part of parts){bytes.set(new Uint8Array(part),offset);offset+=part.byteLength;}
-      new GLTFLoader().parse(bytes.buffer,'',gltf=>{const actor=gltf.scene;actor.traverse(o=>{if(o.isMesh){o.frustumCulled=true;if(o.material){const mats=Array.isArray(o.material)?o.material:[o.material];mats.forEach(m=>m.side=THREE.DoubleSide);}}});fitModel(actor,2.3);amyrStageGroup.add(actor);springDisplay.root=actor;springDisplay.head=null;},err=>console.error('No se pudo procesar el nuevo Spring Bonnie:',err));
-    }).catch(err=>console.error('No se pudo cargar el nuevo Spring Bonnie:',err));
+  // Se quitó el animatrónico blanco del escenario. Se conservan la tarima y la radio.
 
-  // Los tres perseguidores empiezan en el escenario junto al Spring Bonnie amarillo.
+  // Enemigos activos: Toy Bonnie y Springtrap.
   loadRosterActor('toy');
 
   // Radio cercana al Spring Bonnie del escenario; música se filtra como radio vieja y se oye espacialmente.
@@ -1754,7 +1743,7 @@ new GLTFLoader().load('assets/springtrap-roster.glb',gltf=>{
   if(fallbackBonnie){bonnie.group.remove(fallbackBonnie);fallbackBonnie=null;}
   // Girar únicamente el modelo del asesino, incluso durante sus animaciones.
   const killerFacing = new THREE.Group();
-  killerFacing.rotation.y = Math.PI;
+  killerFacing.rotation.y = 0; // corregido: el modelo mira hacia delante al caminar, no de espaldas
   killerFacing.add(m);
   bonnie.group.add(killerFacing);enemyMixer=new THREE.AnimationMixer(m);
   const map={idle:/K40_IdleMenu$/,walk:/K40_WalkFT$/,run:/K40_RunFT$/,walkLeft:/K40_WalkLT$/,walkRight:/K40_WalkRT$/,attack:/K40_Attack_Wipe$/};

@@ -16,6 +16,10 @@
   .intro-rec span{color:#ff3448;animation:blink .8s steps(2) infinite}
   #introSkip{position:absolute;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));padding:10px 13px;border:1px solid #d9e6dc;background:#07100ddd;color:#fff;font:700 10px var(--mono);letter-spacing:.12em;touch-action:manipulation;pointer-events:auto}
   .intro-glitch{display:none}
+  #introCinematic.dark-cut{background:rgba(0,0,0,.88)}
+  #introCinematic.glitch-hit:after{content:'';position:absolute;inset:38% 0 55%;background:rgba(225,244,255,.28);mix-blend-mode:screen;animation:camGlitch .18s steps(2) both}
+  #introCinematic.dark-cut{background:rgba(0,0,0,.88)}
+  #introCinematic.glitch-hit:after{content:'';position:absolute;inset:38% 0 55%;background:rgba(225,244,255,.28);mix-blend-mode:screen;animation:camGlitch .18s steps(2) both}
   @keyframes blink{50%{opacity:0}}
   @keyframes glitch{0%,90%,100%{transform:none}91%{transform:translate(-4px,1px) skewX(6deg)}93%{transform:translate(5px,-1px)}95%{transform:translate(-2px,0) skewX(-5deg)}97%{transform:none}}
 
@@ -672,10 +676,26 @@ function buildWorld() {
     }
   });
 
-  // El animatrónico blanco del escenario fue retirado. Los dos modelos ya previstos
-  // para el escenario (Toy Bonnie y Springtrap, en sus posiciones de reposo) se conservan.
+  // Spring Bonnie amarillo original vuelve a la tarima; queda sentado/inactivo y no persigue.
+  const amyrStageGroup = new THREE.Group();
+  amyrStageGroup.name = 'Spring Bonnie amarillo sentado · escenario';
+  amyrStageGroup.position.set(27, 0.63, 3 * CELL);
+  amyrStageGroup.rotation.y = Math.PI;
+  worldGroup.add(amyrStageGroup);
+  springDisplay.group = amyrStageGroup; springDisplay.baseY = 0.63;
+  const springParts = Array.from({length:8},(_,i)=>`assets/bonnie_part_${String(i+1).padStart(2,'0')}.bin`);
+  Promise.all(springParts.map(url=>fetch(url).then(r=>{if(!r.ok)throw new Error(url+' '+r.status);return r.arrayBuffer();})))
+    .then(parts=>{
+      const bytes=new Uint8Array(parts.reduce((n,part)=>n+part.byteLength,0));let offset=0;
+      for(const part of parts){bytes.set(new Uint8Array(part),offset);offset+=part.byteLength;}
+      new GLTFLoader().parse(bytes.buffer,'',gltf=>{
+        const actor=gltf.scene;
+        actor.traverse(o=>{if(o.isMesh){o.frustumCulled=false;if(o.material){const mats=Array.isArray(o.material)?o.material:[o.material];mats.forEach(m=>m.side=THREE.DoubleSide);}}});
+        fitModel(actor,2.3);amyrStageGroup.add(actor);springDisplay.root=actor;springDisplay.head=null;
+      },err=>console.error('No se pudo procesar Spring Bonnie del escenario:',err));
+    }).catch(err=>console.error('No se pudo cargar Spring Bonnie del escenario:',err));
 
-  // Enemigos que sí salen a cazar: Toy Bonnie y Springtrap. Mimic permanece eliminado.
+  // El perseguidor blanco/verdoso se retira; Toy Bonnie queda como único enemigo activo.
   loadRosterActor('toy');
 
   // Radio cercana al Spring Bonnie del escenario; música se filtra como radio vieja y se oye espacialmente.
@@ -1010,18 +1030,30 @@ function newGame() {
 }
 
 let introTime=0,introActive=false,introCompletedThisSession=false,introMusicOsc=null,introMusicGain=null,introMusicTimer=0;
-let introCamPath=null,introLookPath=null;
-function introSeen(){try{return localStorage.getItem('bonniesTerrorIntro3dSeen')==='1'||introCompletedThisSession;}catch(_){return introCompletedThisSession;}}
+let introCamPath=null,introLookPath=null,introBeat=0,introTone=null,introToneGain=null;
+const introOriginalDead=new Map();
+function introSeen(){try{return localStorage.getItem('bonniesTerrorIntroDramaV1')==='1'||introCompletedThisSession;}catch(_){return introCompletedThisSession;}}
 function startIntroMusic(){
-  if(!actx||introMusicOsc)return;
+  if(!actx||introTone)return;
   const osc=actx.createOscillator(),gain=actx.createGain(),filter=actx.createBiquadFilter();
-  const notes=[146.83,174.61,196,174.61,130.81,146.83,110,130.81];let n=0,now=actx.currentTime;
-  osc.type='sine';osc.frequency.setValueAtTime(notes[0],now);filter.type='lowpass';filter.frequency.value=360;gain.gain.value=0;
-  osc.connect(filter);filter.connect(gain);gain.connect(master);osc.start();gain.gain.linearRampToValueAtTime(.025,now+1.4);
-  introMusicOsc=osc;introMusicGain=gain;
-  introMusicTimer=setInterval(()=>{if(!introMusicOsc||!actx)return;n=(n+1)%notes.length;const t=actx.currentTime;osc.frequency.setTargetAtTime(notes[n],t,.12);},650);
+  osc.type='sawtooth';osc.frequency.setValueAtTime(43,actx.currentTime);filter.type='lowpass';filter.frequency.value=115;
+  gain.gain.value=0;osc.connect(filter);filter.connect(gain);gain.connect(master);osc.start();
+  gain.gain.linearRampToValueAtTime(.018,actx.currentTime+3.2);introTone=osc;introToneGain=gain;
 }
-function stopIntroMusic(){if(introMusicTimer){clearInterval(introMusicTimer);introMusicTimer=0;}if(introMusicOsc&&actx){const osc=introMusicOsc,gain=introMusicGain;introMusicOsc=null;introMusicGain=null;gain.gain.cancelScheduledValues(actx.currentTime);gain.gain.setTargetAtTime(0,actx.currentTime,.15);setTimeout(()=>{try{osc.stop();}catch(_){}},600);}}
+function introSting(freq=48,vol=.12,duration=.45){
+  if(!actx)return;const o=actx.createOscillator(),g=actx.createGain(),f=actx.createBiquadFilter();
+  o.type='sine';o.frequency.setValueAtTime(freq,actx.currentTime);o.frequency.exponentialRampToValueAtTime(Math.max(24,freq*.58),actx.currentTime+duration);
+  f.type='lowpass';f.frequency.value=170;g.gain.setValueAtTime(vol,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+duration);
+  o.connect(f);f.connect(g);g.connect(master);o.start();o.stop(actx.currentTime+duration+.03);
+}
+function introPowerCut(ms=420){
+  for(const src of sources){if(!introOriginalDead.has(src))introOriginalDead.set(src,src.dead);src.dead=true;if(src.mat)src.mat.color.set(0x010104);}
+  $('introCinematic').classList.add('dark-cut');
+  setTimeout(()=>{for(const [src,wasDead] of introOriginalDead){src.dead=wasDead;if(src.mat&&src.base)src.mat.color.copy(src.base).multiplyScalar(wasDead?.15:1);}introOriginalDead.clear();$('introCinematic').classList.remove('dark-cut');},ms);
+}
+function introFlash(){const f=$('flash');f.style.transition='none';f.style.background='#d9f4ff';f.style.opacity='.82';requestAnimationFrame(()=>{f.style.transition='opacity .55s';f.style.opacity='0';});$('introCinematic').classList.add('glitch-hit');setTimeout(()=>$('introCinematic').classList.remove('glitch-hit'),180);}
+function stopIntroMusic(){if(introTone&&actx){const o=introTone,g=introToneGain;introTone=null;introToneGain=null;g.gain.cancelScheduledValues(actx.currentTime);g.gain.setTargetAtTime(0,actx.currentTime,.18);setTimeout(()=>{try{o.stop();}catch(_){}},800);}}
+
 function launchGameplay(){
   $('hud').style.display='block';$('vig').style.display='block';$('flash').style.opacity=0;$('cameraOpenBtn').style.display='block';
   state='playing';setTC(true);lock();if(!ambSrc)startAmb();
@@ -1034,28 +1066,35 @@ function beginIntro(){
   $('msg').style.opacity='0';
   // Continuous 3D fly-through: start at the entrance corridor, pass the party room and glide across the stage.
   introCamPath=new THREE.CatmullRomCurve3([
-    new THREE.Vector3(7,1.78,34),new THREE.Vector3(7.5,1.78,28),new THREE.Vector3(12,1.78,22),
-    new THREE.Vector3(18,1.78,17),new THREE.Vector3(23,1.78,12),new THREE.Vector3(29,1.82,10),
-    new THREE.Vector3(35,1.82,10),new THREE.Vector3(31,1.78,17),new THREE.Vector3(27,1.78,23)
+    new THREE.Vector3(7,1.7,34),new THREE.Vector3(7.5,1.68,29),new THREE.Vector3(10,1.62,24),
+    new THREE.Vector3(16,1.58,19),new THREE.Vector3(21,1.55,14),new THREE.Vector3(25,1.52,10),
+    new THREE.Vector3(28,1.48,8.4),new THREE.Vector3(30.5,1.5,9.5),new THREE.Vector3(33,1.65,13),
+    new THREE.Vector3(31,1.78,18),new THREE.Vector3(27,1.75,23)
   ]);
   introLookPath=new THREE.CatmullRomCurve3([
-    new THREE.Vector3(15,1.1,34),new THREE.Vector3(15,1.1,24),new THREE.Vector3(23,1.1,17),
-    new THREE.Vector3(27,1.15,8),new THREE.Vector3(28,1.15,6),new THREE.Vector3(22,1.15,6),
-    new THREE.Vector3(28,1.15,11),new THREE.Vector3(31,1.1,18),new THREE.Vector3(27,1.1,25)
+    new THREE.Vector3(13,1.1,34),new THREE.Vector3(15,1.05,26),new THREE.Vector3(22,1.05,19),
+    new THREE.Vector3(26,1.12,10),new THREE.Vector3(27,1.15,7),new THREE.Vector3(27,1.15,6),
+    new THREE.Vector3(27,1.2,6),new THREE.Vector3(26,1.1,8),new THREE.Vector3(24,1.05,12),
+    new THREE.Vector3(29,1.1,19),new THREE.Vector3(27,1.05,26)
   ]);
   if(enemyMixer&&killerAnim.actions.idle){const a=killerAnim.actions.idle;a.reset().setLoop(THREE.LoopRepeat,Infinity).play();killerAnim.current=a;}
   const toy=animatronicRoster.actors.toy;if(toy&&toy.mixer&&toy.actions?.idle)rosterAnim(toy,'idle');
-  startAmb();startIntroMusic();
+  startAmb();startIntroMusic();introBeat=0;introOriginalDead.clear();
 }
 function finishIntro(){
-  if(!introActive)return;introActive=false;introCompletedThisSession=true;try{localStorage.setItem('bonniesTerrorIntro3dSeen','1');}catch(_){}
-  $('introCinematic').classList.remove('open','glitch');$('introCinematic').setAttribute('aria-hidden','true');stopIntroMusic();
+  if(!introActive)return;introActive=false;introCompletedThisSession=true;try{localStorage.setItem('bonniesTerrorIntroDramaV1','1');}catch(_){}
+  $('introCinematic').classList.remove('open','glitch','dark-cut','glitch-hit');$('introCinematic').setAttribute('aria-hidden','true');$('flash').style.opacity='0';stopIntroMusic();for(const [src,wasDead] of introOriginalDead){src.dead=wasDead;}introOriginalDead.clear();
   launchGameplay();
 }
 function skipIntro(){if(introActive)finishIntro();}
 function updateIntro(dt){
   if(!introActive)return;
-  introTime+=dt;const duration=13.5,t=Math.min(1,introTime/duration);
+  introTime+=dt;const duration=21,t=Math.min(1,introTime/duration);
+  if(introTime>4.8&&introBeat<1){introBeat=1;introSting(39,.16,.85);}
+  if(introTime>9.2&&introBeat<2){introBeat=2;introPowerCut(540);introSting(56,.2,.72);}
+  if(introTime>14.6&&introBeat<3){introBeat=3;introSting(31,.23,1.05);}
+  if(introTime>18.7&&introBeat<4){introBeat=4;introFlash();introSting(72,.15,.42);}
+  if(introToneGain&&actx){const pulse=.012+Math.pow(Math.max(0,Math.sin(introTime*1.8)),12)*.024;introToneGain.gain.setTargetAtTime(pulse,actx.currentTime,.04);}
   // Smooth continuous travel, with a gentle curve through the complete Three.js scene.
   const position=introCamPath.getPointAt(t),look=introLookPath.getPointAt(t);
   camera.position.copy(position);camera.lookAt(look);
@@ -1366,7 +1405,7 @@ function rosterPhaseUpdate(dt){
   if(state!=='playing'||diplomaOpen||cameraOpen)return;
   if(animatronicRoster.step==='wait'){
     if(state==='playing')animatronicRoster.wait-=dt;
-    if(animatronicRoster.wait<=0){const ids=['toy','springtrap'];beginRosterTurn(animatronicRoster.actors[ids[animatronicRoster.turn%ids.length]]);}
+    if(animatronicRoster.wait<=0){const ids=['toy'];beginRosterTurn(animatronicRoster.actors[ids[animatronicRoster.turn%ids.length]]);}
   }else{
     const a=animatronicRoster.actors[animatronicRoster.activeId],g=actorGroup(a);
     if(a&&g){
@@ -1793,26 +1832,9 @@ function makeFallbackBonnie() {
 
 let fallbackBonnie = null, glbLoaded = false, glbLoadTimer = 0;
 function bonnieReady(message){bonnie.ready=true;$('playBtn').disabled=false;$('loadTxt').textContent=message||'LISTO';}
-// El perseguidor ahora es Springtrap optimizado: cinco animaciones guardadas, texturas reducidas y pistas resampleadas.
-fallbackBonnie=makeFallbackBonnie();bonnie.group.add(fallbackBonnie);bonnieReady('LISTO · CARGANDO SPRINGTRAP');
-glbLoadTimer=setTimeout(()=>{if(!glbLoaded)$('loadTxt').textContent='LISTO · CARGANDO ASESINO';},9000);
-new GLTFLoader().load('assets/springtrap-roster.glb',gltf=>{
-  glbLoaded=true;clearTimeout(glbLoadTimer);const m=gltf.scene;
-  m.traverse(o=>{if(o.isMesh){o.frustumCulled=false;if(o.material){const arr=Array.isArray(o.material)?o.material:[o.material];arr.forEach(mat=>{mat.side=THREE.DoubleSide;if(mat.map)mat.map.anisotropy=2;});}}});
-  fitModel(m,2.7);enemyRig.root=m;m.updateMatrixWorld(true);
-  // Omitir arma secundaria opcional para reducir draw calls y mantener silueta de asesino.
-  m.traverse(o=>{if(o.isMesh&&/AltWeaponMesh/i.test(o.name))o.visible=false;});
-  if(fallbackBonnie){bonnie.group.remove(fallbackBonnie);fallbackBonnie=null;}
-  // Girar únicamente el modelo del asesino, incluso durante sus animaciones.
-  const killerFacing = new THREE.Group();
-  killerFacing.rotation.y = 0; // corregido: el modelo mira hacia delante al caminar, no de espaldas
-  killerFacing.add(m);
-  bonnie.group.add(killerFacing);enemyMixer=new THREE.AnimationMixer(m);
-  const map={idle:/K40_IdleMenu$/,walk:/K40_WalkFT$/,run:/K40_RunFT$/,walkLeft:/K40_WalkLT$/,walkRight:/K40_WalkRT$/,attack:/K40_Attack_Wipe$/};
-  for(const [key,re] of Object.entries(map)){const clip=gltf.animations.find(a=>re.test(a.name));if(clip){const action=enemyMixer.clipAction(clip);killerAnim.actions[key]=action;if(key==='idle'){action.setLoop(THREE.LoopRepeat,Infinity);action.play();killerAnim.current=action;}}}
-  if(enemyRig.root)enemyRig.root.rotation.y=0;
-  bonnieReady('ASESINO LISTO');
-},undefined,err=>{console.error('No cargó Springtrap:',err);clearTimeout(glbLoadTimer);bonnieReady('ASESINO · MODO LIGERO');});
+// El modelo blanco/verdoso de Springtrap fue retirado del juego.
+bonnie.group.visible=false;
+bonnieReady('LISTO · TOY BONNIE');
 
 function updateSpringDisplay(dt) {
   if (!springDisplay.root || !springDisplay.head || !springDisplay.headBase || state==='menu' || state==='help') return;
@@ -1843,7 +1865,7 @@ const HRS = ['12', '1', '2', '3', '4', '5', '6'];
 function update(dt) {
   const t = performance.now() / 1000;
   updateIntro(dt);
-  if(state==='intro'){updateRadio(dt);return;}
+  if(state==='intro'){updateLights(dt);updateRadio(dt);updateSpringDisplay(dt);return;}
   updateSpringDisplay(dt);
   updateLights(dt);
   updateRadio(dt);
@@ -1948,11 +1970,10 @@ function update(dt) {
   if (state !== 'caught' && state !== 'intro') camera.position.set(player.x, ventState.inside ? .62 : EYE, player.z);
   if (state !== 'intro') camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
 
-  if(animatronicRoster.activeId!=='springtrap'){bonnie.group.position.set(...animatronicRoster.actors.springtrap.home);bonnie.group.rotation.y=Math.PI;}
-  else if(animatronicRoster.step==='chase'||animatronicRoster.step==='return'||state==='caught'){bonnie.group.position.set(bonnie.x,0,bonnie.z);bonnie.group.rotation.y=bonnie.heading;}
+  bonnie.group.visible=false;
   const auraDist = Math.hypot(bonnie.x - player.x, bonnie.z - player.z);
   bonnieAura.position.set(bonnie.x, 1.65, bonnie.z);
-  bonnieAura.visible = animatronicRoster.activeId==='springtrap'&&bonnie.active && (auraDist < 18 || bonnie.stun > 0);
+  bonnieAura.visible = false;
   bonnieAura.material.color.setHex(bonnie.stun > 0 ? 0x5de5ff : 0xffffff);
   bonnieAura.material.opacity = bonnie.stun > 0 ? 0.88 : 0.42;
 
